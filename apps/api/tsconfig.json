@@ -1,7 +1,6 @@
 {
+  // 不设 baseUrl：tsconfig.base.json 里的 paths 依赖相对该文件（仓库根）解析，
+  // 一旦这里设了 baseUrl，继承来的 paths 会改为相对 apps/api 解析而全部失效。
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "baseUrl": "./"
-  },
   "include": ["src", "test"]
 }

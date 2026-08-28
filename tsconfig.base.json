@@ -11,6 +11,17 @@
     // 注意：各包的 tsconfig.build.json 必须把它置空，否则 tsc 会把别的包的
     // 源码当成本包的输入文件，撞上 rootDir 限制。
     "customConditions": ["@nest-admin/source"],
+    // paths 与上面的 customConditions 指向同一批源码，是刻意的双保险：
+    // customConditions 需要 TS 5.0+ 且要求工具链正确读到 exports 条件，
+    // 编辑器用的 TS 版本不一定满足；paths 则是所有 TS 版本都认的老机制。
+    // 两者任一生效都能把 @nest-admin/* 解析到源码。
+    // 路径相对本文件所在目录（仓库根）解析，所以任何继承它的包都不要再设 baseUrl，
+    // 否则 paths 会改为相对那个 baseUrl 解析而全部失效。
+    "paths": {
+      "@nest-admin/shared": ["./packages/shared/src/index.ts"],
+      "@nest-admin/shared/node": ["./packages/shared/src/node/index.ts"],
+      "@nest-admin/database": ["./packages/database/src/index.ts"]
+    },
     "esModuleInterop": true,
     "isolatedModules": true,
     "declaration": true,
