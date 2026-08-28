@@ -1,0 +1,10 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+allowBuilds:
+  # 仅遥测上报，无需构建
+  '@scarf/scarf': false
+  # drizzle-kit 依赖 esbuild，其 postinstall 负责下载对应平台的二进制
+  esbuild: true
+  unrs-resolver: true
