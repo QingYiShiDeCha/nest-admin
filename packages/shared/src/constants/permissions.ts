@@ -15,6 +15,8 @@ export const PERMISSIONS = {
   USER_DELETE: 'system:user:delete',
   /** 给用户分配角色，与改用户资料分开，因为它实际是在授权 */
   USER_ASSIGN_ROLE: 'system:user:assign-role',
+  /** 强制用户下线：吊销其全部 refreshToken */
+  USER_FORCE_LOGOUT: 'system:user:force-logout',
 
   ROLE_LIST: 'system:role:list',
   ROLE_READ: 'system:role:read',
@@ -55,6 +57,11 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   {
     code: PERMISSIONS.USER_ASSIGN_ROLE,
     name: '给用户分配角色',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.USER_FORCE_LOGOUT,
+    name: '强制用户下线',
     module: 'system',
   },
   { code: PERMISSIONS.ROLE_LIST, name: '查询角色列表', module: 'system' },

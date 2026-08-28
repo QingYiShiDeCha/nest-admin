@@ -62,6 +62,19 @@ export class AuthController {
     return this.authService.refresh(dto.refreshToken);
   }
 
+  @Public()
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @OperationLog({ module: '认证', action: '登出' })
+  @ApiOperation({
+    summary: '登出，吊销本次提交的 refreshToken',
+    description:
+      '只影响当前这一个会话，其他设备不受影响。令牌本身无效时同样返回 204——正在退出的用户不需要知道令牌为什么坏了。注意 accessToken 仍会在剩余有效期内可用。',
+  })
+  logout(@Body() dto: RefreshTokenDto): Promise<void> {
+    return this.authService.logout(dto.refreshToken);
+  }
+
   @Get('profile')
   @ApiBearerAuth()
   @ApiOperation({

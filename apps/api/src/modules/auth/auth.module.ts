@@ -7,11 +7,13 @@ import type { Env } from '../../config/env.validation';
 import { UserModule } from '../user/user.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { RefreshTokenModule } from './refresh-token.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
   imports: [
     UserModule,
+    RefreshTokenModule,
     PassportModule,
     // 这里注册的是 accessToken 的默认签名配置，refreshToken 在 service 里单独传 secret
     JwtModule.registerAsync({

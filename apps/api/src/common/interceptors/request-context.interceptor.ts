@@ -12,24 +12,39 @@ import type { AuthUser } from '../../modules/auth/interfaces/auth-user.interface
 import type { AppClsStore } from '../context/request-context.service';
 
 /**
- * 把当前登录用户 id 写进 CLS，供 service 层填充 created_by / updated_by。
+ * 把当前请求的上下文写进 CLS：登录用户 id（供审计字段）、
+ * 客户端 IP 与 UA（供 refreshToken 的会话记录）。
  *
  * 用拦截器而不是中间件：中间件在守卫之前执行，那时 request.user 还不存在。
  * 拦截器一定在所有守卫之后运行，此时 JwtAuthGuard 已经把 AuthUser 挂上去了。
  *
- * @Public() 接口不会有 user，此时不写入，RequestContext.userId 返回 null。
+ * @Public() 接口不会有 user，此时只写 ip/ua，userId 保持为空。
  */
 @Injectable()
-export class CurrentUserInterceptor implements NestInterceptor {
+export class RequestContextInterceptor implements NestInterceptor {
   constructor(private readonly cls: ClsService<AppClsStore>) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    if (context.getType() !== 'http') {
+      return next.handle();
+    }
+
     const request = context
       .switchToHttp()
       .getRequest<Request & { user?: AuthUser }>();
 
     if (request.user) {
       this.cls.set('userId', request.user.id);
+    }
+
+    if (request.ip) {
+      this.cls.set('ip', request.ip);
+    }
+
+    const userAgent = request.get('user-agent');
+
+    if (userAgent) {
+      this.cls.set('userAgent', userAgent);
     }
 
     return next.handle();

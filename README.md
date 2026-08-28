@@ -122,6 +122,14 @@ pnpm dev
 
 `GET /menus/mine` 是前端渲染侧边栏的入口，不需要菜单管理权限。超管拿到全部启用菜单，其余按角色授权返回，并且**会自动补齐授权节点的祖先**：只授子菜单而没授父目录时，子节点会因为找不到父亲而在建树时被丢掉，整块入口就消失了。反过来，停用一个目录会连带隐藏它下面的所有入口。`visible: false` 的节点仍会返回，它表示「不在侧边栏显示但路由可访问」（详情页那类），由前端决定怎么处理。
 
+**refreshToken 可吊销，且每次刷新都轮换**。`sys_refresh_token` 记录每个 refreshToken 的 jti，刷新时作废旧 jti 并签发新的。存 jti 而不存 token 本身：token 是 bearer 凭证，落库等于多一处泄漏面，而签名校验由 JWT 自己完成，这张表只回答「这个 jti 还有效吗」。
+
+**「已吊销」分两种，混为一谈会出 bug**。`replaced_by_jti` 非空表示它是被轮换掉的——正常客户端拿到新 token 后不会再用旧的，旧的再次出现说明被复制走了，此时吊销该用户全部会话并要求重新登录。`replaced_by_jti` 为空则是主动登出、改密或被踢下线，属于预期内失效，只拒绝这一次请求。我最初把两者都当成盗用，结果在一台设备上登出会把其他设备的登录态一起弄掉，`auth.service.spec.ts` 里有专门的回归用例守着这条。
+
+改密码和软删除用户会自动吊销该用户全部会话——密码泄漏后改密是第一反应，如果旧 refreshToken 还能继续换新，改密就等于没改。
+
+**accessToken 仍是无状态的**，吊销 refreshToken 不会让已签发的 accessToken 立刻失效，它最多再活 `JWT_ACCESS_EXPIRES_IN`（默认 30 分钟）。需要立刻阻断请把用户状态改成 `disabled`，那是每次请求都会校验的。
+
 **操作日志**。所有写操作（POST/PUT/PATCH/DELETE）由 `OperationLogInterceptor` 自动记录，无需在每个 service 里手写。GET 不记——量级太大且没有审计价值，记了只会淹没真正要看的东西。用 `@OperationLog({ module, action })` 补上可读的中文标签，不标也会记录，只是只能靠 method + path 辨认；确实不该记的用 `@SkipOperationLog()`。
 
 **参数快照会脱敏**。命中 `password|token|secret|authorization|cookie|credential` 的键一律替换成 `***`，递归处理嵌套对象和数组。这不是可选项：登录失败的请求同样会被记录，而它的 body 里正好是明文密码。`redact.spec.ts` 专门覆盖了各种形态，包括大小写混写和循环引用。
@@ -187,13 +195,15 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | GET | `/api/health` | 公开 | 健康检查，数据库不通时返回 `degraded` |
 | POST | `/api/auth/register` | 公开 | 注册并直接返回 token |
 | POST | `/api/auth/login` | 公开 | 账号密码登录 |
-| POST | `/api/auth/refresh` | 公开 | 用 refreshToken 换新 token 对 |
+| POST | `/api/auth/refresh` | 公开 | 用 refreshToken 换新 token 对（会轮换旧的） |
+| POST | `/api/auth/logout` | 公开 | 登出，吊销本次提交的 refreshToken |
 | GET | `/api/auth/profile` | 需要 | 当前登录用户信息，含角色码与权限码 |
 | GET | `/api/users` | `system:user:list` | 分页查询，支持 `keyword` / `status` |
 | POST | `/api/users` | `system:user:create` | 新增用户 |
 | GET | `/api/users/:id` | `system:user:read` | 用户详情 |
 | PATCH | `/api/users/:id` | `system:user:update` | 更新用户（不含用户名和密码） |
 | DELETE | `/api/users/:id` | `system:user:delete` | 删除用户 |
+| POST | `/api/users/:id/force-logout` | `system:user:force-logout` | 强制该用户下线，吊销其全部会话 |
 | PUT | `/api/users/me/password` | 仅需登录 | 修改自己的密码，需校验旧密码 |
 | GET | `/api/users/:id/roles` | `system:user:assign-role` | 用户已分配的角色 id，供分配界面回显 |
 | PUT | `/api/users/:id/roles` | `system:user:assign-role` | 全量替换用户的角色 |
@@ -219,7 +229,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 按当前范围刻意留白的部分，后续要做时的落点：
 
 - **日志的归档与清理**。`sys_operation_log` 只增不减，长期运行需要按 `created_at` 定期归档或分区。
-- **refreshToken 吊销**。现在的刷新是无状态的，只验签名和类型，签发后无法单独踢下线。要支持就得把 token 的 `jti` 存进 Redis 做白名单。
+- **会话列表接口**。`sys_refresh_token` 已经记了每个会话的 IP 与 UA，但还没有「我的登录设备」这类查询与单独下线的接口。
 - **限流的分布式存储**。当前计数在进程内存中，多实例部署时配额会按实例数翻倍。
 - **操作日志、文件上传、Redis 缓存、软删除**。
 - **`JwtStrategy` 每请求回库**。当前每个受保护请求都会按主键查一次用户，好处是禁用/删除立即生效，量大时需要在这里加缓存。

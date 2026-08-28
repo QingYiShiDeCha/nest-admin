@@ -9,10 +9,11 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { RequestContextModule } from './common/context/request-context.module';
 import { AppThrottlerGuard } from './common/guards/throttler.guard';
-import { CurrentUserInterceptor } from './common/interceptors/current-user.interceptor';
+import { RequestContextInterceptor } from './common/interceptors/request-context.interceptor';
 import { validateEnv, type Env } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { RefreshTokenModule } from './modules/auth/refresh-token.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PermissionGuard } from './modules/rbac/guards/permission.guard';
 import { OperationLogInterceptor } from './modules/operation-log/operation-log.interceptor';
@@ -31,7 +32,7 @@ import { UserModule } from './modules/user/user.module';
       validate: validateEnv,
     }),
     // 中间件负责建立 AsyncLocalStorage 上下文（此时还没认证，拿不到用户）；
-    // 真正写入 userId 的是 CurrentUserInterceptor，它在守卫之后执行。
+    // 真正写入内容的是 RequestContextInterceptor，它在守卫之后执行。
     ClsModule.forRoot({ global: true, middleware: { mount: true } }),
     RequestContextModule,
     // 只声明一个默认限流器，登录这类需要收紧的接口用 @Throttle 就地覆盖。
@@ -48,6 +49,7 @@ import { UserModule } from './modules/user/user.module';
       }),
     }),
     DatabaseModule,
+    RefreshTokenModule,
     OperationLogModule,
     RbacModule,
     AuthModule,
@@ -65,10 +67,9 @@ import { UserModule } from './modules/user/user.module';
     { provide: APP_GUARD, useClass: AppThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
-    // 顺序同样重要：CurrentUserInterceptor 先把 userId 写进 CLS，
-    // OperationLogInterceptor 再记录（它读的是 request.user，不依赖 CLS，
-    // 但保持这个顺序能让后续从上下文取值的改动不出意外）。
-    { provide: APP_INTERCEPTOR, useClass: CurrentUserInterceptor },
+    // 顺序同样重要：RequestContextInterceptor 先把 userId / ip / UA 写进 CLS，
+    // 后面的拦截器和 service 才能从上下文取到。
+    { provide: APP_INTERCEPTOR, useClass: RequestContextInterceptor },
     { provide: APP_INTERCEPTOR, useClass: OperationLogInterceptor },
   ],
 })

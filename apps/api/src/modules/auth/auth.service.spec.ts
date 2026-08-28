@@ -5,8 +5,10 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { hash } from 'bcryptjs';
 
 import type { SafeUser } from '@nest-admin/database';
+import { RequestContext } from '../../common/context/request-context.service';
 import { UserService } from '../user/user.service';
 import { AuthService } from './auth.service';
+import { RefreshTokenService } from './refresh-token.service';
 import type { JwtPayload } from './interfaces/jwt-payload.interface';
 
 const ACCESS_SECRET = 'unit-test-access-secret';
@@ -48,6 +50,12 @@ describe('AuthService', () => {
     >
   >;
   let passwordHash: string;
+  let refreshTokens: jest.Mocked<
+    Pick<
+      RefreshTokenService,
+      'issue' | 'check' | 'rotate' | 'revoke' | 'revokeAllForUser'
+    >
+  >;
 
   beforeAll(async () => {
     passwordHash = await hash(PASSWORD, 4);
@@ -60,6 +68,17 @@ describe('AuthService', () => {
       verifyPassword: jest.fn(),
       touchLastLogin: jest.fn().mockResolvedValue(undefined),
       findById: jest.fn().mockResolvedValue(USER),
+    };
+
+    refreshTokens = {
+      issue: jest.fn().mockResolvedValue('jti-new'),
+      // 默认当作有效会话，需要测异常分支的用例自行覆盖
+      check: jest
+        .fn()
+        .mockResolvedValue({ ok: true, record: { jti: 'jti-old' } }),
+      rotate: jest.fn().mockResolvedValue('jti-rotated'),
+      revoke: jest.fn().mockResolvedValue(undefined),
+      revokeAllForUser: jest.fn().mockResolvedValue(2),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -75,6 +94,11 @@ describe('AuthService', () => {
         {
           provide: ConfigService,
           useValue: { get: (key: string) => CONFIG[key] },
+        },
+        { provide: RefreshTokenService, useValue: refreshTokens },
+        {
+          provide: RequestContext,
+          useValue: { client: () => ({ ip: '127.0.0.1', userAgent: 'jest' }) },
         },
       ],
     }).compile();
@@ -141,7 +165,12 @@ describe('AuthService', () => {
 
   it('refresh 能换出新 token 对', async () => {
     const refreshToken = await jwtService.signAsync(
-      { sub: USER.id, username: USER.username, type: 'refresh' },
+      {
+        sub: USER.id,
+        username: USER.username,
+        type: 'refresh',
+        jti: 'jti-old',
+      },
       { secret: REFRESH_SECRET, expiresIn: '7d' },
     );
 
@@ -157,7 +186,7 @@ describe('AuthService', () => {
   it('拿 accessToken 当 refreshToken 用会被拒绝', async () => {
     // 故意用 refresh 密钥签一个 access 类型的 token，绕过签名校验只留类型校验
     const wrongTypeToken = await jwtService.signAsync(
-      { sub: USER.id, username: USER.username, type: 'access' },
+      { sub: USER.id, username: USER.username, type: 'access', jti: 'x' },
       { secret: REFRESH_SECRET },
     );
 
@@ -168,12 +197,83 @@ describe('AuthService', () => {
 
   it('refreshToken 签名不对时抛 401', async () => {
     const forged = await jwtService.signAsync(
-      { sub: USER.id, username: USER.username, type: 'refresh' },
+      { sub: USER.id, username: USER.username, type: 'refresh', jti: 'x' },
       { secret: 'some-other-secret' },
     );
 
     await expect(service.refresh(forged)).rejects.toThrow(
       new UnauthorizedException('refreshToken 无效或已过期'),
     );
+  });
+
+  const signRefresh = (jti: string | undefined) =>
+    jwtService.signAsync(
+      {
+        sub: USER.id,
+        username: USER.username,
+        type: 'refresh',
+        ...(jti ? { jti } : {}),
+      },
+      { secret: REFRESH_SECRET, expiresIn: '7d' },
+    );
+
+  it('刷新时会轮换：旧 jti 作废并签发新的', async () => {
+    await service.refresh(await signRefresh('jti-old'));
+
+    expect(refreshTokens.rotate).toHaveBeenCalledWith(
+      'jti-old',
+      USER.id,
+      expect.any(Date),
+      { ip: '127.0.0.1', userAgent: 'jest' },
+    );
+  });
+
+  it('已吊销的 refreshToken 再次使用会被判定为盗用，并踢掉该用户全部会话', async () => {
+    refreshTokens.check.mockResolvedValue({ ok: false, reason: 'reused' });
+
+    await expect(service.refresh(await signRefresh('jti-old'))).rejects.toThrow(
+      new UnauthorizedException(
+        '检测到令牌重复使用，出于安全考虑已退出所有登录',
+      ),
+    );
+    expect(refreshTokens.revokeAllForUser).toHaveBeenCalledWith(USER.id);
+  });
+
+  it('主动登出后再用该令牌只拒绝这一次，绝不连坐其他设备', async () => {
+    // revoked 与 reused 的区别在于是否被轮换过。若把两者混为一谈，
+    // 用户在一台设备上登出会把手机上的登录态也一起弄掉。
+    refreshTokens.check.mockResolvedValue({ ok: false, reason: 'revoked' });
+
+    await expect(service.refresh(await signRefresh('jti-old'))).rejects.toThrow(
+      new UnauthorizedException('登录态已失效，请重新登录'),
+    );
+    expect(refreshTokens.revokeAllForUser).not.toHaveBeenCalled();
+  });
+
+  it('库里查不到的 jti 按无效处理，且不误伤其他会话', async () => {
+    refreshTokens.check.mockResolvedValue({ ok: false, reason: 'unknown' });
+
+    await expect(service.refresh(await signRefresh('ghost'))).rejects.toThrow(
+      new UnauthorizedException('refreshToken 无效或已过期'),
+    );
+    expect(refreshTokens.revokeAllForUser).not.toHaveBeenCalled();
+  });
+
+  it('没有 jti 的旧版 token 要求重新登录', async () => {
+    await expect(service.refresh(await signRefresh(undefined))).rejects.toThrow(
+      new UnauthorizedException('refreshToken 格式已过期，请重新登录'),
+    );
+  });
+
+  it('登出只吊销当前这一个会话', async () => {
+    await service.logout(await signRefresh('jti-old'));
+
+    expect(refreshTokens.revoke).toHaveBeenCalledWith('jti-old');
+    expect(refreshTokens.revokeAllForUser).not.toHaveBeenCalled();
+  });
+
+  it('登出时令牌本身无效也不报错', async () => {
+    await expect(service.logout('not-a-jwt')).resolves.toBeUndefined();
+    expect(refreshTokens.revoke).not.toHaveBeenCalled();
   });
 });

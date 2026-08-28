@@ -58,6 +58,21 @@ export class UserController {
     return this.userService.changePassword(userId, dto);
   }
 
+  @Post(':id/force-logout')
+  @Permissions(PERMISSIONS.USER_FORCE_LOGOUT)
+  @HttpCode(HttpStatus.OK)
+  @OperationLog({ module: '用户管理', action: '强制下线' })
+  @ApiOperation({
+    summary: '强制该用户下线，吊销其全部 refreshToken',
+    description:
+      '已签发的 accessToken 仍会在剩余有效期内可用；需要立刻阻断请把用户状态改为 disabled，那是每次请求都会校验的。',
+  })
+  forceLogout(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<{ revokedSessions: number }> {
+    return this.userService.forceLogout(id);
+  }
+
   @Get(':id')
   @Permissions(PERMISSIONS.USER_READ)
   @ApiOperation({ summary: '查询用户详情' })

@@ -13,6 +13,7 @@ import { compare, hash } from 'bcryptjs';
 import { and, count, desc, eq, isNull, like, sql, type SQL } from 'drizzle-orm';
 
 import { RequestContext } from '../../common/context/request-context.service';
+import { RefreshTokenService } from '../auth/refresh-token.service';
 import type { Env } from '../../config/env.validation';
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
 import type { ChangePasswordDto } from './dto/change-password.dto';
@@ -50,6 +51,7 @@ export class UserService {
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     private readonly config: ConfigService<Env, true>,
     private readonly ctx: RequestContext,
+    private readonly refreshTokens: RefreshTokenService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<SafeUser> {
@@ -165,6 +167,17 @@ export class UserService {
         ...this.ctx.auditOnUpdate(),
       })
       .where(alive(eq(users.id, id)));
+
+    // 改完密码让所有会话失效：密码泄漏后改密是第一反应，
+    // 如果旧的 refreshToken 还能继续换新，改密就等于没改
+    await this.refreshTokens.revokeAllForUser(id);
+  }
+
+  /** 管理员强制某用户下线，返回被吊销的会话数 */
+  async forceLogout(id: number): Promise<{ revokedSessions: number }> {
+    await this.findById(id);
+
+    return { revokedSessions: await this.refreshTokens.revokeAllForUser(id) };
   }
 
   /** 软删除。用数据库端的 CURRENT_TIMESTAMP，与 created_at/updated_at 同源避免时钟偏差 */
@@ -175,6 +188,9 @@ export class UserService {
       .update(users)
       .set({ deletedAt: sql`CURRENT_TIMESTAMP`, ...this.ctx.auditOnUpdate() })
       .where(alive(eq(users.id, id)));
+
+    // 人都删了，残留的会话没有存在意义
+    await this.refreshTokens.revokeAllForUser(id);
   }
 
   async touchLastLogin(id: number): Promise<void> {

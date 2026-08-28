@@ -8,6 +8,11 @@ export interface JwtPayload {
   username: string;
   /** 区分 access / refresh，避免拿 accessToken 去换新 token */
   type: TokenType;
+  /**
+   * 仅 refreshToken 有。对应 sys_refresh_token.jti，
+   * 刷新时靠它查库判断是否已被吊销——accessToken 保持无状态。
+   */
+  jti?: string;
 }
 
 export interface AuthTokens {
