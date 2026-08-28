@@ -6,7 +6,7 @@ import {
 } from '@nest-admin/database';
 import { SUPER_ADMIN_ROLE_CODE } from '@nest-admin/shared';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
 
@@ -17,6 +17,13 @@ export interface UserAuthorization {
   permissions: string[];
   /** 是否持有内置超管角色，持有则跳过权限比对 */
   isSuperAdmin: boolean;
+}
+
+export interface PermissionCatalogItem {
+  id: number;
+  code: string;
+  name: string;
+  module: string | null;
 }
 
 @Injectable()
@@ -73,5 +80,22 @@ export class PermissionService {
       permissions: codes.map((row) => row.code),
       isSuperAdmin,
     };
+  }
+
+  /**
+   * 权限码目录，供角色授权界面拉取可选项。
+   * 数量是接口个数量级（几十到几百），不分页，一次取完前端按 module 分组即可。
+   */
+  async findCatalog(): Promise<PermissionCatalogItem[]> {
+    return this.db
+      .select({
+        id: permissions.id,
+        code: permissions.code,
+        name: permissions.name,
+        module: permissions.module,
+      })
+      .from(permissions)
+      .where(isNull(permissions.deletedAt))
+      .orderBy(asc(permissions.module), asc(permissions.code));
   }
 }

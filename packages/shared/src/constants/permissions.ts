@@ -13,6 +13,19 @@ export const PERMISSIONS = {
   USER_CREATE: 'system:user:create',
   USER_UPDATE: 'system:user:update',
   USER_DELETE: 'system:user:delete',
+  /** 给用户分配角色，与改用户资料分开，因为它实际是在授权 */
+  USER_ASSIGN_ROLE: 'system:user:assign-role',
+
+  ROLE_LIST: 'system:role:list',
+  ROLE_READ: 'system:role:read',
+  ROLE_CREATE: 'system:role:create',
+  ROLE_UPDATE: 'system:role:update',
+  ROLE_DELETE: 'system:role:delete',
+  /** 给角色配置权限码与菜单 */
+  ROLE_ASSIGN: 'system:role:assign',
+
+  /** 权限码目录只读，供角色授权界面拉取可选项 */
+  PERMISSION_LIST: 'system:permission:list',
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -30,6 +43,26 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   { code: PERMISSIONS.USER_CREATE, name: '新增用户', module: 'system' },
   { code: PERMISSIONS.USER_UPDATE, name: '更新用户', module: 'system' },
   { code: PERMISSIONS.USER_DELETE, name: '删除用户', module: 'system' },
+  {
+    code: PERMISSIONS.USER_ASSIGN_ROLE,
+    name: '给用户分配角色',
+    module: 'system',
+  },
+  { code: PERMISSIONS.ROLE_LIST, name: '查询角色列表', module: 'system' },
+  { code: PERMISSIONS.ROLE_READ, name: '查看角色详情', module: 'system' },
+  { code: PERMISSIONS.ROLE_CREATE, name: '新增角色', module: 'system' },
+  { code: PERMISSIONS.ROLE_UPDATE, name: '更新角色', module: 'system' },
+  { code: PERMISSIONS.ROLE_DELETE, name: '删除角色', module: 'system' },
+  {
+    code: PERMISSIONS.ROLE_ASSIGN,
+    name: '配置角色的权限与菜单',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.PERMISSION_LIST,
+    name: '查询权限码目录',
+    module: 'system',
+  },
 ];
 
 /**

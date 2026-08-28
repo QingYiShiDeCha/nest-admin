@@ -114,6 +114,10 @@ pnpm dev
 
 **超管短路**。持有 `super_admin` 角色的用户在 `PermissionGuard` 里直接放行，不参与权限码比对。这不是图省事——没有这条兜底，一旦权限数据配错或被清空，管理员会连「修复权限」的接口都调不了，只能去数据库手工插数据。所以超管的 `permissions` 字段返回空数组，前端见到 `isSuperAdmin: true` 应视为拥有全部权限。
 
+**授权接口是全量替换语义**。`PUT /roles/:id/permissions` 传入的集合就是最终结果，未包含的视为撤销，空数组清空全部。比增量的 add/remove 少一半接口，也不会因为前端漏发某一项而产生「以为撤销了其实没撤销」的偏差。替换在事务里完成（先删后插），已实测插入失败时删除会回滚。
+
+**几条防自锁规则**。内置角色（`is_system`）不可删除、不可停用、不可改角色码——停用超管角色会把所有管理员一起锁在系统外；改角色码会让守卫里的超管短路判断失效。另外不允许修改自己的角色，否则误摘超管后只能去数据库手工恢复。改名称和备注不受限制。
+
 **权限变更即时生效**。`JwtStrategy` 每个请求回库查用户与授权，所以改角色授权、禁用角色、禁用用户都不需要重新登录就会生效。代价是每个受保护请求多几次查询；要优化就在 `PermissionService` 加缓存，届时需一并解决「改权限后缓存何时失效」的一致性问题。
 
 **注入数据库**。任何 service 里 `@Inject(DRIZZLE) private readonly db: DrizzleDB`，即可获得带完整表结构推断的 Drizzle 实例。`DatabaseModule` 是 `@Global` 的，不必在各模块重复 import。
@@ -167,12 +171,22 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | PATCH | `/api/users/:id` | `system:user:update` | 更新用户（不含用户名和密码） |
 | DELETE | `/api/users/:id` | `system:user:delete` | 删除用户 |
 | PUT | `/api/users/me/password` | 仅需登录 | 修改自己的密码，需校验旧密码 |
+| GET | `/api/users/:id/roles` | `system:user:assign-role` | 用户已分配的角色 id，供分配界面回显 |
+| PUT | `/api/users/:id/roles` | `system:user:assign-role` | 全量替换用户的角色 |
+| GET | `/api/roles` | `system:role:list` | 分页查询角色 |
+| POST | `/api/roles` | `system:role:create` | 新增角色 |
+| GET | `/api/roles/:id` | `system:role:read` | 角色详情，含 `permissionIds` / `menuIds` |
+| PATCH | `/api/roles/:id` | `system:role:update` | 更新角色 |
+| DELETE | `/api/roles/:id` | `system:role:delete` | 删除角色（软删除） |
+| PUT | `/api/roles/:id/permissions` | `system:role:assign` | 全量替换角色的权限码 |
+| PUT | `/api/roles/:id/menus` | `system:role:assign` | 全量替换角色的菜单 |
+| GET | `/api/permissions` | `system:permission:list` | 权限码目录，供授权界面拉取可选项 |
 
 ## 尚未包含
 
 按当前范围刻意留白的部分，后续要做时的落点：
 
-- **角色 / 权限 / 菜单的管理接口**。鉴权链路已通（`@Permissions()` + `PermissionGuard`），但还没有 CRUD：角色增删改查、给角色授权限、给角色授菜单、给用户分配角色，目前只能直接改库。菜单树和「我的菜单」接口也还没做，前端拿不到侧边栏数据。
+- **菜单管理与「我的菜单」接口**。`sys_menu` 表和角色授菜单的接口都在，但菜单本身的增删改查还没做，菜单数据目前只能直接写库；前端也还拿不到「当前用户可见的菜单树」，侧边栏渲染不了。
 - **refreshToken 吊销**。现在的刷新是无状态的，只验签名和类型，签发后无法单独踢下线。要支持就得把 token 的 `jti` 存进 Redis 做白名单。
 - **登录限流**。`@nestjs/throttler` 尚未接入，登录接口目前没有暴力破解防护。
 - **操作日志、文件上传、Redis 缓存、软删除**。
