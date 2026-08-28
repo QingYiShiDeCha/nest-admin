@@ -34,6 +34,7 @@ import {
   type SQL,
 } from 'drizzle-orm';
 
+import { RequestContext } from '../../common/context/request-context.service';
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
 import type { CreateRoleDto } from './dto/create-role.dto';
 import type { QueryRoleDto } from './dto/query-role.dto';
@@ -51,7 +52,10 @@ function aliveRole(...conditions: (SQL | undefined)[]): SQL {
 
 @Injectable()
 export class RoleService {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly ctx: RequestContext,
+  ) {}
 
   async findPage(query: QueryRoleDto): Promise<PaginatedResult<RoleRow>> {
     const where = aliveRole(
@@ -100,21 +104,17 @@ export class RoleService {
     };
   }
 
-  async create(dto: CreateRoleDto, operatorId: number): Promise<RoleRow> {
+  async create(dto: CreateRoleDto): Promise<RoleRow> {
     await this.assertCodeAvailable(dto.code);
 
     const [result] = await this.db
       .insert(roles)
-      .values({ ...dto, createdBy: operatorId, updatedBy: operatorId });
+      .values({ ...dto, ...this.ctx.auditOnCreate() });
 
     return this.findRoleOrFail(result.insertId);
   }
 
-  async update(
-    id: number,
-    dto: UpdateRoleDto,
-    operatorId: number,
-  ): Promise<RoleRow> {
+  async update(id: number, dto: UpdateRoleDto): Promise<RoleRow> {
     if (Object.keys(dto).length === 0) {
       throw new BadRequestException('没有需要更新的字段');
     }
@@ -138,7 +138,7 @@ export class RoleService {
 
     await this.db
       .update(roles)
-      .set({ ...dto, updatedBy: operatorId })
+      .set({ ...dto, ...this.ctx.auditOnUpdate() })
       .where(aliveRole(eq(roles.id, id)));
 
     return this.findRoleOrFail(id);
@@ -149,7 +149,7 @@ export class RoleService {
    * 刻意保留不删：PermissionService 查授权时会过滤掉已删除的角色，
    * 所以权限即刻失效；保留关系是为了将来支持恢复。
    */
-  async remove(id: number, operatorId: number): Promise<void> {
+  async remove(id: number): Promise<void> {
     const role = await this.findRoleOrFail(id);
 
     if (role.isSystem) {
@@ -158,16 +158,12 @@ export class RoleService {
 
     await this.db
       .update(roles)
-      .set({ deletedAt: sql`CURRENT_TIMESTAMP`, updatedBy: operatorId })
+      .set({ deletedAt: sql`CURRENT_TIMESTAMP`, ...this.ctx.auditOnUpdate() })
       .where(aliveRole(eq(roles.id, id)));
   }
 
   /** 全量替换角色的权限码 */
-  async setPermissions(
-    roleId: number,
-    permissionIds: number[],
-    operatorId: number,
-  ): Promise<void> {
+  async setPermissions(roleId: number, permissionIds: number[]): Promise<void> {
     await this.findRoleOrFail(roleId);
     await this.assertAllExist(permissions, permissionIds, '权限');
 
@@ -181,7 +177,7 @@ export class RoleService {
           permissionIds.map((permissionId) => ({
             roleId,
             permissionId,
-            createdBy: operatorId,
+            createdBy: this.ctx.userId,
           })),
         );
       }
@@ -189,11 +185,7 @@ export class RoleService {
   }
 
   /** 全量替换角色的菜单 */
-  async setMenus(
-    roleId: number,
-    menuIds: number[],
-    operatorId: number,
-  ): Promise<void> {
+  async setMenus(roleId: number, menuIds: number[]): Promise<void> {
     await this.findRoleOrFail(roleId);
     await this.assertAllExist(menus, menuIds, '菜单');
 
@@ -205,7 +197,7 @@ export class RoleService {
           menuIds.map((menuId) => ({
             roleId,
             menuId,
-            createdBy: operatorId,
+            createdBy: this.ctx.userId,
           })),
         );
       }
@@ -213,14 +205,10 @@ export class RoleService {
   }
 
   /** 全量替换用户的角色 */
-  async setUserRoles(
-    userId: number,
-    roleIds: number[],
-    operatorId: number,
-  ): Promise<void> {
+  async setUserRoles(userId: number, roleIds: number[]): Promise<void> {
     // 不允许改自己的角色：否则管理员可以把自己的超管角色摘掉，
     // 或误操作后失去修复权限的能力，只能去数据库手工恢复
-    if (userId === operatorId) {
+    if (userId === this.ctx.userId) {
       throw new ForbiddenException('不允许修改自己的角色，请由其他管理员操作');
     }
 
@@ -244,7 +232,7 @@ export class RoleService {
           roleIds.map((roleId) => ({
             userId,
             roleId,
-            createdBy: operatorId,
+            createdBy: this.ctx.userId,
           })),
         );
       }

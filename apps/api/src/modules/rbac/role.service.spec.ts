@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
+import { RequestContext } from '../../common/context/request-context.service';
 import { DRIZZLE } from '../../database/database.constants';
 import { RoleService } from './role.service';
 
@@ -13,6 +14,13 @@ describe('RoleService 的保护性规则', () => {
   let service: RoleService;
   let db: { select: jest.Mock };
 
+  /** 当前操作人固定为 1，用来验证「不允许改自己的角色」这条规则 */
+  const ctx = {
+    userId: 1,
+    auditOnCreate: () => ({ createdBy: 1, updatedBy: 1 }),
+    auditOnUpdate: () => ({ updatedBy: 1 }),
+  };
+
   const mockSelectOnce = (rows: unknown[]) => {
     db.select.mockReturnValueOnce({
       from: () => ({ where: () => ({ limit: () => Promise.resolve(rows) }) }),
@@ -23,14 +31,18 @@ describe('RoleService 的保护性规则', () => {
     db = { select: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [RoleService, { provide: DRIZZLE, useValue: db }],
+      providers: [
+        RoleService,
+        { provide: DRIZZLE, useValue: db },
+        { provide: RequestContext, useValue: ctx },
+      ],
     }).compile();
 
     service = module.get(RoleService);
   });
 
   it('不允许修改自己的角色，避免误摘超管后失去修复能力', async () => {
-    await expect(service.setUserRoles(1, [2], 1)).rejects.toThrow(
+    await expect(service.setUserRoles(1, [2])).rejects.toThrow(
       new ForbiddenException('不允许修改自己的角色，请由其他管理员操作'),
     );
     // 应该在任何查询之前就拦下
@@ -42,7 +54,7 @@ describe('RoleService 的保护性规则', () => {
       { id: 1, code: 'super_admin', isSystem: true, status: 'active' },
     ]);
 
-    await expect(service.update(1, { code: 'hacked' }, 9)).rejects.toThrow(
+    await expect(service.update(1, { code: 'hacked' })).rejects.toThrow(
       new ForbiddenException('内置角色的角色码不允许修改'),
     );
   });
@@ -52,7 +64,7 @@ describe('RoleService 的保护性规则', () => {
       { id: 1, code: 'super_admin', isSystem: true, status: 'active' },
     ]);
 
-    await expect(service.update(1, { status: 'disabled' }, 9)).rejects.toThrow(
+    await expect(service.update(1, { status: 'disabled' })).rejects.toThrow(
       new ForbiddenException('内置角色不允许停用'),
     );
   });
@@ -62,7 +74,7 @@ describe('RoleService 的保护性规则', () => {
       { id: 1, code: 'super_admin', isSystem: true, status: 'active' },
     ]);
 
-    await expect(service.remove(1, 9)).rejects.toThrow(
+    await expect(service.remove(1)).rejects.toThrow(
       new ForbiddenException('内置角色不允许删除'),
     );
   });
@@ -70,7 +82,7 @@ describe('RoleService 的保护性规则', () => {
   it('角色不存在时抛 404', async () => {
     mockSelectOnce([]);
 
-    await expect(service.remove(404, 9)).rejects.toThrow(
+    await expect(service.remove(404)).rejects.toThrow(
       new NotFoundException('角色 404 不存在'),
     );
   });
@@ -90,7 +102,7 @@ describe('RoleService 的保护性规则', () => {
     });
     (db as unknown as { update: unknown }).update = update;
 
-    await expect(service.update(2, { remark: 'ok' }, 9)).resolves.toBeDefined();
+    await expect(service.update(2, { remark: 'ok' })).resolves.toBeDefined();
     expect(update).toHaveBeenCalled();
   });
 });

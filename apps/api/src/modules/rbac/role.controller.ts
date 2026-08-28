@@ -16,7 +16,6 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { AssignIdsDto } from './dto/assign-ids.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -34,11 +33,8 @@ export class RoleController {
   @Post()
   @Permissions(PERMISSIONS.ROLE_CREATE)
   @ApiOperation({ summary: '新增角色' })
-  create(
-    @Body() dto: CreateRoleDto,
-    @CurrentUser('id') operatorId: number,
-  ): Promise<RoleRow> {
-    return this.roleService.create(dto, operatorId);
+  create(@Body() dto: CreateRoleDto): Promise<RoleRow> {
+    return this.roleService.create(dto);
   }
 
   @Get()
@@ -64,20 +60,16 @@ export class RoleController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateRoleDto,
-    @CurrentUser('id') operatorId: number,
   ): Promise<RoleRow> {
-    return this.roleService.update(id, dto, operatorId);
+    return this.roleService.update(id, dto);
   }
 
   @Delete(':id')
   @Permissions(PERMISSIONS.ROLE_DELETE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '删除角色（软删除），内置角色不可删' })
-  remove(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser('id') operatorId: number,
-  ): Promise<void> {
-    return this.roleService.remove(id, operatorId);
+  remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    return this.roleService.remove(id);
   }
 
   @Put(':id/permissions')
@@ -90,9 +82,8 @@ export class RoleController {
   setPermissions(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AssignIdsDto,
-    @CurrentUser('id') operatorId: number,
   ): Promise<void> {
-    return this.roleService.setPermissions(id, dto.ids, operatorId);
+    return this.roleService.setPermissions(id, dto.ids);
   }
 
   @Put(':id/menus')
@@ -105,8 +96,7 @@ export class RoleController {
   setMenus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AssignIdsDto,
-    @CurrentUser('id') operatorId: number,
   ): Promise<void> {
-    return this.roleService.setMenus(id, dto.ids, operatorId);
+    return this.roleService.setMenus(id, dto.ids);
   }
 }

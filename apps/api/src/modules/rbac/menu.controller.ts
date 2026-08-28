@@ -51,11 +51,8 @@ export class MenuController {
   @Post()
   @Permissions(PERMISSIONS.MENU_CREATE)
   @ApiOperation({ summary: '新增菜单' })
-  create(
-    @Body() dto: CreateMenuDto,
-    @CurrentUser('id') operatorId: number,
-  ): Promise<MenuRow> {
-    return this.menuService.create(dto, operatorId);
+  create(@Body() dto: CreateMenuDto): Promise<MenuRow> {
+    return this.menuService.create(dto);
   }
 
   @Get(':id')
@@ -71,19 +68,15 @@ export class MenuController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateMenuDto,
-    @CurrentUser('id') operatorId: number,
   ): Promise<MenuRow> {
-    return this.menuService.update(id, dto, operatorId);
+    return this.menuService.update(id, dto);
   }
 
   @Delete(':id')
   @Permissions(PERMISSIONS.MENU_DELETE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '删除菜单（软删除），有子菜单时拒绝' })
-  remove(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser('id') operatorId: number,
-  ): Promise<void> {
-    return this.menuService.remove(id, operatorId);
+  remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    return this.menuService.remove(id);
   }
 }

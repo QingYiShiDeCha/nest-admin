@@ -12,6 +12,7 @@ import { ConfigService } from '@nestjs/config';
 import { compare, hash } from 'bcryptjs';
 import { and, count, desc, eq, isNull, like, sql, type SQL } from 'drizzle-orm';
 
+import { RequestContext } from '../../common/context/request-context.service';
 import type { Env } from '../../config/env.validation';
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
 import type { ChangePasswordDto } from './dto/change-password.dto';
@@ -48,6 +49,7 @@ export class UserService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     private readonly config: ConfigService<Env, true>,
+    private readonly ctx: RequestContext,
   ) {}
 
   async create(dto: CreateUserDto): Promise<SafeUser> {
@@ -70,6 +72,7 @@ export class UserService {
     const [result] = await this.db.insert(users).values({
       ...dto,
       password: await this.hashPassword(dto.password),
+      ...this.ctx.auditOnCreate(),
     });
 
     return this.findById(result.insertId);
@@ -134,7 +137,7 @@ export class UserService {
     await this.findById(id);
     await this.db
       .update(users)
-      .set(dto)
+      .set({ ...dto, ...this.ctx.auditOnUpdate() })
       .where(alive(eq(users.id, id)));
 
     return this.findById(id);
@@ -157,7 +160,10 @@ export class UserService {
 
     await this.db
       .update(users)
-      .set({ password: await this.hashPassword(dto.newPassword) })
+      .set({
+        password: await this.hashPassword(dto.newPassword),
+        ...this.ctx.auditOnUpdate(),
+      })
       .where(alive(eq(users.id, id)));
   }
 
@@ -167,7 +173,7 @@ export class UserService {
 
     await this.db
       .update(users)
-      .set({ deletedAt: sql`CURRENT_TIMESTAMP` })
+      .set({ deletedAt: sql`CURRENT_TIMESTAMP`, ...this.ctx.auditOnUpdate() })
       .where(alive(eq(users.id, id)));
   }
 

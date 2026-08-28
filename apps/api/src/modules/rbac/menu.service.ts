@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
+import { RequestContext } from '../../common/context/request-context.service';
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
 import type { CreateMenuDto } from './dto/create-menu.dto';
 import type { UpdateMenuDto } from './dto/update-menu.dto';
@@ -24,7 +25,10 @@ export interface MenuTreeNode extends MenuRow {
 
 @Injectable()
 export class MenuService {
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly ctx: RequestContext,
+  ) {}
 
   /** 管理端用的完整菜单树，含已停用与隐藏节点 */
   async findTree(): Promise<MenuTreeNode[]> {
@@ -35,7 +39,7 @@ export class MenuService {
     return this.findMenuOrFail(id);
   }
 
-  async create(dto: CreateMenuDto, operatorId: number): Promise<MenuRow> {
+  async create(dto: CreateMenuDto): Promise<MenuRow> {
     const type = dto.type ?? 'menu';
     this.assertShapeMatchesType(type, dto);
     await this.assertParentUsable(dto.parentId);
@@ -43,18 +47,13 @@ export class MenuService {
     const [result] = await this.db.insert(menus).values({
       ...dto,
       type,
-      createdBy: operatorId,
-      updatedBy: operatorId,
+      ...this.ctx.auditOnCreate(),
     });
 
     return this.findMenuOrFail(result.insertId);
   }
 
-  async update(
-    id: number,
-    dto: UpdateMenuDto,
-    operatorId: number,
-  ): Promise<MenuRow> {
+  async update(id: number, dto: UpdateMenuDto): Promise<MenuRow> {
     if (Object.keys(dto).length === 0) {
       throw new BadRequestException('没有需要更新的字段');
     }
@@ -82,7 +81,7 @@ export class MenuService {
 
     await this.db
       .update(menus)
-      .set({ ...dto, updatedBy: operatorId })
+      .set({ ...dto, ...this.ctx.auditOnUpdate() })
       .where(and(eq(menus.id, id), isNull(menus.deletedAt)));
 
     return this.findMenuOrFail(id);
@@ -92,7 +91,7 @@ export class MenuService {
    * 软删除。有子节点时拒绝而不是级联删除——
    * 级联删一棵子树是不可逆的重操作，让调用方显式地逐个确认更安全。
    */
-  async remove(id: number, operatorId: number): Promise<void> {
+  async remove(id: number): Promise<void> {
     await this.findMenuOrFail(id);
 
     if ((await this.countChildren(id)) > 0) {
@@ -101,7 +100,7 @@ export class MenuService {
 
     await this.db
       .update(menus)
-      .set({ deletedAt: sql`CURRENT_TIMESTAMP`, updatedBy: operatorId })
+      .set({ deletedAt: sql`CURRENT_TIMESTAMP`, ...this.ctx.auditOnUpdate() })
       .where(and(eq(menus.id, id), isNull(menus.deletedAt)));
   }
 

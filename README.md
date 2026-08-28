@@ -166,7 +166,11 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 
 **关联表带外键且 `ON DELETE CASCADE`**。主表虽走软删除、级联极少触发，但一旦真的物理清理数据，不会留下悬空的授权行。
 
-**审计字段**。`created_by` / `updated_by` 目前可空——填充它需要在请求上下文里拿到当前用户，等 RBAC 的 service 层接上后统一写入。
+**审计字段自动填充**。`created_by` / `updated_by` 由 `RequestContext` 统一写入，service 里只要 `...this.ctx.auditOnCreate()` 或 `...this.ctx.auditOnUpdate()`，不需要把 `operatorId` 从 controller 一路当参数传下来。
+
+底层是 `nestjs-cls`（AsyncLocalStorage）：上下文由 `ClsMiddleware` 建立，当前用户 id 由 `CurrentUserInterceptor` 写入。**用拦截器而不是中间件**是关键——中间件在守卫之前执行，那时 `request.user` 还不存在；拦截器一定在所有守卫之后运行。
+
+字段仍然可空，这是正常的：`@Public()` 接口（比如自助注册）没有登录态，seed 和定时任务这类非 HTTP 入口连 CLS 上下文都没有，两种情况都会写入 `null`。`RequestContext` 里用 `cls.isActive()` 做了保护，在没有上下文时返回 `null` 而不是抛错。
 
 ## 接口一览
 
@@ -204,7 +208,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 
 按当前范围刻意留白的部分，后续要做时的落点：
 
-- **`created_by` / `updated_by` 的自动填充**。RBAC 相关接口已经在写这两个字段（从 `@CurrentUser('id')` 取），但用户模块还没接。要彻底统一得引入 `nestjs-cls` 之类的请求上下文，否则得把 `operatorId` 一路当参数传下去。
+- **操作日志**。审计字段只记录了「谁最后改的」，没有「改了什么、什么时候改的」的完整轨迹。
 - **refreshToken 吊销**。现在的刷新是无状态的，只验签名和类型，签发后无法单独踢下线。要支持就得把 token 的 `jti` 存进 Redis 做白名单。
 - **限流的分布式存储**。当前计数在进程内存中，多实例部署时配额会按实例数翻倍。
 - **操作日志、文件上传、Redis 缓存、软删除**。

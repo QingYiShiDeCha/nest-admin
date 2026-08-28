@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
 
+import { RequestContext } from '../../common/context/request-context.service';
 import { DRIZZLE } from '../../database/database.constants';
 import { MenuService } from './menu.service';
 
@@ -51,7 +52,18 @@ describe('MenuService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [MenuService, { provide: DRIZZLE, useValue: db }],
+      providers: [
+        MenuService,
+        { provide: DRIZZLE, useValue: db },
+        {
+          provide: RequestContext,
+          useValue: {
+            userId: 1,
+            auditOnCreate: () => ({ createdBy: 1, updatedBy: 1 }),
+            auditOnUpdate: () => ({ updatedBy: 1 }),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get(MenuService);
@@ -59,7 +71,7 @@ describe('MenuService', () => {
 
   describe('类型与字段的匹配规则', () => {
     const create = (dto: Record<string, unknown>) =>
-      service.create(dto as never, 1);
+      service.create(dto as never);
 
     it('目录不能设置 component', async () => {
       await expect(

@@ -11,7 +11,6 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { AssignIdsDto } from './dto/assign-ids.dto';
 import { RoleService } from './role.service';
@@ -44,8 +43,7 @@ export class UserRoleController {
   setUserRoles(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AssignIdsDto,
-    @CurrentUser('id') operatorId: number,
   ): Promise<void> {
-    return this.roleService.setUserRoles(id, dto.ids, operatorId);
+    return this.roleService.setUserRoles(id, dto.ids);
   }
 }

@@ -1,12 +1,15 @@
 import { workspaceEnvFiles } from '@nest-admin/shared/node';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule, seconds } from '@nestjs/throttler';
+import { ClsModule } from 'nestjs-cls';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { RequestContextModule } from './common/context/request-context.module';
 import { AppThrottlerGuard } from './common/guards/throttler.guard';
+import { CurrentUserInterceptor } from './common/interceptors/current-user.interceptor';
 import { validateEnv, type Env } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
@@ -25,6 +28,10 @@ import { UserModule } from './modules/user/user.module';
       envFilePath: workspaceEnvFiles(),
       validate: validateEnv,
     }),
+    // 中间件负责建立 AsyncLocalStorage 上下文（此时还没认证，拿不到用户）；
+    // 真正写入 userId 的是 CurrentUserInterceptor，它在守卫之后执行。
+    ClsModule.forRoot({ global: true, middleware: { mount: true } }),
+    RequestContextModule,
     // 只声明一个默认限流器，登录这类需要收紧的接口用 @Throttle 就地覆盖。
     // 声明多个具名限流器会让它们同时作用于所有路由，反而要到处 @SkipThrottle。
     ThrottlerModule.forRootAsync({
@@ -55,6 +62,7 @@ import { UserModule } from './modules/user/user.module';
     { provide: APP_GUARD, useClass: AppThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
+    { provide: APP_INTERCEPTOR, useClass: CurrentUserInterceptor },
   ],
 })
 export class AppModule {}
