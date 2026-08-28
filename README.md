@@ -118,6 +118,10 @@ pnpm dev
 
 **几条防自锁规则**。内置角色（`is_system`）不可删除、不可停用、不可改角色码——停用超管角色会把所有管理员一起锁在系统外；改角色码会让守卫里的超管短路判断失效。另外不允许修改自己的角色，否则误摘超管后只能去数据库手工恢复。改名称和备注不受限制。
 
+**菜单树的几条规则**。节点分三类：`directory` 只做分组、不对应页面也不能有 `component`；`menu` 必须有 `path` 和 `component`；`external` 的 `path` 必须是完整 URL。只有目录能当父节点。改 `parentId` 时会拒绝指向自己或自己的后代，避免子树脱离主干成环。删除和「目录改成其他类型」在还有子节点时都会被拒绝——级联删一棵子树不可逆，让调用方显式逐个确认更安全。
+
+`GET /menus/mine` 是前端渲染侧边栏的入口，不需要菜单管理权限。超管拿到全部启用菜单，其余按角色授权返回，并且**会自动补齐授权节点的祖先**：只授子菜单而没授父目录时，子节点会因为找不到父亲而在建树时被丢掉，整块入口就消失了。反过来，停用一个目录会连带隐藏它下面的所有入口。`visible: false` 的节点仍会返回，它表示「不在侧边栏显示但路由可访问」（详情页那类），由前端决定怎么处理。
+
 **权限变更即时生效**。`JwtStrategy` 每个请求回库查用户与授权，所以改角色授权、禁用角色、禁用用户都不需要重新登录就会生效。代价是每个受保护请求多几次查询；要优化就在 `PermissionService` 加缓存，届时需一并解决「改权限后缓存何时失效」的一致性问题。
 
 **注入数据库**。任何 service 里 `@Inject(DRIZZLE) private readonly db: DrizzleDB`，即可获得带完整表结构推断的 Drizzle 实例。`DatabaseModule` 是 `@Global` 的，不必在各模块重复 import。
@@ -181,12 +185,18 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | PUT | `/api/roles/:id/permissions` | `system:role:assign` | 全量替换角色的权限码 |
 | PUT | `/api/roles/:id/menus` | `system:role:assign` | 全量替换角色的菜单 |
 | GET | `/api/permissions` | `system:permission:list` | 权限码目录，供授权界面拉取可选项 |
+| GET | `/api/menus/mine` | 仅需登录 | 当前用户可见的菜单树，前端渲染侧边栏 |
+| GET | `/api/menus` | `system:menu:list` | 完整菜单树（管理端），含停用与隐藏节点 |
+| POST | `/api/menus` | `system:menu:create` | 新增菜单 |
+| GET | `/api/menus/:id` | `system:menu:read` | 菜单详情 |
+| PATCH | `/api/menus/:id` | `system:menu:update` | 更新菜单 |
+| DELETE | `/api/menus/:id` | `system:menu:delete` | 删除菜单（软删除），有子菜单时拒绝 |
 
 ## 尚未包含
 
 按当前范围刻意留白的部分，后续要做时的落点：
 
-- **菜单管理与「我的菜单」接口**。`sys_menu` 表和角色授菜单的接口都在，但菜单本身的增删改查还没做，菜单数据目前只能直接写库；前端也还拿不到「当前用户可见的菜单树」，侧边栏渲染不了。
+- **`created_by` / `updated_by` 的自动填充**。RBAC 相关接口已经在写这两个字段（从 `@CurrentUser('id')` 取），但用户模块还没接。要彻底统一得引入 `nestjs-cls` 之类的请求上下文，否则得把 `operatorId` 一路当参数传下去。
 - **refreshToken 吊销**。现在的刷新是无状态的，只验签名和类型，签发后无法单独踢下线。要支持就得把 token 的 `jti` 存进 Redis 做白名单。
 - **登录限流**。`@nestjs/throttler` 尚未接入，登录接口目前没有暴力破解防护。
 - **操作日志、文件上传、Redis 缓存、软删除**。

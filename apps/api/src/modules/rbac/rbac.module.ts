@@ -1,6 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 
 import { PermissionGuard } from './guards/permission.guard';
+import { MenuController } from './menu.controller';
+import { MenuService } from './menu.service';
 import { PermissionController } from './permission.controller';
 import { PermissionService } from './permission.service';
 import { RoleController } from './role.controller';
@@ -13,8 +15,13 @@ import { UserRoleController } from './user-role.controller';
  */
 @Global()
 @Module({
-  controllers: [RoleController, PermissionController, UserRoleController],
-  providers: [PermissionService, PermissionGuard, RoleService],
-  exports: [PermissionService, PermissionGuard, RoleService],
+  controllers: [
+    RoleController,
+    PermissionController,
+    MenuController,
+    UserRoleController,
+  ],
+  providers: [PermissionService, PermissionGuard, RoleService, MenuService],
+  exports: [PermissionService, PermissionGuard, RoleService, MenuService],
 })
 export class RbacModule {}

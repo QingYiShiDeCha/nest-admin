@@ -24,6 +24,12 @@ export const PERMISSIONS = {
   /** 给角色配置权限码与菜单 */
   ROLE_ASSIGN: 'system:role:assign',
 
+  MENU_LIST: 'system:menu:list',
+  MENU_READ: 'system:menu:read',
+  MENU_CREATE: 'system:menu:create',
+  MENU_UPDATE: 'system:menu:update',
+  MENU_DELETE: 'system:menu:delete',
+
   /** 权限码目录只读，供角色授权界面拉取可选项 */
   PERMISSION_LIST: 'system:permission:list',
 } as const;
@@ -58,6 +64,11 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
     name: '配置角色的权限与菜单',
     module: 'system',
   },
+  { code: PERMISSIONS.MENU_LIST, name: '查询菜单树', module: 'system' },
+  { code: PERMISSIONS.MENU_READ, name: '查看菜单详情', module: 'system' },
+  { code: PERMISSIONS.MENU_CREATE, name: '新增菜单', module: 'system' },
+  { code: PERMISSIONS.MENU_UPDATE, name: '更新菜单', module: 'system' },
+  { code: PERMISSIONS.MENU_DELETE, name: '删除菜单', module: 'system' },
   {
     code: PERMISSIONS.PERMISSION_LIST,
     name: '查询权限码目录',
