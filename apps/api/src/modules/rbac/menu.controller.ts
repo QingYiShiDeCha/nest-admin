@@ -15,6 +15,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { OperationLog } from '../operation-log/operation-log.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface';
 import { CreateMenuDto } from './dto/create-menu.dto';
@@ -50,6 +51,7 @@ export class MenuController {
 
   @Post()
   @Permissions(PERMISSIONS.MENU_CREATE)
+  @OperationLog({ module: '菜单管理', action: '新增菜单' })
   @ApiOperation({ summary: '新增菜单' })
   create(@Body() dto: CreateMenuDto): Promise<MenuRow> {
     return this.menuService.create(dto);
@@ -64,6 +66,7 @@ export class MenuController {
 
   @Patch(':id')
   @Permissions(PERMISSIONS.MENU_UPDATE)
+  @OperationLog({ module: '菜单管理', action: '更新菜单' })
   @ApiOperation({ summary: '更新菜单' })
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -74,6 +77,7 @@ export class MenuController {
 
   @Delete(':id')
   @Permissions(PERMISSIONS.MENU_DELETE)
+  @OperationLog({ module: '菜单管理', action: '删除菜单' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '删除菜单（软删除），有子菜单时拒绝' })
   remove(@Param('id', ParseIntPipe) id: number): Promise<void> {

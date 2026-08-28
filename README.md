@@ -122,6 +122,14 @@ pnpm dev
 
 `GET /menus/mine` 是前端渲染侧边栏的入口，不需要菜单管理权限。超管拿到全部启用菜单，其余按角色授权返回，并且**会自动补齐授权节点的祖先**：只授子菜单而没授父目录时，子节点会因为找不到父亲而在建树时被丢掉，整块入口就消失了。反过来，停用一个目录会连带隐藏它下面的所有入口。`visible: false` 的节点仍会返回，它表示「不在侧边栏显示但路由可访问」（详情页那类），由前端决定怎么处理。
 
+**操作日志**。所有写操作（POST/PUT/PATCH/DELETE）由 `OperationLogInterceptor` 自动记录，无需在每个 service 里手写。GET 不记——量级太大且没有审计价值，记了只会淹没真正要看的东西。用 `@OperationLog({ module, action })` 补上可读的中文标签，不标也会记录，只是只能靠 method + path 辨认；确实不该记的用 `@SkipOperationLog()`。
+
+**参数快照会脱敏**。命中 `password|token|secret|authorization|cookie|credential` 的键一律替换成 `***`，递归处理嵌套对象和数组。这不是可选项：登录失败的请求同样会被记录，而它的 body 里正好是明文密码。`redact.spec.ts` 专门覆盖了各种形态，包括大小写混写和循环引用。
+
+**日志是旁路，绝不能拖垮业务**。写入不 await、异常在 service 内部吞掉只留一行告警。已实测：把日志表改名制造写入失败后，新增用户依然返回 201 且数据正常落库。
+
+日志表 append-only，没有软删除也没有 `created_by`——日志本身就是「谁在何时做了什么」，再套一层审计字段是循环。`username` 冗余存一份而非做外键：用户被删除后仍要能回答「是谁做的」。接口只提供查询，不提供删除，能被随手删掉的审计日志没有审计价值；清理历史应当是运维层面按 `created_at` 批量删除的定时任务。
+
 **限流**。全局默认按客户端 IP 计数，窗口与配额由 `THROTTLE_TTL` / `THROTTLE_LIMIT` 控制；登录和注册另有更严格的固定阈值（60 秒 5 次，见 `packages/shared` 的 `LOGIN_THROTTLE`）。写成常量而非环境变量是因为 `@Throttle` 是装饰器，在类定义时求值，那会儿 ConfigModule 还没加载 `.env`。
 
 限流守卫注册在守卫链最前面：它必须先于认证执行，否则每次暴力尝试都会先做一遍查库和 bcrypt 比对，防护本身反而成了最贵的一环。健康检查用 `@SkipThrottle()` 豁免，避免被负载均衡和监控的轮询打满。
@@ -197,6 +205,8 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | PUT | `/api/roles/:id/permissions` | `system:role:assign` | 全量替换角色的权限码 |
 | PUT | `/api/roles/:id/menus` | `system:role:assign` | 全量替换角色的菜单 |
 | GET | `/api/permissions` | `system:permission:list` | 权限码目录，供授权界面拉取可选项 |
+| GET | `/api/operation-logs` | `system:log:list` | 分页查询操作日志，支持用户名/模块/结果/时间范围过滤 |
+| GET | `/api/operation-logs/:id` | `system:log:read` | 日志详情，含脱敏后的请求参数快照 |
 | GET | `/api/menus/mine` | 仅需登录 | 当前用户可见的菜单树，前端渲染侧边栏 |
 | GET | `/api/menus` | `system:menu:list` | 完整菜单树（管理端），含停用与隐藏节点 |
 | POST | `/api/menus` | `system:menu:create` | 新增菜单 |
@@ -208,7 +218,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 
 按当前范围刻意留白的部分，后续要做时的落点：
 
-- **操作日志**。审计字段只记录了「谁最后改的」，没有「改了什么、什么时候改的」的完整轨迹。
+- **日志的归档与清理**。`sys_operation_log` 只增不减，长期运行需要按 `created_at` 定期归档或分区。
 - **refreshToken 吊销**。现在的刷新是无状态的，只验签名和类型，签发后无法单独踢下线。要支持就得把 token 的 `jti` 存进 Redis 做白名单。
 - **限流的分布式存储**。当前计数在进程内存中，多实例部署时配额会按实例数翻倍。
 - **操作日志、文件上传、Redis 缓存、软删除**。

@@ -30,6 +30,9 @@ export const PERMISSIONS = {
   MENU_UPDATE: 'system:menu:update',
   MENU_DELETE: 'system:menu:delete',
 
+  LOG_LIST: 'system:log:list',
+  LOG_READ: 'system:log:read',
+
   /** 权限码目录只读，供角色授权界面拉取可选项 */
   PERMISSION_LIST: 'system:permission:list',
 } as const;
@@ -69,6 +72,8 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   { code: PERMISSIONS.MENU_CREATE, name: '新增菜单', module: 'system' },
   { code: PERMISSIONS.MENU_UPDATE, name: '更新菜单', module: 'system' },
   { code: PERMISSIONS.MENU_DELETE, name: '删除菜单', module: 'system' },
+  { code: PERMISSIONS.LOG_LIST, name: '查询操作日志', module: 'system' },
+  { code: PERMISSIONS.LOG_READ, name: '查看日志详情', module: 'system' },
   {
     code: PERMISSIONS.PERMISSION_LIST,
     name: '查询权限码目录',

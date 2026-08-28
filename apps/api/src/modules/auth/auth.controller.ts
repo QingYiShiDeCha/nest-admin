@@ -11,6 +11,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { OperationLog } from '../operation-log/operation-log.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -30,6 +31,7 @@ export class AuthController {
   @Public()
   @Throttle({ default: LOGIN_THROTTLE })
   @Post('register')
+  @OperationLog({ module: '认证', action: '注册' })
   @ApiOperation({
     summary: '注册并直接返回登录态',
     description: `限流：每 IP ${LOGIN_THROTTLE.ttl / 1000} 秒内最多 ${LOGIN_THROTTLE.limit} 次`,
@@ -41,6 +43,7 @@ export class AuthController {
   @Public()
   @Throttle({ default: LOGIN_THROTTLE })
   @Post('login')
+  @OperationLog({ module: '认证', action: '登录' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: '账号密码登录',
@@ -52,6 +55,7 @@ export class AuthController {
 
   @Public()
   @Post('refresh')
+  @OperationLog({ module: '认证', action: '刷新令牌' })
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '用 refreshToken 换取新的 token 对' })
   refresh(@Body() dto: RefreshTokenDto): Promise<AuthTokens> {

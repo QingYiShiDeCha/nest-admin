@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import { OperationLog } from '../operation-log/operation-log.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { AssignIdsDto } from './dto/assign-ids.dto';
 import { CreateRoleDto } from './dto/create-role.dto';
@@ -32,6 +33,7 @@ export class RoleController {
 
   @Post()
   @Permissions(PERMISSIONS.ROLE_CREATE)
+  @OperationLog({ module: '角色管理', action: '新增角色' })
   @ApiOperation({ summary: '新增角色' })
   create(@Body() dto: CreateRoleDto): Promise<RoleRow> {
     return this.roleService.create(dto);
@@ -56,6 +58,7 @@ export class RoleController {
 
   @Patch(':id')
   @Permissions(PERMISSIONS.ROLE_UPDATE)
+  @OperationLog({ module: '角色管理', action: '更新角色' })
   @ApiOperation({ summary: '更新角色，内置角色的角色码与状态不可改' })
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -66,6 +69,7 @@ export class RoleController {
 
   @Delete(':id')
   @Permissions(PERMISSIONS.ROLE_DELETE)
+  @OperationLog({ module: '角色管理', action: '删除角色' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '删除角色（软删除），内置角色不可删' })
   remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
@@ -73,6 +77,7 @@ export class RoleController {
   }
 
   @Put(':id/permissions')
+  @OperationLog({ module: '角色管理', action: '配置角色权限' })
   @Permissions(PERMISSIONS.ROLE_ASSIGN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -87,6 +92,7 @@ export class RoleController {
   }
 
   @Put(':id/menus')
+  @OperationLog({ module: '角色管理', action: '配置角色菜单' })
   @Permissions(PERMISSIONS.ROLE_ASSIGN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({

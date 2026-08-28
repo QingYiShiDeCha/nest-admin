@@ -15,6 +15,8 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import { PermissionGuard } from './modules/rbac/guards/permission.guard';
+import { OperationLogInterceptor } from './modules/operation-log/operation-log.interceptor';
+import { OperationLogModule } from './modules/operation-log/operation-log.module';
 import { RbacModule } from './modules/rbac/rbac.module';
 import { UserModule } from './modules/user/user.module';
 
@@ -46,6 +48,7 @@ import { UserModule } from './modules/user/user.module';
       }),
     }),
     DatabaseModule,
+    OperationLogModule,
     RbacModule,
     AuthModule,
     UserModule,
@@ -62,7 +65,11 @@ import { UserModule } from './modules/user/user.module';
     { provide: APP_GUARD, useClass: AppThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
+    // 顺序同样重要：CurrentUserInterceptor 先把 userId 写进 CLS，
+    // OperationLogInterceptor 再记录（它读的是 request.user，不依赖 CLS，
+    // 但保持这个顺序能让后续从上下文取值的改动不出意外）。
     { provide: APP_INTERCEPTOR, useClass: CurrentUserInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: OperationLogInterceptor },
   ],
 })
 export class AppModule {}

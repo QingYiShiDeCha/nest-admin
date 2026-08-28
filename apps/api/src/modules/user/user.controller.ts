@@ -17,6 +17,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { OperationLog } from '../../modules/operation-log/operation-log.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -32,6 +33,7 @@ export class UserController {
 
   @Post()
   @Permissions(PERMISSIONS.USER_CREATE)
+  @OperationLog({ module: '用户管理', action: '新增用户' })
   @ApiOperation({ summary: '新增用户' })
   create(@Body() dto: CreateUserDto): Promise<SafeUser> {
     return this.userService.create(dto);
@@ -46,6 +48,7 @@ export class UserController {
 
   // 改自己的密码不需要用户管理权限，任何登录用户都可以
   @Put('me/password')
+  @OperationLog({ module: '用户管理', action: '修改自己的密码' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '修改当前登录用户的密码' })
   changeOwnPassword(
@@ -64,6 +67,7 @@ export class UserController {
 
   @Patch(':id')
   @Permissions(PERMISSIONS.USER_UPDATE)
+  @OperationLog({ module: '用户管理', action: '更新用户' })
   @ApiOperation({ summary: '更新用户' })
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -74,6 +78,7 @@ export class UserController {
 
   @Delete(':id')
   @Permissions(PERMISSIONS.USER_DELETE)
+  @OperationLog({ module: '用户管理', action: '删除用户' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '删除用户' })
   remove(@Param('id', ParseIntPipe) id: number): Promise<void> {

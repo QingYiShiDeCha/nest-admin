@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import { OperationLog } from '../operation-log/operation-log.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { AssignIdsDto } from './dto/assign-ids.dto';
 import { RoleService } from './role.service';
@@ -34,6 +35,7 @@ export class UserRoleController {
   }
 
   @Put(':id/roles')
+  @OperationLog({ module: '用户管理', action: '分配用户角色' })
   @Permissions(PERMISSIONS.USER_ASSIGN_ROLE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
