@@ -1,3 +1,5 @@
+import { users, type SafeUser } from '@nest-admin/database';
+import type { PaginatedResult } from '@nest-admin/shared';
 import {
   BadRequestException,
   ConflictException,
@@ -8,12 +10,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { compare, hash } from 'bcryptjs';
-import { and, count, desc, eq, like, sql } from 'drizzle-orm';
+import { and, count, desc, eq, isNull, like, sql, type SQL } from 'drizzle-orm';
 
-import type { PaginatedResult } from '@nest-admin/shared';
 import type { Env } from '../../config/env.validation';
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
-import { users, type SafeUser } from '@nest-admin/database';
 import type { ChangePasswordDto } from './dto/change-password.dto';
 import type { CreateUserDto } from './dto/create-user.dto';
 import type { QueryUserDto } from './dto/query-user.dto';
@@ -29,9 +29,19 @@ const safeColumns = {
   avatar: users.avatar,
   status: users.status,
   lastLoginAt: users.lastLoginAt,
+  createdBy: users.createdBy,
+  updatedBy: users.updatedBy,
   createdAt: users.createdAt,
   updatedAt: users.updatedAt,
 } as const;
+
+/**
+ * 拼接查询条件时统一叠加「未软删除」。
+ * 所有面向业务的查询都必须走它，漏掉一处就会把已删除用户捞出来。
+ */
+function alive(...conditions: (SQL | undefined)[]): SQL {
+  return and(isNull(users.deletedAt), ...conditions)!;
+}
 
 @Injectable()
 export class UserService {
@@ -41,14 +51,20 @@ export class UserService {
   ) {}
 
   async create(dto: CreateUserDto): Promise<SafeUser> {
-    const exists = await this.db
-      .select({ id: users.id })
+    // 唯一索引覆盖已软删除的行，所以这里查全量而不是只查未删除的，
+    // 否则会先告诉调用方「可用」，再在插入时撞上 ER_DUP_ENTRY
+    const [existing] = await this.db
+      .select({ id: users.id, deletedAt: users.deletedAt })
       .from(users)
       .where(eq(users.username, dto.username))
       .limit(1);
 
-    if (exists.length > 0) {
-      throw new ConflictException(`用户名 ${dto.username} 已被占用`);
+    if (existing) {
+      throw new ConflictException(
+        existing.deletedAt
+          ? `用户名 ${dto.username} 被一个已删除的账号占用，无法复用`
+          : `用户名 ${dto.username} 已被占用`,
+      );
     }
 
     const [result] = await this.db.insert(users).values({
@@ -60,12 +76,10 @@ export class UserService {
   }
 
   async findPage(query: QueryUserDto): Promise<PaginatedResult<SafeUser>> {
-    const conditions = [
+    const where = alive(
       query.keyword ? like(users.username, `%${query.keyword}%`) : undefined,
       query.status ? eq(users.status, query.status) : undefined,
-    ].filter((condition) => condition !== undefined);
-
-    const where = conditions.length > 0 ? and(...conditions) : undefined;
+    );
 
     const [list, [{ total }]] = await Promise.all([
       this.db
@@ -85,7 +99,7 @@ export class UserService {
     const [user] = await this.db
       .select(safeColumns)
       .from(users)
-      .where(eq(users.id, id))
+      .where(alive(eq(users.id, id)))
       .limit(1);
 
     if (!user) {
@@ -105,7 +119,7 @@ export class UserService {
     const [row] = await this.db
       .select({ user: safeColumns, passwordHash: users.password })
       .from(users)
-      .where(eq(users.username, username))
+      .where(alive(eq(users.username, username)))
       .limit(1);
 
     return row;
@@ -118,7 +132,10 @@ export class UserService {
 
     // 先确认存在，否则 MySQL 的 update 影响 0 行时无法区分「不存在」和「值没变」
     await this.findById(id);
-    await this.db.update(users).set(dto).where(eq(users.id, id));
+    await this.db
+      .update(users)
+      .set(dto)
+      .where(alive(eq(users.id, id)));
 
     return this.findById(id);
   }
@@ -127,7 +144,7 @@ export class UserService {
     const [user] = await this.db
       .select({ id: users.id, password: users.password })
       .from(users)
-      .where(eq(users.id, id))
+      .where(alive(eq(users.id, id)))
       .limit(1);
 
     if (!user) {
@@ -141,19 +158,24 @@ export class UserService {
     await this.db
       .update(users)
       .set({ password: await this.hashPassword(dto.newPassword) })
-      .where(eq(users.id, id));
+      .where(alive(eq(users.id, id)));
   }
 
+  /** 软删除。用数据库端的 CURRENT_TIMESTAMP，与 created_at/updated_at 同源避免时钟偏差 */
   async remove(id: number): Promise<void> {
     await this.findById(id);
-    await this.db.delete(users).where(eq(users.id, id));
+
+    await this.db
+      .update(users)
+      .set({ deletedAt: sql`CURRENT_TIMESTAMP` })
+      .where(alive(eq(users.id, id)));
   }
 
   async touchLastLogin(id: number): Promise<void> {
     await this.db
       .update(users)
       .set({ lastLoginAt: sql`CURRENT_TIMESTAMP` })
-      .where(eq(users.id, id));
+      .where(alive(eq(users.id, id)));
   }
 
   hashPassword(plain: string): Promise<string> {

@@ -10,7 +10,7 @@ import {
   MaxLength,
 } from 'class-validator';
 
-import { USER_STATUS, type UserStatus } from '@nest-admin/shared';
+import { STATUS, type Status } from '@nest-admin/shared';
 
 export class CreateUserDto {
   @ApiProperty({ description: '登录账号', example: 'admin' })
@@ -57,10 +57,10 @@ export class CreateUserDto {
 
   @ApiPropertyOptional({
     description: '状态',
-    enum: USER_STATUS,
+    enum: STATUS,
     default: 'active',
   })
-  @IsEnum(USER_STATUS, { message: `状态只能是 ${USER_STATUS.join(' / ')}` })
+  @IsEnum(STATUS, { message: `状态只能是 ${STATUS.join(' / ')}` })
   @IsOptional()
-  status?: UserStatus;
+  status?: Status;
 }

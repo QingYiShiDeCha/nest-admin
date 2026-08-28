@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
-import { USER_STATUS, type UserStatus } from '@nest-admin/shared';
+import { STATUS, type Status } from '@nest-admin/shared';
 
 export class QueryUserDto extends PaginationQueryDto {
   @ApiPropertyOptional({ description: '用户名模糊搜索' })
@@ -11,8 +11,8 @@ export class QueryUserDto extends PaginationQueryDto {
   @IsOptional()
   keyword?: string;
 
-  @ApiPropertyOptional({ description: '按状态过滤', enum: USER_STATUS })
-  @IsEnum(USER_STATUS)
+  @ApiPropertyOptional({ description: '按状态过滤', enum: STATUS })
+  @IsEnum(STATUS)
   @IsOptional()
-  status?: UserStatus;
+  status?: Status;
 }

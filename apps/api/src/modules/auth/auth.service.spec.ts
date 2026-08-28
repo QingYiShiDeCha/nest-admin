@@ -29,6 +29,8 @@ const USER: SafeUser = {
   avatar: null,
   status: 'active',
   lastLoginAt: null,
+  createdBy: null,
+  updatedBy: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

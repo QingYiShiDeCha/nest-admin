@@ -96,7 +96,9 @@ pnpm dev
 
 要只操作某个包，用 `pnpm --filter @nest-admin/api <script>`。
 
-**改了 packages 下的代码，api 不会自动生效**——跨包引用走的是各包的 `dist`。要么重跑 `pnpm build:packages`，要么开一个终端跑 `pnpm -r --parallel dev` 让 `tsc --watch` 常驻。
+**类型即时生效，运行时需要构建**。`tsconfig.base.json` 里配了 `customConditions: ["@nest-admin/source"]`，各包 `exports` 中对应的分支指向 `src`，所以**编辑器和 `pnpm typecheck` 直接读源码**——改了 `packages` 下的类型，`apps/api` 立刻能看到，不需要先构建。Node 运行时不认识这个自定义条件，会落到 `default` 分支走 `dist`，因此**跑服务或测试前仍要 `pnpm build:packages`**（`pnpm dev` / `pnpm test` 已经内置了这一步）。
+
+这个设计是为了根除一类恼人的问题：早先跨包类型只能来自 `dist`，一旦执行过 `pnpm clean`、切分支或新克隆仓库还没构建，编辑器里所有 `@nest-admin/*` 导入都会解析失败，连带报出成片的 `no-unsafe-assignment` 之类的错误，而命令行却是干净的。注意各包的 `tsconfig.build.json` 里必须保留 `"customConditions": []`，否则 `tsc` 会把别的包的源码当成本包的输入文件，撞上 `rootDir` 限制。
 
 ## 约定
 
@@ -109,6 +111,36 @@ pnpm dev
 **密码字段**。`UserService` 里有一个 `safeColumns` 投影，所有对外查询都走它，保证 `password` 不会跟着结果溜出去。auth 校验密码走 `findCredentialsByUsername`，它把哈希和用户信息拆成两个字段返回。
 
 **改表流程**。改 `packages/database/src/schema/*.ts` → `pnpm db:generate` → 检查生成的 SQL → `pnpm db:migrate` → 迁移文件一起提交。迁移 SQL 不进 `dist`，生产环境执行迁移需要源码目录。
+
+## 数据模型
+
+RBAC 采用**菜单与权限分离**：`sys_menu` 只回答「看得见什么」（前端路由树），`sys_permission` 只回答「能做什么」（接口级权限码），两者各自关联角色。
+
+```
+sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >── sys_permission
+                                   │
+                                   └──< sys_role_menu >── sys_menu (自引用树)
+```
+
+| 表 | 作用 | 关键约束 |
+| --- | --- | --- |
+| `sys_user` | 用户 | `username` 唯一 |
+| `sys_role` | 角色 | `code` 唯一；`data_scope` 数据权限范围；`is_system` 内置角色保护 |
+| `sys_permission` | 权限码，如 `system:user:delete` | `code` 唯一；`module` 用于分配界面分组 |
+| `sys_menu` | 前端路由菜单树 | `parent_id` 自引用，`type` 为 directory / menu / external |
+| `sys_user_role` | 用户授角色 | 联合主键 |
+| `sys_role_permission` | 角色授权限 | 联合主键 |
+| `sys_role_menu` | 角色授菜单 | 联合主键 |
+
+几条贯穿全表的约定：
+
+**软删除**。业务主表都有 `deleted_at`，非空即已删除。所有业务查询必须叠加 `isNull(deletedAt)`——`UserService` 里的 `alive()` 辅助函数就是干这个的，新写查询时照抄。三张关联表不软删除：解绑就是真删行，授权关系只有"有"和"没有"两种状态。
+
+**唯一码删除后不可复用**。`sys_role.code`、`sys_permission.code`、`sys_user.username` 的唯一索引覆盖已软删除的行。这是有意为之：权限码会被前端和守卫元数据引用，让新角色复用一个被删除的旧码，等于把历史授权语义悄悄还给了它。相应地，`UserService.create` 的重名预检查查的是全量而非仅未删除的行，否则会先告诉调用方"可用"再在插入时撞 `ER_DUP_ENTRY`。
+
+**关联表带外键且 `ON DELETE CASCADE`**。主表虽走软删除、级联极少触发，但一旦真的物理清理数据，不会留下悬空的授权行。
+
+**审计字段**。`created_by` / `updated_by` 目前可空——填充它需要在请求上下文里拿到当前用户，等 RBAC 的 service 层接上后统一写入。
 
 ## 接口一览
 
@@ -130,7 +162,7 @@ pnpm dev
 
 按当前范围刻意留白的部分，后续要做时的落点：
 
-- **RBAC 权限**。角色表、菜单/权限表、用户角色关联，以及一个读 `@Permissions()` 元数据的 `PermissionGuard`。
+- **RBAC 的读写与鉴权**。基础表已建好（见「数据模型」），还缺角色/权限/菜单的 service 与 controller、`@Permissions()` 装饰器和读取它的 `PermissionGuard`、以及给前端的「我的菜单树」接口。权限码目前一条都没预置，要跟实际接口一一对应地随功能录入。
 - **refreshToken 吊销**。现在的刷新是无状态的，只验签名和类型，签发后无法单独踢下线。要支持就得把 token 的 `jti` 存进 Redis 做白名单。
 - **登录限流**。`@nestjs/throttler` 尚未接入，登录接口目前没有暴力破解防护。
 - **操作日志、文件上传、Redis 缓存、软删除**。

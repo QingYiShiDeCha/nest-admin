@@ -1,6 +1,5 @@
-import { USER_STATUS } from '@nest-admin/shared';
+import { STATUS } from '@nest-admin/shared';
 import {
-  bigint,
   index,
   mysqlEnum,
   mysqlTable,
@@ -9,12 +8,12 @@ import {
   varchar,
 } from 'drizzle-orm/mysql-core';
 
+import { auditColumns, primaryId } from './columns';
+
 export const users = mysqlTable(
   'sys_user',
   {
-    id: bigint('id', { mode: 'number', unsigned: true })
-      .autoincrement()
-      .primaryKey(),
+    id: primaryId(),
     username: varchar('username', { length: 32 }).notNull(),
     /** bcrypt 哈希，任何对外返回都必须剔除该字段 */
     password: varchar('password', { length: 100 }).notNull(),
@@ -22,10 +21,9 @@ export const users = mysqlTable(
     email: varchar('email', { length: 128 }),
     phone: varchar('phone', { length: 20 }),
     avatar: varchar('avatar', { length: 255 }),
-    status: mysqlEnum('status', USER_STATUS).notNull().default('active'),
+    status: mysqlEnum('status', STATUS).notNull().default('active'),
     lastLoginAt: timestamp('last_login_at'),
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+    ...auditColumns(),
   },
   (table) => [
     uniqueIndex('uk_sys_user_username').on(table.username),
@@ -35,5 +33,8 @@ export const users = mysqlTable(
 
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
-/** 对外可见的用户字段，不含 password */
-export type SafeUser = Omit<UserRow, 'password'>;
+/**
+ * 对外可见的用户字段：去掉密码，也去掉 deletedAt——
+ * 对外查询永远只返回未删除的行，这个字段对调用方没有信息量。
+ */
+export type SafeUser = Omit<UserRow, 'password' | 'deletedAt'>;
