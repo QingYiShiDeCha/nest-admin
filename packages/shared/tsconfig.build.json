@@ -1,3 +1,10 @@
 {
-  "extends": "./tsconfig.json"
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    // 与产物同生共死，避免删了 dist 却留下过期的增量状态
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "include": ["src"]
 }

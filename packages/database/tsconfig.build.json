@@ -2,7 +2,12 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // 与产物同生共死，避免删了 dist 却留下过期的增量状态
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    // 构建时解析到 @nest-admin/shared 的 dist，而不是把它的源码
+    // 当成本包的输入文件（会撞 rootDir 限制）
+    "customConditions": []
   },
   "include": ["src"]
 }

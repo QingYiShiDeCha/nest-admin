@@ -1,0 +1,29 @@
+{
+  // 用仓库自带的 TypeScript 5.9.3，而不是 VS Code 内置的版本。
+  // 版本不一致会导致编辑器报出命令行查不到的错误。
+  // 首次打开时右下角会提示，需要点一次「Allow」/「使用工作区版本」。
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  // 兜底：万一某个文件没落进任何 tsconfig，推断项目也要开着装饰器，
+  // 否则 NestJS 的 @Controller/@Get 等会整片报 TS1241。
+  "js/ts.implicitProjectConfig.experimentalDecorators": true,
+
+  // monorepo 下让 ESLint 按包定位工作目录，
+  // 保证类型感知规则能找到对应包的 tsconfig。
+  "eslint.workingDirectories": [{ "mode": "auto" }],
+
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+
+  "files.exclude": {
+    "**/dist": true
+  },
+  "search.exclude": {
+    "**/dist": true,
+    "**/pnpm-lock.yaml": true
+  }
+}

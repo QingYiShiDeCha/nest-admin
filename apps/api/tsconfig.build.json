@@ -2,7 +2,14 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": "src",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    // 增量状态必须放进 outDir：nest-cli 的 deleteOutDir 会清空 dist，
+    // 若状态文件留在外面，tsc 会以为其余文件仍是最新的而跳过输出，
+    // 导致 dist 只剩本次改动过的几个文件。
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    // 构建时必须解析到各包的 dist 而非 src，否则别的包的源码会被当成
+    // 本包的输入文件，触发 rootDir 报错。置空即撤销 tsconfig.base 里的设置。
+    "customConditions": []
   },
   "include": ["src"],
   "exclude": ["node_modules", "test", "dist", "**/*spec.ts"]

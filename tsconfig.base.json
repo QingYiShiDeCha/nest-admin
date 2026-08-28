@@ -3,6 +3,14 @@
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "resolvePackageJsonExports": true,
+    // 让类型检查与编辑器把 @nest-admin/* 解析到各包的 src 源码，而不是 dist 产物。
+    // 各包 package.json 的 exports 里声明了这个条件；Node 运行时不认识它，
+    // 会落到 default 分支走 dist，所以运行时行为不变。
+    // 好处是编辑器不再依赖构建产物——dist 没构建或过期时，
+    // 不会出现 @nest-admin/* 解析失败导致的一整片 error 类型报错。
+    // 注意：各包的 tsconfig.build.json 必须把它置空，否则 tsc 会把别的包的
+    // 源码当成本包的输入文件，撞上 rootDir 限制。
+    "customConditions": ["@nest-admin/source"],
     "esModuleInterop": true,
     "isolatedModules": true,
     "declaration": true,

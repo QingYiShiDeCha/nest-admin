@@ -1,0 +1,21 @@
+{
+  // monorepo 根配置，只作兜底。各包都有自己的 tsconfig.json，
+  // 编辑器会优先用离文件最近的那一份；这份的作用是：
+  // 万一某个文件不属于任何子包（比如根目录的临时脚本），编辑器也能拿到
+  // experimentalDecorators 等正确选项，而不是退回默认关闭装饰器的
+  // 「推断项目」，导致 NestJS 装饰器整片报 TS1241。
+  //
+  // 测试文件刻意排除在外：@types/jest 装在 apps/api 里，根目录的程序解析不到它。
+  // 这些文件由 apps/api/tsconfig.json 覆盖，不需要兜底。
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "apps/*/src",
+    "packages/*/src",
+    "packages/*/scripts",
+    "packages/*/drizzle.config.ts"
+  ],
+  "exclude": ["**/node_modules", "**/dist", "**/*.spec.ts", "**/*.e2e-spec.ts"]
+}
