@@ -15,7 +15,9 @@ export const PERMISSIONS = {
   USER_DELETE: 'system:user:delete',
   /** 给用户分配角色，与改用户资料分开，因为它实际是在授权 */
   USER_ASSIGN_ROLE: 'system:user:assign-role',
-  /** 强制用户下线：吊销其全部 refreshToken */
+  /** 查看用户的在线设备。与下线拆开：看是只读，踢是写 */
+  USER_SESSION_LIST: 'system:user:session:list',
+  /** 强制用户下线：吊销其全部或指定 refreshToken */
   USER_FORCE_LOGOUT: 'system:user:force-logout',
 
   ROLE_LIST: 'system:role:list',
@@ -57,6 +59,11 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   {
     code: PERMISSIONS.USER_ASSIGN_ROLE,
     name: '给用户分配角色',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.USER_SESSION_LIST,
+    name: '查看用户在线设备',
     module: 'system',
   },
   {

@@ -8,6 +8,7 @@ import { UserModule } from '../user/user.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RefreshTokenModule } from './refresh-token.module';
+import { UserSessionController } from './user-session.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 @Module({
@@ -27,7 +28,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, UserSessionController],
   providers: [AuthService, JwtStrategy],
   exports: [AuthService],
 })

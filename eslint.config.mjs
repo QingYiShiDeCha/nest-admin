@@ -13,6 +13,9 @@ export default tseslint.config(
       '**/dist/**',
       '**/coverage/**',
       '**/migrations/**',
+      // 这份是面向 Node/NestJS 的类型感知配置，解析不了 .vue，
+      // 也没有 eslint-plugin-vue。前端应当在 apps/web 下配自己的那套。
+      'apps/web/**',
     ],
   },
   eslint.configs.recommended,

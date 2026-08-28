@@ -170,6 +170,35 @@ export class AuthService {
   }
 
   /**
+   * 管理员查看指定用户的在线设备。
+   *
+   * 先确认用户存在，否则查一个不存在的 id 会得到空数组，
+   * 让调用方分不清「这人没登录」和「压根没这个人」。
+   *
+   * current 仍按查看者自己的会话计算：管理员查自己时能正确标出当前设备，
+   * 查别人时自然全是 false。
+   */
+  async listUserSessions(
+    targetUserId: number,
+    viewerSessionId: string | null,
+  ): Promise<SessionVo[]> {
+    await this.userService.findById(targetUserId);
+
+    return this.listSessions(targetUserId, viewerSessionId);
+  }
+
+  /** 管理员下线指定用户的某台设备 */
+  async revokeUserSession(
+    sessionId: number,
+    targetUserId: number,
+  ): Promise<void> {
+    await this.userService.findById(targetUserId);
+    // 复用同一个带归属条件的方法：会话必须确实属于这个目标用户，
+    // 否则管理员可能因为拼错 id 而下掉另一个人的设备
+    await this.revokeSession(sessionId, targetUserId);
+  }
+
+  /**
    * 下线指定设备。归属校验在 SQL 条件里完成，
    * 未命中一律按「不存在」响应，不区分「不是你的」和「本来就没有」，
    * 免得成为探测他人会话 id 的接口。

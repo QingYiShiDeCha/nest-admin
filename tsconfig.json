@@ -11,8 +11,11 @@
   "compilerOptions": {
     "noEmit": true
   },
+  // 只覆盖后端。apps/web 是 Vue 应用，有自己的 tsconfig.app.json
+  // （bundler 解析、.vue 类型声明、import.meta.env 等），
+  // 用这份 Node 配置去扫它只会得到一堆假错误。
   "include": [
-    "apps/*/src",
+    "apps/api/src",
     "packages/*/src",
     "packages/*/scripts",
     "packages/*/drizzle.config.ts"

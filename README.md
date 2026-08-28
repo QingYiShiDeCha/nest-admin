@@ -132,6 +132,8 @@ pnpm dev
 
 列表刻意不返回 jti，只给数据库主键 id 用于下线。下线时**归属校验写在 SQL 条件里**（`id = ? AND user_id = ?`），只按 id 查会让任何登录用户猜 id 就能下掉别人的会话。未命中一律返回 404，不区分「不是你的」和「本来就没有」，否则这个接口就成了探测他人会话 id 的工具。
 
+管理员那组接口（`/users/:id/sessions`）与用户自己的那组是分开的：后者只能操作自己、不需要权限，前者能操作任意用户、受权限码保护。读和写也拆成两个码——看是 `system:user:session:list`，踢是 `system:user:force-logout`。管理员下线时会话必须确实属于路径上的那个用户，否则返回 404，避免拼错 id 就把别人的设备下掉。
+
 `revoke-others` 在识别不出当前设备时（用早期版本签发的 accessToken）直接拒绝，而不是退化成「全部下线」——那会把发起操作的人自己也踢掉。
 
 **accessToken 仍是无状态的**，吊销 refreshToken 不会让已签发的 accessToken 立刻失效，它最多再活 `JWT_ACCESS_EXPIRES_IN`（默认 30 分钟）。需要立刻阻断请把用户状态改成 `disabled`，那是每次请求都会校验的。
@@ -212,6 +214,8 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | GET | `/api/users/:id` | `system:user:read` | 用户详情 |
 | PATCH | `/api/users/:id` | `system:user:update` | 更新用户（不含用户名和密码） |
 | DELETE | `/api/users/:id` | `system:user:delete` | 删除用户 |
+| GET | `/api/users/:id/sessions` | `system:user:session:list` | 查看指定用户的在线设备 |
+| DELETE | `/api/users/:id/sessions/:sessionId` | `system:user:force-logout` | 下线该用户的某台设备 |
 | POST | `/api/users/:id/force-logout` | `system:user:force-logout` | 强制该用户下线，吊销其全部会话 |
 | PUT | `/api/users/me/password` | 仅需登录 | 修改自己的密码，需校验旧密码 |
 | GET | `/api/users/:id/roles` | `system:user:assign-role` | 用户已分配的角色 id，供分配界面回显 |
@@ -238,7 +242,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 按当前范围刻意留白的部分，后续要做时的落点：
 
 - **日志的归档与清理**。`sys_operation_log` 只增不减，长期运行需要按 `created_at` 定期归档或分区。
-- **管理员视角的会话列表**。目前管理员只能整体踢下线（`force-logout`），看不到某个用户具体有哪些设备在线。
+- **部门表与数据权限**。`sys_role.data_scope` 已经落库但还没有任何地方消费它，需要先有 `sys_dept` 才能把「本部门」「本部门及以下」这些范围翻译成查询条件。
 - **限流的分布式存储**。当前计数在进程内存中，多实例部署时配额会按实例数翻倍。
 - **操作日志、文件上传、Redis 缓存、软删除**。
 - **`JwtStrategy` 每请求回库**。当前每个受保护请求都会按主键查一次用户，好处是禁用/删除立即生效，量大时需要在这里加缓存。

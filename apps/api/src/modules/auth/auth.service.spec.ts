@@ -346,6 +346,30 @@ describe('AuthService', () => {
       expect(refreshTokens.revokeOthers).toHaveBeenCalledWith(USER.id, 'mine');
     });
 
+    it('管理员查会话前先确认用户存在，避免把「没这人」显示成「没登录」', async () => {
+      refreshTokens.listActive.mockResolvedValue([] as never);
+
+      await service.listUserSessions(42, null);
+
+      expect(userService.findById).toHaveBeenCalledWith(42);
+      expect(refreshTokens.listActive).toHaveBeenCalledWith(42);
+    });
+
+    it('管理员下线时把目标用户 id 一起带进归属条件', async () => {
+      await service.revokeUserSession(9, 42);
+
+      // 不是 (9, 管理员自己)，否则管理员拼错 id 会下掉别人的设备
+      expect(refreshTokens.revokeOwned).toHaveBeenCalledWith(9, 42);
+    });
+
+    it('会话不属于目标用户时返回 404', async () => {
+      refreshTokens.revokeOwned.mockResolvedValue(false);
+
+      await expect(service.revokeUserSession(9, 42)).rejects.toThrow(
+        new NotFoundException('会话 9 不存在'),
+      );
+    });
+
     it('识别不出当前设备时拒绝执行，否则会把自己也踢掉', async () => {
       await expect(service.revokeOtherSessions(USER.id, null)).rejects.toThrow(
         new BadRequestException('当前登录态无法识别设备，请重新登录后再操作'),
