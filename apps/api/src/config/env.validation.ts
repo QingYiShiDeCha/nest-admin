@@ -45,6 +45,13 @@ export const envSchema = z.object({
    * 格式：redis://[:password@]host:port[/db]
    * 启动日志会明确打印当前用的是哪种，避免线上以为配了其实没生效。
    */
+  /** 操作日志保留天数，超过则被定时任务物理删除 */
+  LOG_RETENTION_DAYS: z.coerce.number().int().min(1).default(90),
+  /** 清理任务的 cron 表达式，默认每天凌晨 3 点 */
+  LOG_CLEANUP_CRON: z.string().default('0 3 * * *'),
+  /** 关掉定时清理。日志量小或想完全交给运维处理时使用 */
+  LOG_CLEANUP_ENABLED: booleanFromString.default(true),
+
   REDIS_URL: z
     .string()
     .trim()

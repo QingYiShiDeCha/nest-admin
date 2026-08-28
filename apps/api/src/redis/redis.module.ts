@@ -9,11 +9,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Redis } from 'ioredis';
 
 import type { Env } from '../config/env.validation';
-
-/** 注入 Redis 客户端。未配置 REDIS_URL 时注入的是 null，调用方必须判空 */
-export const REDIS_CLIENT = 'REDIS_CLIENT';
-
-export type RedisClient = Redis | null;
+import { RedisLockService } from './redis-lock.service';
+import { REDIS_CLIENT, type RedisClient } from './redis.constants';
 
 @Global()
 @Module({
@@ -47,8 +44,9 @@ export type RedisClient = Redis | null;
         return client;
       },
     },
+    RedisLockService,
   ],
-  exports: [REDIS_CLIENT],
+  exports: [REDIS_CLIENT, RedisLockService],
 })
 export class RedisModule implements OnApplicationShutdown {
   private readonly logger = new Logger(RedisModule.name);

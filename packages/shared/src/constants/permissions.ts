@@ -36,6 +36,8 @@ export const PERMISSIONS = {
 
   LOG_LIST: 'system:log:list',
   LOG_READ: 'system:log:read',
+  /** 手动触发日志清理 */
+  LOG_CLEAN: 'system:log:clean',
 
   /** 权限码目录只读，供角色授权界面拉取可选项 */
   PERMISSION_LIST: 'system:permission:list',
@@ -88,6 +90,7 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   { code: PERMISSIONS.MENU_DELETE, name: '删除菜单', module: 'system' },
   { code: PERMISSIONS.LOG_LIST, name: '查询操作日志', module: 'system' },
   { code: PERMISSIONS.LOG_READ, name: '查看日志详情', module: 'system' },
+  { code: PERMISSIONS.LOG_CLEAN, name: '手动清理日志', module: 'system' },
   {
     code: PERMISSIONS.PERMISSION_LIST,
     name: '查询权限码目录',

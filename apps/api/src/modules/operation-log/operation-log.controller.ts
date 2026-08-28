@@ -1,10 +1,21 @@
 import type { OperationLogRow } from '@nest-admin/database';
 import { PERMISSIONS, type PaginatedResult } from '@nest-admin/shared';
-import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { QueryOperationLogDto } from './dto/query-operation-log.dto';
+import { LogCleanupService, type CleanupResult } from './log-cleanup.service';
+import { OperationLog } from './operation-log.decorator';
 import { OperationLogService } from './operation-log.service';
 
 /**
@@ -15,7 +26,10 @@ import { OperationLogService } from './operation-log.service';
 @ApiBearerAuth()
 @Controller('operation-logs')
 export class OperationLogController {
-  constructor(private readonly service: OperationLogService) {}
+  constructor(
+    private readonly service: OperationLogService,
+    private readonly cleanup: LogCleanupService,
+  ) {}
 
   @Get()
   @Permissions(PERMISSIONS.LOG_LIST)
@@ -27,6 +41,29 @@ export class OperationLogController {
     @Query() query: QueryOperationLogDto,
   ): Promise<PaginatedResult<OperationLogRow>> {
     return this.service.findPage(query);
+  }
+
+  @Get('cleanup/preview')
+  @Permissions(PERMISSIONS.LOG_CLEAN)
+  @ApiOperation({
+    summary: '预览本次清理会删掉多少行',
+    description: '按 LOG_RETENTION_DAYS 计算，执行前可先看一眼规模',
+  })
+  previewCleanup(): Promise<CleanupResult> {
+    return this.cleanup.countExpired();
+  }
+
+  @Post('cleanup')
+  @Permissions(PERMISSIONS.LOG_CLEAN)
+  @HttpCode(HttpStatus.OK)
+  @OperationLog({ module: '操作日志', action: '手动清理' })
+  @ApiOperation({
+    summary: '立即执行一次清理',
+    description:
+      '与定时任务共用同一把 Redis 锁，不会和它撞在一起同时删。单次上限 10 万行，超出部分留到下一轮。',
+  })
+  runCleanup(): Promise<CleanupResult> {
+    return this.cleanup.runManually();
   }
 
   @Get(':id')

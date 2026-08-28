@@ -144,6 +144,14 @@ pnpm dev
 
 **日志是旁路，绝不能拖垮业务**。写入不 await、异常在 service 内部吞掉只留一行告警。已实测：把日志表改名制造写入失败后，新增用户依然返回 201 且数据正常落库。
 
+**过期日志由定时任务清理**。保留天数、cron、开关都在环境变量里（默认保留 90 天、每天 3 点）。cron 表达式来自配置，所以用 `SchedulerRegistry` 动态注册而不是 `@Cron()` 装饰器——装饰器参数在类定义时求值，那会儿读不到配置。
+
+**删除是分批的。** 一条 `DELETE WHERE created_at < ?` 打在几百万行上会长时间持锁、撑爆 undo 和 binlog，线上表现就是整个库卡住。这里每批 1000 行、单次最多 100 批，超出部分留到下一轮。
+
+**多实例下靠 Redis 锁保证只跑一份。** 没有锁的话 N 个实例会同时删同一批数据，互相竞争行锁。锁用 `SET NX PX` 获取、Lua 脚本比对持有者后删除——分两步做的话，恰好在两步之间锁过期被别人抢到，就会误删对方的锁。抢不到锁直接跳过而不排队：定时任务错过一轮无所谓，排队反而会堆积。没配 Redis 时不加锁直接执行，单实例部署本就不需要它。
+
+清理时顺带删掉已经没用的会话记录（已过期的，或吊销时间超过保留期的）。`RefreshTokenService` 只在签发时清理当前用户的过期记录，已吊销但未过期、以及不再登录的用户留下的行不会被碰到，这里补上。
+
 日志表 append-only，没有软删除也没有 `created_by`——日志本身就是「谁在何时做了什么」，再套一层审计字段是循环。`username` 冗余存一份而非做外键：用户被删除后仍要能回答「是谁做的」。接口只提供查询，不提供删除，能被随手删掉的审计日志没有审计价值；清理历史应当是运维层面按 `created_at` 批量删除的定时任务。
 
 **限流**。全局默认按客户端 IP 计数，窗口与配额由 `THROTTLE_TTL` / `THROTTLE_LIMIT` 控制；登录和注册另有更严格的固定阈值（60 秒 5 次，见 `packages/shared` 的 `LOGIN_THROTTLE`）。写成常量而非环境变量是因为 `@Throttle` 是装饰器，在类定义时求值，那会儿 ConfigModule 还没加载 `.env`。
@@ -232,6 +240,8 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | GET | `/api/permissions` | `system:permission:list` | 权限码目录，供授权界面拉取可选项 |
 | GET | `/api/operation-logs` | `system:log:list` | 分页查询操作日志，支持用户名/模块/结果/时间范围过滤 |
 | GET | `/api/operation-logs/:id` | `system:log:read` | 日志详情，含脱敏后的请求参数快照 |
+| GET | `/api/operation-logs/cleanup/preview` | `system:log:clean` | 预览本次清理会删掉多少行 |
+| POST | `/api/operation-logs/cleanup` | `system:log:clean` | 立即执行一次清理 |
 | GET | `/api/menus/mine` | 仅需登录 | 当前用户可见的菜单树，前端渲染侧边栏 |
 | GET | `/api/menus` | `system:menu:list` | 完整菜单树（管理端），含停用与隐藏节点 |
 | POST | `/api/menus` | `system:menu:create` | 新增菜单 |
@@ -243,7 +253,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 
 按当前范围刻意留白的部分，后续要做时的落点：
 
-- **日志的归档与清理**。`sys_operation_log` 只增不减，长期运行需要按 `created_at` 定期归档或分区。
+- **日志归档到冷存储**。目前超期日志是直接物理删除。若有合规要求需要长期留存，应在 `LogCleanupService` 删除前先导出到对象存储或归档表。
 - **部门表与数据权限**。`sys_role.data_scope` 已经落库但还没有任何地方消费它，需要先有 `sys_dept` 才能把「本部门」「本部门及以下」这些范围翻译成查询条件。
 - **Redis 的其他用途**。目前只有限流在用它，`RedisModule` 已经把客户端抽出来了，后续做缓存、分布式锁可以直接注入 `REDIS_CLIENT`。
 - **操作日志、文件上传、Redis 缓存、软删除**。
