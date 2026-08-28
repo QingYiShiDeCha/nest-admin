@@ -85,7 +85,9 @@ pnpm dev
 | --- | --- |
 | `pnpm dev` | 先构建 packages，再以 watch 模式启动 api |
 | `pnpm build` | 按拓扑顺序构建全部包 |
-| `pnpm typecheck` / `pnpm lint` | 全仓库类型检查 / ESLint 自动修复 |
+| `pnpm typecheck` / `pnpm lint` | 全仓库类型检查 / ESLint 自动修复（前后端各自的配置） |
+| `pnpm lint:api` / `pnpm lint:web` | 单独跑后端 / 前端的 lint，两者配置独立 |
+| `pnpm format` / `pnpm format:web` | 后端 / 前端的 prettier |
 | `pnpm test` / `pnpm test:e2e` | 单元测试 / 端到端测试（会先构建依赖包） |
 | `pnpm clean` | 删除所有 dist 与 tsbuildinfo |
 | `pnpm db:generate` | 对比 schema 生成迁移 SQL 到 `packages/database/migrations` |
@@ -99,6 +101,16 @@ pnpm dev
 **类型即时生效，运行时需要构建**。`tsconfig.base.json` 里配了 `customConditions: ["@nest-admin/source"]`，各包 `exports` 中对应的分支指向 `src`，所以**编辑器和 `pnpm typecheck` 直接读源码**——改了 `packages` 下的类型，`apps/api` 立刻能看到，不需要先构建。Node 运行时不认识这个自定义条件，会落到 `default` 分支走 `dist`，因此**跑服务或测试前仍要 `pnpm build:packages`**（`pnpm dev` / `pnpm test` 已经内置了这一步）。
 
 这个设计是为了根除一类恼人的问题：早先跨包类型只能来自 `dist`，一旦执行过 `pnpm clean`、切分支或新克隆仓库还没构建，编辑器里所有 `@nest-admin/*` 导入都会解析失败，连带报出成片的 `no-unsafe-assignment` 之类的错误，而命令行却是干净的。注意各包的 `tsconfig.build.json` 里必须保留 `"customConditions": []`，否则 `tsc` 会把别的包的源码当成本包的输入文件，撞上 `rootDir` 限制。
+
+## 前端（apps/web）
+
+Vue 3.5 + Vite 8 + TypeScript + vue-router 5 + Pinia 4 + antdv-next（按需自动引入）+ UnoCSS（wind4 preset）。`create-vue` 脚手架起步。
+
+**ESLint 配置前后端是分开的两套**：根那份面向 Node/NestJS（类型感知、flat config），ignore 了 `apps/web`；前端在自己的 `eslint.config.ts` 里用 `eslint-plugin-vue` + `@vue/eslint-config-typescript`（create-vue 官方组合）。互不解析对方的文件。
+
+**TypeScript 版本是故意分叉的**：后端 5.9.3（根依赖）、前端 6.0.x（本包依赖），pnpm 会各装一份。Volar（Vue 语言服务）用包自己的版本，不会互相干扰；但 VS Code 的 `typescript.tsdk` 指向根那份 5.9.3，只对 `.ts` 生效，Vue 文件由 Volar 接管。
+
+样式入口是 `main.ts` 里的 `import 'virtual:uno.css'`，UnoCSS 靠这个虚拟模块注入生成的工具类，**漏掉这行插件就整个空跑**（脚手架默认不自带，是手工配的，漏过一次）。antdv 的组件不用手动 import，`AntdvNextResolver` 按需自动注册。
 
 ## 约定
 

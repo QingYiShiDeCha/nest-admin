@@ -10,7 +10,7 @@
     "dev": "pnpm build:packages && pnpm --filter @nest-admin/api start:dev",
     "start:prod": "pnpm --filter @nest-admin/api start:prod",
     "typecheck": "pnpm -r typecheck",
-    "lint": "eslint . --fix",
+    "lint": "pnpm lint:api && pnpm lint:web",
     "format": "prettier --write \"{apps,packages}/*/{src,test}/**/*.ts\"",
     "test": "pnpm build:packages && pnpm -r test",
     "test:e2e": "pnpm build:packages && pnpm --filter @nest-admin/api test:e2e",
@@ -19,7 +19,10 @@
     "db:migrate": "pnpm build:packages && pnpm --filter @nest-admin/database db:migrate",
     "db:push": "pnpm build:packages && pnpm --filter @nest-admin/database db:push",
     "db:studio": "pnpm build:packages && pnpm --filter @nest-admin/database db:studio",
-    "db:seed": "pnpm build:packages && pnpm --filter @nest-admin/database db:seed"
+    "db:seed": "pnpm build:packages && pnpm --filter @nest-admin/database db:seed",
+    "lint:api": "eslint . --fix",
+    "lint:web": "pnpm --filter @nest-admin/web lint",
+    "format:web": "pnpm --filter @nest-admin/web format"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
