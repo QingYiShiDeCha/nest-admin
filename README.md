@@ -83,7 +83,8 @@ pnpm dev
 
 | 命令 | 说明 |
 | --- | --- |
-| `pnpm dev` | 先构建 packages，再以 watch 模式启动 api |
+| `pnpm dev` | 先构建 packages，然后**并行**启动 api（:3000）与 web（:5173），带包名前缀的混合输出 |
+| `pnpm dev:api` / `pnpm dev:web` | 只启动其中一端 |
 | `pnpm build` | 按拓扑顺序构建全部包 |
 | `pnpm typecheck` / `pnpm lint` | 全仓库类型检查 / ESLint 自动修复（前后端各自的配置） |
 | `pnpm lint:api` / `pnpm lint:web` | 单独跑后端 / 前端的 lint，两者配置独立 |
@@ -109,6 +110,8 @@ Vue 3.5 + Vite 8 + TypeScript + vue-router 5 + Pinia 4 + antdv-next（按需自�
 **ESLint 配置前后端是分开的两套**：根那份面向 Node/NestJS（类型感知、flat config），ignore 了 `apps/web`；前端在自己的 `eslint.config.ts` 里用 `eslint-plugin-vue` + `@vue/eslint-config-typescript`（create-vue 官方组合）。互不解析对方的文件。
 
 **TypeScript 版本是故意分叉的**：后端 5.9.3（根依赖）、前端 6.0.x（本包依赖），pnpm 会各装一份。Volar（Vue 语言服务）用包自己的版本，不会互相干扰；但 VS Code 的 `typescript.tsdk` 指向根那份 5.9.3，只对 `.ts` 生效，Vue 文件由 Volar 接管。
+
+开发时前端把 `/api` 代理到 `http://localhost:3000`（配置在 `vite.config.ts` 的 `server.proxy`），所以前端代码里统一写相对路径 `/api/...`，不需要关心后端端口也不存在跨域问题。
 
 样式入口是 `main.ts` 里的 `import 'virtual:uno.css'`，UnoCSS 靠这个虚拟模块注入生成的工具类，**漏掉这行插件就整个空跑**（脚手架默认不自带，是手工配的，漏过一次）。antdv 的组件不用手动 import，`AntdvNextResolver` 按需自动注册。
 

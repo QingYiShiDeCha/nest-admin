@@ -7,7 +7,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "build:packages": "pnpm --filter \"./packages/*\" build",
-    "dev": "pnpm build:packages && pnpm --filter @nest-admin/api start:dev",
+    "dev": "pnpm build:packages && pnpm --parallel --filter @nest-admin/api --filter @nest-admin/web run dev",
     "start:prod": "pnpm --filter @nest-admin/api start:prod",
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm lint:api && pnpm lint:web",
@@ -22,7 +22,9 @@
     "db:seed": "pnpm build:packages && pnpm --filter @nest-admin/database db:seed",
     "lint:api": "eslint . --fix",
     "lint:web": "pnpm --filter @nest-admin/web lint",
-    "format:web": "pnpm --filter @nest-admin/web format"
+    "format:web": "pnpm --filter @nest-admin/web format",
+    "dev:api": "pnpm --filter @nest-admin/api start:dev",
+    "dev:web": "pnpm --filter @nest-admin/web dev"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
