@@ -104,7 +104,17 @@ pnpm dev
 
 **统一响应**。成功由 `TransformInterceptor` 包成 `{ code: 0, message: 'success', data, timestamp }`，controller 只返回业务数据本身。失败由 `AllExceptionsFilter` 包成同构结构，`code` 是 HTTP 状态码；未知异常统一 500，堆栈只进日志不外泄。MySQL 唯一索引冲突会被翻译成 409。
 
-**默认全局鉴权**。`JwtAuthGuard` 通过 `APP_GUARD` 全局注册，所有路由默认需要 `Authorization: Bearer <accessToken>`。登录、注册、刷新、健康检查用 `@Public()` 显式开放——**新增无需登录的接口时别忘了加它**。
+**默认全局鉴权，两道守卫**。`JwtAuthGuard` 与 `PermissionGuard` 都通过 `APP_GUARD` 注册，且**刻意放在 `AppModule` 同一个 providers 数组里**——顺序即执行顺序，前者认证并把 `AuthUser` 挂到 request 上，后者依赖它的产物比对权限码。分散到各自模块时执行顺序取决于模块解析顺序，改动 imports 就可能悄悄失效。
+
+所有路由默认需要 `Authorization: Bearer <accessToken>`，登录、注册、刷新、健康检查用 `@Public()` 显式开放——**新增无需登录的接口时别忘了加它**。
+
+**权限码**。用 `@Permissions(PERMISSIONS.USER_DELETE)` 标注接口，未标注的只要登录即可访问。传多个码是「满足其一即可」；需要「同时满足」时请拆出更细的权限码，那在分配界面上是可见可解释的，叠加是隐式规则。
+
+码值只在 `packages/shared/src/constants/permissions.ts` 定义一次，被三处消费：controller 标注、seed 录入 `sys_permission`、前端按钮级控制。**不要在别处写字面量**，新增权限码时同步往 `PERMISSION_DEFINITIONS` 补一条，再跑 `pnpm db:seed` 录入。
+
+**超管短路**。持有 `super_admin` 角色的用户在 `PermissionGuard` 里直接放行，不参与权限码比对。这不是图省事——没有这条兜底，一旦权限数据配错或被清空，管理员会连「修复权限」的接口都调不了，只能去数据库手工插数据。所以超管的 `permissions` 字段返回空数组，前端见到 `isSuperAdmin: true` 应视为拥有全部权限。
+
+**权限变更即时生效**。`JwtStrategy` 每个请求回库查用户与授权，所以改角色授权、禁用角色、禁用用户都不需要重新登录就会生效。代价是每个受保护请求多几次查询；要优化就在 `PermissionService` 加缓存，届时需一并解决「改权限后缓存何时失效」的一致性问题。
 
 **注入数据库**。任何 service 里 `@Inject(DRIZZLE) private readonly db: DrizzleDB`，即可获得带完整表结构推断的 Drizzle 实例。`DatabaseModule` 是 `@Global` 的，不必在各模块重复 import。
 
@@ -150,19 +160,19 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | POST | `/api/auth/register` | 公开 | 注册并直接返回 token |
 | POST | `/api/auth/login` | 公开 | 账号密码登录 |
 | POST | `/api/auth/refresh` | 公开 | 用 refreshToken 换新 token 对 |
-| GET | `/api/auth/profile` | 需要 | 当前登录用户信息 |
-| GET | `/api/users` | 需要 | 分页查询，支持 `keyword` / `status` |
-| POST | `/api/users` | 需要 | 新增用户 |
-| GET | `/api/users/:id` | 需要 | 用户详情 |
-| PATCH | `/api/users/:id` | 需要 | 更新用户（不含用户名和密码） |
-| DELETE | `/api/users/:id` | 需要 | 删除用户 |
-| PUT | `/api/users/me/password` | 需要 | 修改自己的密码，需校验旧密码 |
+| GET | `/api/auth/profile` | 需要 | 当前登录用户信息，含角色码与权限码 |
+| GET | `/api/users` | `system:user:list` | 分页查询，支持 `keyword` / `status` |
+| POST | `/api/users` | `system:user:create` | 新增用户 |
+| GET | `/api/users/:id` | `system:user:read` | 用户详情 |
+| PATCH | `/api/users/:id` | `system:user:update` | 更新用户（不含用户名和密码） |
+| DELETE | `/api/users/:id` | `system:user:delete` | 删除用户 |
+| PUT | `/api/users/me/password` | 仅需登录 | 修改自己的密码，需校验旧密码 |
 
 ## 尚未包含
 
 按当前范围刻意留白的部分，后续要做时的落点：
 
-- **RBAC 的读写与鉴权**。基础表已建好（见「数据模型」），还缺角色/权限/菜单的 service 与 controller、`@Permissions()` 装饰器和读取它的 `PermissionGuard`、以及给前端的「我的菜单树」接口。权限码目前一条都没预置，要跟实际接口一一对应地随功能录入。
+- **角色 / 权限 / 菜单的管理接口**。鉴权链路已通（`@Permissions()` + `PermissionGuard`），但还没有 CRUD：角色增删改查、给角色授权限、给角色授菜单、给用户分配角色，目前只能直接改库。菜单树和「我的菜单」接口也还没做，前端拿不到侧边栏数据。
 - **refreshToken 吊销**。现在的刷新是无状态的，只验签名和类型，签发后无法单独踢下线。要支持就得把 token 的 `jti` 存进 Redis 做白名单。
 - **登录限流**。`@nestjs/throttler` 尚未接入，登录接口目前没有暴力破解防护。
 - **操作日志、文件上传、Redis 缓存、软删除**。

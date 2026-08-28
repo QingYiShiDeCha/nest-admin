@@ -1,3 +1,5 @@
+import type { SafeUser } from '@nest-admin/database';
+import { PERMISSIONS, type PaginatedResult } from '@nest-admin/shared';
 import {
   Body,
   Controller,
@@ -15,8 +17,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import type { PaginatedResult } from '@nest-admin/shared';
-import type { SafeUser } from '@nest-admin/database';
+import { Permissions } from '../../common/decorators/permissions.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { QueryUserDto } from './dto/query-user.dto';
@@ -30,17 +31,20 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post()
+  @Permissions(PERMISSIONS.USER_CREATE)
   @ApiOperation({ summary: '新增用户' })
   create(@Body() dto: CreateUserDto): Promise<SafeUser> {
     return this.userService.create(dto);
   }
 
   @Get()
+  @Permissions(PERMISSIONS.USER_LIST)
   @ApiOperation({ summary: '分页查询用户' })
   findPage(@Query() query: QueryUserDto): Promise<PaginatedResult<SafeUser>> {
     return this.userService.findPage(query);
   }
 
+  // 改自己的密码不需要用户管理权限，任何登录用户都可以
   @Put('me/password')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '修改当前登录用户的密码' })
@@ -52,12 +56,14 @@ export class UserController {
   }
 
   @Get(':id')
+  @Permissions(PERMISSIONS.USER_READ)
   @ApiOperation({ summary: '查询用户详情' })
   findOne(@Param('id', ParseIntPipe) id: number): Promise<SafeUser> {
     return this.userService.findById(id);
   }
 
   @Patch(':id')
+  @Permissions(PERMISSIONS.USER_UPDATE)
   @ApiOperation({ summary: '更新用户' })
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -67,6 +73,7 @@ export class UserController {
   }
 
   @Delete(':id')
+  @Permissions(PERMISSIONS.USER_DELETE)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '删除用户' })
   remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
