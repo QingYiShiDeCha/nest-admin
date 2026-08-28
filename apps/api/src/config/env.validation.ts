@@ -38,6 +38,20 @@ export const envSchema = z.object({
    * 直接暴露在公网时必须保持关闭，否则客户端可伪造该头绕过限流。
    */
   TRUST_PROXY: booleanFromString.default(false),
+
+  /**
+   * 限流计数的存放位置。不配则用进程内存——多实例部署时每个实例各算各的，
+   * 实际配额会按实例数翻倍。配上之后各实例共享同一份计数。
+   * 格式：redis://[:password@]host:port[/db]
+   * 启动日志会明确打印当前用的是哪种，避免线上以为配了其实没生效。
+   */
+  REDIS_URL: z
+    .string()
+    .trim()
+    // 把 REDIS_URL= 这种留空写法当作「不配置」。
+    // 留空是关掉一个可选依赖最自然的方式，不该让应用启动失败。
+    .transform((value) => value || undefined)
+    .pipe(z.string().url().optional()),
 });
 
 export type Env = z.infer<typeof envSchema>;

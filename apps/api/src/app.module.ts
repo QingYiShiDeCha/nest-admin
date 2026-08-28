@@ -2,6 +2,7 @@ import { workspaceEnvFiles } from '@nest-admin/shared/node';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { ThrottlerModule, seconds } from '@nestjs/throttler';
 import { ClsModule } from 'nestjs-cls';
 
@@ -20,6 +21,11 @@ import { OperationLogInterceptor } from './modules/operation-log/operation-log.i
 import { OperationLogModule } from './modules/operation-log/operation-log.module';
 import { RbacModule } from './modules/rbac/rbac.module';
 import { UserModule } from './modules/user/user.module';
+import {
+  REDIS_CLIENT,
+  RedisModule,
+  type RedisClient,
+} from './redis/redis.module';
 
 @Module({
   imports: [
@@ -34,18 +40,23 @@ import { UserModule } from './modules/user/user.module';
     // 中间件负责建立 AsyncLocalStorage 上下文（此时还没认证，拿不到用户）；
     // 真正写入内容的是 RequestContextInterceptor，它在守卫之后执行。
     ClsModule.forRoot({ global: true, middleware: { mount: true } }),
+    RedisModule,
     RequestContextModule,
     // 只声明一个默认限流器，登录这类需要收紧的接口用 @Throttle 就地覆盖。
     // 声明多个具名限流器会让它们同时作用于所有路由，反而要到处 @SkipThrottle。
     ThrottlerModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<Env, true>) => ({
+      inject: [ConfigService, REDIS_CLIENT],
+      useFactory: (config: ConfigService<Env, true>, redis: RedisClient) => ({
         throttlers: [
           {
             ttl: seconds(config.get('THROTTLE_TTL', { infer: true })),
             limit: config.get('THROTTLE_LIMIT', { infer: true }),
           },
         ],
+        // 配了 REDIS_URL 就用 Redis，各实例共享计数；
+        // 没配则回退到 throttler 自带的进程内存储。
+        // 究竟用了哪种会在启动日志里明说，避免线上以为配了其实没生效。
+        ...(redis ? { storage: new ThrottlerStorageRedisService(redis) } : {}),
       }),
     }),
     DatabaseModule,

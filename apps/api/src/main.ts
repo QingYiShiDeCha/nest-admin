@@ -49,6 +49,12 @@ async function bootstrap(): Promise<void> {
 
   const logger = new Logger('Bootstrap');
   logger.log(`服务已启动：http://localhost:${port}/${prefix}`);
+  // 明确打印限流存储，避免线上以为配了 Redis 其实回退到了内存
+  logger.log(
+    config.get('REDIS_URL', { infer: true })
+      ? '限流存储：Redis（多实例共享计数）'
+      : '限流存储：进程内存（多实例部署时配额会按实例数翻倍）',
+  );
   if (docsPath) {
     logger.log(`接口文档：http://localhost:${port}/${docsPath}`);
   }
