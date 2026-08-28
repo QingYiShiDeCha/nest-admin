@@ -48,6 +48,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       user.id,
     );
 
-    return { ...user, ...authorization };
+    return { ...user, ...authorization, sessionId: payload.sid ?? null };
   }
 }

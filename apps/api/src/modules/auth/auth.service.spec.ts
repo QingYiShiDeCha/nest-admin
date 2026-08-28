@@ -1,4 +1,8 @@
-import { UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { Test, type TestingModule } from '@nestjs/testing';
@@ -53,7 +57,14 @@ describe('AuthService', () => {
   let refreshTokens: jest.Mocked<
     Pick<
       RefreshTokenService,
-      'issue' | 'check' | 'rotate' | 'revoke' | 'revokeAllForUser'
+      | 'issue'
+      | 'check'
+      | 'rotate'
+      | 'revoke'
+      | 'revokeAllForUser'
+      | 'listActive'
+      | 'revokeOwned'
+      | 'revokeOthers'
     >
   >;
 
@@ -79,6 +90,9 @@ describe('AuthService', () => {
       rotate: jest.fn().mockResolvedValue('jti-rotated'),
       revoke: jest.fn().mockResolvedValue(undefined),
       revokeAllForUser: jest.fn().mockResolvedValue(2),
+      listActive: jest.fn().mockResolvedValue([]),
+      revokeOwned: jest.fn().mockResolvedValue(true),
+      revokeOthers: jest.fn().mockResolvedValue(3),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -275,5 +289,68 @@ describe('AuthService', () => {
   it('登出时令牌本身无效也不报错', async () => {
     await expect(service.logout('not-a-jwt')).resolves.toBeUndefined();
     expect(refreshTokens.revoke).not.toHaveBeenCalled();
+  });
+
+  describe('会话管理', () => {
+    const session = (id: number, jti: string) => ({
+      id,
+      jti,
+      ip: '1.1.1.1',
+      userAgent: 'ua',
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 1000),
+    });
+
+    it('当前设备被标出来并排在最前', async () => {
+      refreshTokens.listActive.mockResolvedValue([
+        session(1, 'other'),
+        session(2, 'mine'),
+      ] as never);
+
+      const list = await service.listSessions(USER.id, 'mine');
+
+      expect(list.map((s) => [s.id, s.current])).toEqual([
+        [2, true],
+        [1, false],
+      ]);
+    });
+
+    it('不暴露 jti，只给出用于下线的 id', async () => {
+      refreshTokens.listActive.mockResolvedValue([
+        session(1, 'secret-jti'),
+      ] as never);
+
+      const [item] = await service.listSessions(USER.id, null);
+
+      expect(JSON.stringify(item)).not.toContain('secret-jti');
+    });
+
+    it('下线时把归属校验交给 SQL，userId 必须一起传下去', async () => {
+      await service.revokeSession(7, USER.id);
+
+      expect(refreshTokens.revokeOwned).toHaveBeenCalledWith(7, USER.id);
+    });
+
+    it('下线别人的会话按 404 处理，不透露它是否存在', async () => {
+      refreshTokens.revokeOwned.mockResolvedValue(false);
+
+      await expect(service.revokeSession(7, USER.id)).rejects.toThrow(
+        new NotFoundException('会话 7 不存在'),
+      );
+    });
+
+    it('下线其他设备时保留当前会话', async () => {
+      await expect(
+        service.revokeOtherSessions(USER.id, 'mine'),
+      ).resolves.toEqual({ revokedSessions: 3 });
+      expect(refreshTokens.revokeOthers).toHaveBeenCalledWith(USER.id, 'mine');
+    });
+
+    it('识别不出当前设备时拒绝执行，否则会把自己也踢掉', async () => {
+      await expect(service.revokeOtherSessions(USER.id, null)).rejects.toThrow(
+        new BadRequestException('当前登录态无法识别设备，请重新登录后再操作'),
+      );
+      expect(refreshTokens.revokeOthers).not.toHaveBeenCalled();
+    });
   });
 });

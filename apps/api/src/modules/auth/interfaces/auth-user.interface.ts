@@ -9,4 +9,6 @@ export interface AuthUser extends SafeUser {
   roles: string[];
   permissions: string[];
   isSuperAdmin: boolean;
+  /** 当前 accessToken 所属的会话标识，旧 token 没有则为 null */
+  sessionId: string | null;
 }

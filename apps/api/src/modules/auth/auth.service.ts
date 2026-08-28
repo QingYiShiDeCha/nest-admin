@@ -1,5 +1,11 @@
 import type { SafeUser } from '@nest-admin/database';
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 
@@ -8,6 +14,7 @@ import type { Env } from '../../config/env.validation';
 import { UserService } from '../user/user.service';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
+import type { SessionVo } from './dto/session.vo';
 import type {
   AuthResult,
   AuthTokens,
@@ -122,7 +129,7 @@ export class AuthService {
     );
 
     return {
-      accessToken: await this.signAccessToken(user),
+      accessToken: await this.signAccessToken(user, jti),
       refreshToken: await this.signRefreshToken(user, jti, expiresIn),
     };
   }
@@ -141,6 +148,58 @@ export class AuthService {
 
     await this.refreshTokens.revoke(payload.jti);
     this.logger.log(`用户 ${payload.username} 已登出`);
+  }
+
+  /** 我的登录设备列表，当前设备排在最前 */
+  async listSessions(
+    userId: number,
+    currentSessionId: string | null,
+  ): Promise<SessionVo[]> {
+    const sessions = await this.refreshTokens.listActive(userId);
+
+    return sessions
+      .map((item) => ({
+        id: item.id,
+        ip: item.ip,
+        userAgent: item.userAgent,
+        createdAt: item.createdAt,
+        expiresAt: item.expiresAt,
+        current: currentSessionId !== null && item.jti === currentSessionId,
+      }))
+      .sort((a, b) => Number(b.current) - Number(a.current));
+  }
+
+  /**
+   * 下线指定设备。归属校验在 SQL 条件里完成，
+   * 未命中一律按「不存在」响应，不区分「不是你的」和「本来就没有」，
+   * 免得成为探测他人会话 id 的接口。
+   */
+  async revokeSession(id: number, userId: number): Promise<void> {
+    const revoked = await this.refreshTokens.revokeOwned(id, userId);
+
+    if (!revoked) {
+      throw new NotFoundException(`会话 ${id} 不存在`);
+    }
+  }
+
+  /** 下线除当前设备外的全部会话，常见于「发现异常登录」时的自救 */
+  async revokeOtherSessions(
+    userId: number,
+    currentSessionId: string | null,
+  ): Promise<{ revokedSessions: number }> {
+    if (!currentSessionId) {
+      // 无法识别当前设备就执行不了「保留当前」，否则会把自己也踢掉
+      throw new BadRequestException(
+        '当前登录态无法识别设备，请重新登录后再操作',
+      );
+    }
+
+    return {
+      revokedSessions: await this.refreshTokens.revokeOthers(
+        userId,
+        currentSessionId,
+      ),
+    };
   }
 
   private async verifyRefreshToken(
@@ -177,16 +236,17 @@ export class AuthService {
     );
 
     return {
-      accessToken: await this.signAccessToken(user),
+      accessToken: await this.signAccessToken(user, jti),
       refreshToken: await this.signRefreshToken(user, jti, expiresIn),
     };
   }
 
-  private signAccessToken(user: SafeUser): Promise<string> {
+  private signAccessToken(user: SafeUser, sid: string): Promise<string> {
     return this.jwtService.signAsync({
       sub: user.id,
       username: user.username,
       type: 'access',
+      sid,
     } satisfies JwtPayload);
   }
 

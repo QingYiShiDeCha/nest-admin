@@ -2,9 +2,12 @@ import { LOGIN_THROTTLE } from '@nest-admin/shared';
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
+  ParseIntPipe,
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -17,6 +20,7 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RegisterDto } from './dto/register.dto';
+import { SessionVo } from './dto/session.vo';
 import type { AuthUser } from './interfaces/auth-user.interface';
 import type {
   AuthResult,
@@ -73,6 +77,47 @@ export class AuthController {
   })
   logout(@Body() dto: RefreshTokenDto): Promise<void> {
     return this.authService.logout(dto.refreshToken);
+  }
+
+  @Get('sessions')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: '我的登录设备列表',
+    description:
+      '只列出未吊销且未过期的会话，当前设备排在最前并带 current: true。任何登录用户都能查自己的，不需要额外权限。',
+  })
+  listSessions(@CurrentUser() user: AuthUser): Promise<SessionVo[]> {
+    return this.authService.listSessions(user.id, user.sessionId);
+  }
+
+  @Delete('sessions/:id')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @OperationLog({ module: '认证', action: '下线指定设备' })
+  @ApiOperation({
+    summary: '下线指定设备',
+    description:
+      '只能下线自己的会话，别人的一律返回 404——不区分「不是你的」和「不存在」，避免成为探测他人会话 id 的接口。',
+  })
+  revokeSession(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ): Promise<void> {
+    return this.authService.revokeSession(id, user.id);
+  }
+
+  @Post('sessions/revoke-others')
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @OperationLog({ module: '认证', action: '下线其他设备' })
+  @ApiOperation({
+    summary: '下线除当前设备外的全部会话',
+    description: '发现异常登录时的自救操作，当前设备保持在线',
+  })
+  revokeOtherSessions(
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ revokedSessions: number }> {
+    return this.authService.revokeOtherSessions(user.id, user.sessionId);
   }
 
   @Get('profile')

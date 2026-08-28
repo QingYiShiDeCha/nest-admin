@@ -1,6 +1,7 @@
 import { refreshTokens, type RefreshTokenRow } from '@nest-admin/database';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, lt, ne, sql } from 'drizzle-orm';
+
 import { randomUUID } from 'node:crypto';
 
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
@@ -102,6 +103,86 @@ export class RefreshTokenService {
     });
 
     return newJti;
+  }
+
+  /**
+   * 某用户当前有效的会话，按最近创建排序。
+   * 只返回未吊销且未过期的——已失效的记录对「我的登录设备」没有意义。
+   */
+  listActive(userId: number): Promise<RefreshTokenRow[]> {
+    return this.db
+      .select()
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          isNull(refreshTokens.revokedAt),
+          gt(refreshTokens.expiresAt, new Date()),
+        ),
+      )
+      .orderBy(desc(refreshTokens.createdAt));
+  }
+
+  /**
+   * 按主键吊销，但**必须同时匹配 userId**——这是防越权的关键。
+   * 只用 id 查会让任何登录用户猜 id 就能把别人的会话下掉。
+   * 返回 false 表示没有命中（不存在、已失效、或不属于该用户），
+   * 调用方一律按「不存在」响应，不泄漏究竟是哪种情况。
+   */
+  async revokeOwned(id: number, userId: number): Promise<boolean> {
+    const [record] = await this.db
+      .select({ id: refreshTokens.id })
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.id, id),
+          eq(refreshTokens.userId, userId),
+          isNull(refreshTokens.revokedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!record) {
+      return false;
+    }
+
+    await this.db
+      .update(refreshTokens)
+      .set({ revokedAt: sql`CURRENT_TIMESTAMP` })
+      .where(eq(refreshTokens.id, id));
+
+    return true;
+  }
+
+  /** 吊销该用户除当前会话外的所有会话，返回被踢掉的数量 */
+  async revokeOthers(userId: number, keepJti: string): Promise<number> {
+    const others = await this.db
+      .select({ id: refreshTokens.id })
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          isNull(refreshTokens.revokedAt),
+          ne(refreshTokens.jti, keepJti),
+        ),
+      );
+
+    if (others.length === 0) {
+      return 0;
+    }
+
+    await this.db
+      .update(refreshTokens)
+      .set({ revokedAt: sql`CURRENT_TIMESTAMP` })
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          isNull(refreshTokens.revokedAt),
+          ne(refreshTokens.jti, keepJti),
+        ),
+      );
+
+    return others.length;
   }
 
   /** 吊销单个 token，用于主动登出 */

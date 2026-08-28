@@ -13,6 +13,12 @@ export interface JwtPayload {
    * 刷新时靠它查库判断是否已被吊销——accessToken 保持无状态。
    */
   jti?: string;
+  /**
+   * 仅 accessToken 有，值等于它所属会话的 refreshToken jti。
+   * 只用来在会话列表里标出「当前设备」，鉴权时不校验它——
+   * accessToken 仍然是无状态的。
+   */
+  sid?: string;
 }
 
 export interface AuthTokens {

@@ -128,6 +128,12 @@ pnpm dev
 
 改密码和软删除用户会自动吊销该用户全部会话——密码泄漏后改密是第一反应，如果旧 refreshToken 还能继续换新，改密就等于没改。
 
+**会话列表靠 accessToken 里的 `sid`**。签发时把所属会话的 jti 写进 accessToken 的 `sid` claim，`AuthUser.sessionId` 透出来，列表据此标出「当前设备」。鉴权时不校验 `sid`，accessToken 依然无状态——它只用来回答「这条记录是不是我正在用的这台」。
+
+列表刻意不返回 jti，只给数据库主键 id 用于下线。下线时**归属校验写在 SQL 条件里**（`id = ? AND user_id = ?`），只按 id 查会让任何登录用户猜 id 就能下掉别人的会话。未命中一律返回 404，不区分「不是你的」和「本来就没有」，否则这个接口就成了探测他人会话 id 的工具。
+
+`revoke-others` 在识别不出当前设备时（用早期版本签发的 accessToken）直接拒绝，而不是退化成「全部下线」——那会把发起操作的人自己也踢掉。
+
 **accessToken 仍是无状态的**，吊销 refreshToken 不会让已签发的 accessToken 立刻失效，它最多再活 `JWT_ACCESS_EXPIRES_IN`（默认 30 分钟）。需要立刻阻断请把用户状态改成 `disabled`，那是每次请求都会校验的。
 
 **操作日志**。所有写操作（POST/PUT/PATCH/DELETE）由 `OperationLogInterceptor` 自动记录，无需在每个 service 里手写。GET 不记——量级太大且没有审计价值，记了只会淹没真正要看的东西。用 `@OperationLog({ module, action })` 补上可读的中文标签，不标也会记录，只是只能靠 method + path 辨认；确实不该记的用 `@SkipOperationLog()`。
@@ -197,6 +203,9 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | POST | `/api/auth/login` | 公开 | 账号密码登录 |
 | POST | `/api/auth/refresh` | 公开 | 用 refreshToken 换新 token 对（会轮换旧的） |
 | POST | `/api/auth/logout` | 公开 | 登出，吊销本次提交的 refreshToken |
+| GET | `/api/auth/sessions` | 仅需登录 | 我的登录设备列表，当前设备排最前 |
+| DELETE | `/api/auth/sessions/:id` | 仅需登录 | 下线自己的指定设备 |
+| POST | `/api/auth/sessions/revoke-others` | 仅需登录 | 下线除当前设备外的全部会话 |
 | GET | `/api/auth/profile` | 需要 | 当前登录用户信息，含角色码与权限码 |
 | GET | `/api/users` | `system:user:list` | 分页查询，支持 `keyword` / `status` |
 | POST | `/api/users` | `system:user:create` | 新增用户 |
@@ -229,7 +238,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 按当前范围刻意留白的部分，后续要做时的落点：
 
 - **日志的归档与清理**。`sys_operation_log` 只增不减，长期运行需要按 `created_at` 定期归档或分区。
-- **会话列表接口**。`sys_refresh_token` 已经记了每个会话的 IP 与 UA，但还没有「我的登录设备」这类查询与单独下线的接口。
+- **管理员视角的会话列表**。目前管理员只能整体踢下线（`force-logout`），看不到某个用户具体有哪些设备在线。
 - **限流的分布式存储**。当前计数在进程内存中，多实例部署时配额会按实例数翻倍。
 - **操作日志、文件上传、Redis 缓存、软删除**。
 - **`JwtStrategy` 每请求回库**。当前每个受保护请求都会按主键查一次用户，好处是禁用/删除立即生效，量大时需要在这里加缓存。
