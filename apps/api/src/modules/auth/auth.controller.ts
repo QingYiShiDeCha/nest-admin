@@ -1,3 +1,4 @@
+import { LOGIN_THROTTLE } from '@nest-admin/shared';
 import {
   Body,
   Controller,
@@ -7,6 +8,7 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -26,16 +28,24 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
+  @Throttle({ default: LOGIN_THROTTLE })
   @Post('register')
-  @ApiOperation({ summary: '注册并直接返回登录态' })
+  @ApiOperation({
+    summary: '注册并直接返回登录态',
+    description: `限流：每 IP ${LOGIN_THROTTLE.ttl / 1000} 秒内最多 ${LOGIN_THROTTLE.limit} 次`,
+  })
   register(@Body() dto: RegisterDto): Promise<AuthResult> {
     return this.authService.register(dto);
   }
 
   @Public()
+  @Throttle({ default: LOGIN_THROTTLE })
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: '账号密码登录' })
+  @ApiOperation({
+    summary: '账号密码登录',
+    description: `限流：每 IP ${LOGIN_THROTTLE.ttl / 1000} 秒内最多 ${LOGIN_THROTTLE.limit} 次，超出返回 429`,
+  })
   login(@Body() dto: LoginDto): Promise<AuthResult> {
     return this.authService.login(dto);
   }

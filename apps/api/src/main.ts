@@ -1,6 +1,7 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -9,11 +10,21 @@ import type { Env } from './config/env.validation';
 import { setupSwagger } from './config/swagger.setup';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
   const config = app.get(ConfigService<Env, true>);
 
   const prefix = config.get('API_PREFIX', { infer: true });
   const port = config.get('PORT', { infer: true });
+
+  // 限流按来源 IP 统计，代理后面必须信任 X-Forwarded-For，
+  // 否则所有请求看起来都来自代理，全站共用一个配额；
+  // 而直接暴露公网时打开它又会让客户端能伪造该头绕过限流。
+  // 因此交给部署方通过 TRUST_PROXY 显式声明，不做自动推断。
+  if (config.get('TRUST_PROXY', { infer: true })) {
+    app.set('trust proxy', 1);
+  }
 
   app.setGlobalPrefix(prefix);
   app.enableCors();

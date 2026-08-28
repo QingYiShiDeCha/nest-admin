@@ -27,6 +27,17 @@ export const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
 
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(4).max(15).default(10),
+
+  /** 全局限流窗口（秒）与窗口内允许的请求数，按客户端 IP 统计 */
+  THROTTLE_TTL: z.coerce.number().int().min(1).default(60),
+  THROTTLE_LIMIT: z.coerce.number().int().min(1).default(120),
+  /**
+   * 是否信任反向代理传来的 X-Forwarded-For。
+   * 部署在 nginx 之后必须打开，否则所有请求的来源 IP 都是同一个代理地址，
+   * 限流会退化成「全站共用一个配额」，一个人就能把所有人挡在外面。
+   * 直接暴露在公网时必须保持关闭，否则客户端可伪造该头绕过限流。
+   */
+  TRUST_PROXY: booleanFromString.default(false),
 });
 
 export type Env = z.infer<typeof envSchema>;
