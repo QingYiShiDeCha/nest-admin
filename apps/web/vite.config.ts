@@ -28,6 +28,20 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+    /**
+     * 让 @nest-admin/* 解析到各包的 TS 源码而不是 dist。
+     *
+     * 那些包的产物是 CommonJS（后端在用），浏览器按 ESM 导入拿不到具名导出，
+     * 表现是 "does not provide an export named 'PERMISSIONS'" 且应用直接白屏。
+     * 这个自定义条件在各包的 exports 里已经声明过（后端 typecheck 也用它），
+     * 这里复用即可，不必为前端再产一份 ESM 产物。
+     * 附带好处：改 shared 的代码前端能直接热更新，不需要先 build。
+     */
+    conditions: ['@nest-admin/source', 'module', 'browser', 'development|production'],
+  },
+  optimizeDeps: {
+    // 走源码解析后它就是普通 TS 文件，不该被当成预构建依赖
+    exclude: ['@nest-admin/shared'],
   },
   server: {
     proxy: {

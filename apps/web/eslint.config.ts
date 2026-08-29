@@ -19,4 +19,13 @@ export default defineConfigWithVueTs(
   pluginVue.configs['flat/essential'],
   vueTsConfigs.recommended,
   skipFormatting,
+  {
+    name: 'web/rules',
+    rules: {
+      // 页面组件统一叫 views/<域>/index.vue，路由 path 与目录路径一一对应，
+      // 看 URL 就知道找哪个文件。这个约定下文件名必然单词单一，规则不适用。
+      // 可复用组件仍应用多词命名（放在 components/ 下，不受此影响）。
+      'vue/multi-word-component-names': 'off',
+    },
+  },
 );

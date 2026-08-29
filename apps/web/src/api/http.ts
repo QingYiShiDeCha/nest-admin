@@ -2,6 +2,7 @@ import type { RequestBody } from 'alova';
 import { createAlova } from 'alova';
 import adapterFetch from 'alova/fetch';
 
+import { emitUnauthorized } from '@/utils/auth-events';
 import {
   clearTokens,
   getAccessToken,
@@ -165,6 +166,9 @@ async function sendWithRetry<T>(
     if (!shouldRetry) {
       if (error instanceof ApiError && error.httpStatus === 401) {
         clearTokens();
+        // 通知应用跳登录页。这里只发事件，不 import router——
+        // 一个纯请求模块不该依赖路由实例
+        emitUnauthorized();
       }
 
       throw error;
