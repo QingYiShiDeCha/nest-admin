@@ -13,6 +13,11 @@ declare module 'vue-router' {
     permission?: string;
     /** 侧边栏图标，antdv 图标名 */
     icon?: string;
+    /** 页签钉住：不可关闭、不受「关闭全部」影响 */
+    affix?: boolean;
+    /** 该页参与 KeepAlive 缓存，cacheName 是组件的 defineOptions 名 */
+    keepAlive?: boolean;
+    cacheName?: string;
   }
 }
 
@@ -38,7 +43,13 @@ export const routes: RouteRecordRaw[] = [
         path: 'dashboard',
         name: 'dashboard',
         component: () => import('@/views/dashboard/index.vue'),
-        meta: { title: '首页', icon: 'DashboardOutlined' },
+        meta: {
+          title: '首页',
+          icon: 'DashboardOutlined',
+          affix: true,
+          keepAlive: true,
+          cacheName: 'DashboardPage',
+        },
       },
       {
         path: 'profile',
@@ -50,25 +61,45 @@ export const routes: RouteRecordRaw[] = [
         path: 'system/user',
         name: 'system-user',
         component: () => import('@/views/system/user/index.vue'),
-        meta: { title: '用户管理', permission: PERMISSIONS.USER_LIST },
+        meta: {
+          title: '用户管理',
+          permission: PERMISSIONS.USER_LIST,
+          keepAlive: true,
+          cacheName: 'UserPage',
+        },
       },
       {
         path: 'system/role',
         name: 'system-role',
         component: () => import('@/views/system/role/index.vue'),
-        meta: { title: '角色管理', permission: PERMISSIONS.ROLE_LIST },
+        meta: {
+          title: '角色管理',
+          permission: PERMISSIONS.ROLE_LIST,
+          keepAlive: true,
+          cacheName: 'RolePage',
+        },
       },
       {
         path: 'system/menu',
         name: 'system-menu',
         component: () => import('@/views/system/menu/index.vue'),
-        meta: { title: '菜单管理', permission: PERMISSIONS.MENU_LIST },
+        meta: {
+          title: '菜单管理',
+          permission: PERMISSIONS.MENU_LIST,
+          keepAlive: true,
+          cacheName: 'MenuPage',
+        },
       },
       {
         path: 'system/log',
         name: 'system-log',
         component: () => import('@/views/system/log/index.vue'),
-        meta: { title: '操作日志', permission: PERMISSIONS.LOG_LIST },
+        meta: {
+          title: '操作日志',
+          permission: PERMISSIONS.LOG_LIST,
+          keepAlive: true,
+          cacheName: 'LogPage',
+        },
       },
     ],
   },

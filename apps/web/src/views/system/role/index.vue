@@ -296,6 +296,8 @@ async function submitGrant(): Promise<void> {
     grantSubmitting.value = false;
   }
 }
+
+defineOptions({ name: 'RolePage' });
 </script>
 
 <template>

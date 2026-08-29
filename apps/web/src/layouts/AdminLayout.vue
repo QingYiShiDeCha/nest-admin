@@ -9,6 +9,8 @@ import { BRAND_COLORS } from '@/constants/palette';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
 import { useSettingsStore } from '@/stores/settings';
+import { useTabsStore } from '@/stores/tabs';
+import TabBar from './TabBar.vue';
 import {
   findAncestorKeys,
   findByKey,
@@ -98,6 +100,7 @@ async function handleUserMenuClick({
 
   await auth.logout();
   menu.reset();
+  tabs.reset();
   await router.push({ name: 'login' });
 }
 
@@ -107,6 +110,7 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
 };
 
 const settings = useSettingsStore();
+const tabs = useTabsStore();
 </script>
 
 <template>
@@ -179,8 +183,16 @@ const settings = useSettingsStore();
         </div>
       </a-layout-header>
 
+      <TabBar />
+
       <a-layout-content class="p-6">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <!-- include 用页签的组件名：关掉页签 = 移出缓存 = 状态丢弃，
+               页签里开着的页面在切换间保持实例 -->
+          <KeepAlive :include="tabs.cachedNames">
+            <component :is="Component" />
+          </KeepAlive>
+        </RouterView>
       </a-layout-content>
     </a-layout>
   </a-layout>

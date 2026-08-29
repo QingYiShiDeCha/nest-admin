@@ -88,6 +88,8 @@ const heatRows = heatLabels.map((_, row) =>
     return seed - Math.floor(seed);
   }),
 );
+
+defineOptions({ name: 'DashboardPage' });
 </script>
 
 <template>

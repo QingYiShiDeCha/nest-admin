@@ -215,6 +215,8 @@ function resetFilters(): void {
   filters.status = '';
   void search();
 }
+
+defineOptions({ name: 'UserPage' });
 </script>
 
 <template>

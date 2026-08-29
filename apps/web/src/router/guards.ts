@@ -2,6 +2,7 @@ import type { Router } from 'vue-router';
 
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
+import { useTabsStore } from '@/stores/tabs';
 import { getAccessToken } from '@/utils/auth-token';
 
 const APP_TITLE = 'nest-admin';
@@ -33,9 +34,11 @@ export function setupGuards(router: Router): void {
       try {
         await Promise.all([auth.loadProfile(), menu.load()]);
       } catch {
-        // 拉取失败通常是令牌已失效（http 层已清 token），回登录页重新来
+        // 拉取失败通常是令牌已失效（http 层已清 token），回登录页重新来。
+        // 页签是上个会话的痕迹，一并清掉
         auth.reset();
         menu.reset();
+        useTabsStore().reset();
 
         return { name: 'login', query: { redirect: to.fullPath } };
       }

@@ -119,6 +119,8 @@ async function runCleanup(): Promise<void> {
     cleanupBusy.value = false;
   }
 }
+
+defineOptions({ name: 'LogPage' });
 </script>
 
 <template>

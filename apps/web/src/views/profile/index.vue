@@ -54,6 +54,8 @@ async function submit(): Promise<void> {
     submitting.value = false;
   }
 }
+
+defineOptions({ name: 'ProfilePage' });
 </script>
 
 <template>

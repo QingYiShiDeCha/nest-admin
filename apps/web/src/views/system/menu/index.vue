@@ -203,6 +203,8 @@ async function remove(record: MenuNode): Promise<void> {
 }
 
 const iconKeys = Object.keys(MENU_ICONS);
+
+defineOptions({ name: 'MenuPage' });
 </script>
 
 <template>
