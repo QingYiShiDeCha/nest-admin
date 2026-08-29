@@ -13,6 +13,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AAlert: typeof import('antdv-next')['Alert']
+    AAvatar: typeof import('antdv-next')['Avatar']
     AButton: typeof import('antdv-next')['Button']
     ACard: typeof import('antdv-next')['Card']
     ACheckbox: typeof import('antdv-next')['Checkbox']
@@ -55,6 +56,7 @@ declare module 'vue' {
 // For TSX support
 declare global {
   const AAlert: typeof import('antdv-next')['Alert']
+  const AAvatar: typeof import('antdv-next')['Avatar']
   const AButton: typeof import('antdv-next')['Button']
   const ACard: typeof import('antdv-next')['Card']
   const ACheckbox: typeof import('antdv-next')['Checkbox']
