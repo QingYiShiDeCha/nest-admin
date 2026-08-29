@@ -60,7 +60,7 @@ const table = useTable<OperationLog, LogQuery>({
         record.durationMs === null ? '—' : `${record.durationMs}ms`,
     },
     {
-      title: '',
+      title: '操作',
       key: 'detail',
       width: 80,
       render: (_value, record) =>
