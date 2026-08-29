@@ -23,13 +23,15 @@ export function menuKeyOf(node: MenuNode): string {
  */
 export function toMenuItems(nodes: MenuNode[]): MenuItems {
   return nodes.map((node) => {
-    const icon = resolveMenuIcon(node.icon);
+    const iconClass = resolveMenuIcon(node.icon);
     const item = {
       key: menuKeyOf(node),
       label: node.name,
       // title 是侧栏收起后 tooltip 的文字，不给的话收起时只剩一个图标
       title: node.name,
-      ...(icon ? { icon: h(icon) } : {}),
+      // 图标是 UnoCSS 的 class（见 menu-icons.ts），包一个 i 元素让它
+      // 有载体；mask 模式下颜色继承菜单文字的 currentColor
+      ...(iconClass ? { icon: h('i', { class: iconClass }) } : {}),
     };
 
     return node.children.length > 0

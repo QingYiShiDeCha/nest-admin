@@ -1,10 +1,19 @@
-import { defineConfig, presetWind4, presetIcons } from 'unocss';
 import { presetAntdTailwind4 } from '@antdv-next/unocss';
+import { defineConfig, presetIcons, presetWind4 } from 'unocss';
+
+import { MENU_ICONS } from './src/layouts/menu-icons';
 
 export default defineConfig({
   presets: [
     presetWind4(),
-    presetIcons(),
+    presetIcons({
+      // mask 模式下图标继承 currentColor（菜单/按钮换色自动跟随），
+      // inline-block 让 <i class="i-ant-design:xxx" /> 与文字对齐
+      extraProperties: {
+        display: 'inline-block',
+        'vertical-align': 'middle',
+      },
+    }),
     presetAntdTailwind4({
       prefix: 'a', // class 前缀，默认 'a'
       allowPrefixedUtilities: true, // 保留 a-* 工具类，默认 true
@@ -13,4 +22,10 @@ export default defineConfig({
       tokenPrefix: 'ant', // namespace 安全前缀，默认 'ant'，置空可关闭
     }),
   ],
+  /**
+   * 菜单图标的 class 是运行时从数据库的 sys_menu.icon 拼出来的，
+   * 扫描器在源码里看不到，必须 safelist 让它们始终生成。
+   * 清单直接取自注册表，与页面下拉选项同源。
+   */
+  safelist: Object.values(MENU_ICONS),
 });

@@ -15,7 +15,6 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
-    "@antdv-next/icons": "^1.1.2",
     "@nest-admin/shared": "workspace:*",
     "alova": "^3.5.5",
     "antdv-next": "^1.5.2",
@@ -28,6 +27,7 @@
   "devDependencies": {
     "@antdv-next/auto-import-resolver": "^1.1.1",
     "@antdv-next/unocss": "^1.1.1",
+    "@iconify-json/ant-design": "^1.2.8",
     "@tsconfig/node24": "^24.0.4",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^24.13.3",

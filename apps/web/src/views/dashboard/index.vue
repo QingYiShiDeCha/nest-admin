@@ -1,12 +1,4 @@
 <script setup lang="ts">
-import {
-  ClockCircleOutlined,
-  DeleteOutlined,
-  EditOutlined,
-  MessageOutlined,
-  ThunderboltOutlined,
-  UserOutlined,
-} from '@antdv-next/icons';
 import { SEMANTIC_COLORS } from '@/constants/palette';
 import { useSettingsStore } from '@/stores/settings';
 import { computed } from 'vue';
@@ -35,10 +27,10 @@ const themeVars = computed(() => ({
 
 /** 顶部四张统计卡 */
 const statCards = [
-  { icon: UserOutlined, tint: 'blue', label: '总访客数', value: '48,260', trend: '1.18%', up: true },
-  { icon: MessageOutlined, tint: 'cyan', label: '总会话数', value: '156K', trend: '3.04%', up: true },
-  { icon: ThunderboltOutlined, tint: 'green', label: '跳出率', value: '38.2%', trend: '1.12%', up: false },
-  { icon: ClockCircleOutlined, tint: 'orange', label: '平均会话时长', value: '4分12秒', trend: '0.84%', up: true },
+  { icon: 'i-ant-design:user-outlined', tint: 'blue', label: '总访客数', value: '48,260', trend: '1.18%', up: true },
+  { icon: 'i-ant-design:message-outlined', tint: 'cyan', label: '总会话数', value: '156K', trend: '3.04%', up: true },
+  { icon: 'i-ant-design:thunderbolt-outlined', tint: 'green', label: '跳出率', value: '38.2%', trend: '1.12%', up: false },
+  { icon: 'i-ant-design:clock-circle-outlined', tint: 'orange', label: '平均会话时长', value: '4分12秒', trend: '0.84%', up: true },
 ];
 
 /** 终端会话占比：分段比例与底部分类统计一致，中心是总量 */
@@ -107,7 +99,7 @@ const heatRows = heatLabels.map((_, row) =>
         <div class="dash-stats">
           <div v-for="card in statCards" :key="card.label" class="panel stat-card">
             <div class="stat-icon" :class="`tint-${card.tint}`">
-              <component :is="card.icon" />
+              <i :class="card.icon" />
             </div>
             <div class="stat-meta">
               <div class="stat-label">{{ card.label }}</div>
@@ -226,10 +218,10 @@ const heatRows = heatLabels.map((_, row) =>
                   <td class="ta-r">
                     <a-space :size="4">
                       <a-button type="text" size="small">
-                        <EditOutlined />
+                        <i class="i-ant-design:edit-outlined" />
                       </a-button>
                       <a-button type="text" size="small" danger>
-                        <DeleteOutlined />
+                        <i class="i-ant-design:delete-outlined" />
                       </a-button>
                     </a-space>
                   </td>
