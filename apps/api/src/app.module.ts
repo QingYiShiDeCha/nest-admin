@@ -17,6 +17,7 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { RefreshTokenModule } from './modules/auth/refresh-token.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { FileModule } from './modules/file/file.module';
 import { PermissionGuard } from './modules/rbac/guards/permission.guard';
 import { OperationLogInterceptor } from './modules/operation-log/operation-log.interceptor';
 import { OperationLogModule } from './modules/operation-log/operation-log.module';
@@ -60,6 +61,7 @@ import { RedisModule } from './redis/redis.module';
     }),
     DatabaseModule,
     RefreshTokenModule,
+    FileModule,
     OperationLogModule,
     RbacModule,
     AuthModule,

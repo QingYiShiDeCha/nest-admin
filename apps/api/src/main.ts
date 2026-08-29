@@ -8,6 +8,10 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import type { Env } from './config/env.validation';
 import { setupSwagger } from './config/swagger.setup';
+import {
+  normalizeLocalUrlPrefix,
+  resolveLocalUploadDirectory,
+} from './modules/file/file-storage.factory';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -24,6 +28,12 @@ async function bootstrap(): Promise<void> {
   // 因此交给部署方通过 TRUST_PROXY 显式声明，不做自动推断。
   if (config.get('TRUST_PROXY', { infer: true })) {
     app.set('trust proxy', 1);
+  }
+
+  if (config.get('UPLOAD_DRIVER', { infer: true }) === 'local') {
+    app.useStaticAssets(resolveLocalUploadDirectory(config), {
+      prefix: `${normalizeLocalUrlPrefix(config)}/`,
+    });
   }
 
   app.setGlobalPrefix(prefix);
@@ -55,6 +65,7 @@ async function bootstrap(): Promise<void> {
       ? '限流存储：Redis（多实例共享计数）'
       : '限流存储：进程内存（多实例部署时配额会按实例数翻倍）',
   );
+  logger.log(`文件存储：${config.get('UPLOAD_DRIVER', { infer: true })}`);
   if (docsPath) {
     logger.log(`接口文档：http://localhost:${port}/${docsPath}`);
   }

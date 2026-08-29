@@ -14,6 +14,7 @@
 | 认证 | `@nestjs/jwt` + passport-jwt，双 token（access / refresh），bcryptjs 存密码 |
 | 校验 | class-validator / class-transformer，全局 `ValidationPipe` |
 | 文档 | `@nestjs/swagger` |
+| 文件存储 | 本地文件系统或 AWS S3 / S3 兼容对象存储（`@aws-sdk/client-s3`） |
 | 测试 | Jest 30 + ts-jest，e2e 用 supertest |
 | 规范 | ESLint 9 flat config + typescript-eslint + Prettier |
 | 仓库结构 | pnpm 11 workspace，跨包脚本用 pnpm 原生 `-r` / `--filter` 编排 |
@@ -120,6 +121,17 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 开发时前端把 `/api` 代理到 `http://localhost:3000`（配置在 `vite.config.ts` 的 `server.proxy`），所以前端代码里统一写相对路径 `/api/...`，不需要关心后端端口也不存在跨域问题。
 
 样式入口是 `main.ts` 里的 `import 'virtual:uno.css'`，UnoCSS 靠这个虚拟模块注入生成的工具类，**漏掉这行插件就整个空跑**（脚手架默认不自带，是手工配的，漏过一次）。antdv 的组件不用手动 import，`AntdvNextResolver` 按需自动注册。
+
+## 文件上传
+
+`POST /api/files/upload` 接收 `multipart/form-data`，文件字段名固定为 `file`，默认需要登录但不要求额外权限码。成功后返回存储 key、访问 URL、原始文件名、MIME、大小和实际使用的存储驱动。
+
+存储由 `UPLOAD_DRIVER` 切换：
+
+- `local`：写入仓库根下的 `UPLOAD_LOCAL_DIR`，默认 `.uploads`，并通过 `UPLOAD_LOCAL_URL_PREFIX` 暴露静态访问路径，默认 `/uploads`。
+- `s3`：使用 AWS SDK v3 的 `PutObject`，同时支持 AWS S3、MinIO 和提供 S3 兼容接口的 OSS。AWS S3 可不配 endpoint；兼容服务填写 `UPLOAD_S3_ENDPOINT`。凭证留空时走 AWS SDK 默认凭证链。上传请求不会主动设置 `public-read` ACL，公开读取应由 Bucket Policy、对象存储控制台或 CDN 配置负责。
+
+上传使用内存缓冲，`UPLOAD_MAX_FILE_SIZE_MB` 是单文件硬上限，默认 10 MB、最高 100 MB。`UPLOAD_ALLOWED_MIME_TYPES` 是逗号分隔白名单，支持 `image/*` 和 `*/*` 通配符。存储 key 的扩展名由 MIME 映射生成，不采用客户端文件名里的扩展名，避免上传伪装成普通文本的 HTML 后在同域执行。若对象通过私有域名、CDN 或自定义 Bucket 域名访问，配置 `UPLOAD_S3_PUBLIC_BASE_URL`；否则服务会根据 endpoint、bucket 和 region 生成对象 URL。
 
 ## 约定
 
@@ -263,6 +275,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | GET | `/api/operation-logs/:id` | `system:log:read` | 日志详情，含脱敏后的请求参数快照 |
 | GET | `/api/operation-logs/cleanup/preview` | `system:log:clean` | 预览本次清理会删掉多少行 |
 | POST | `/api/operation-logs/cleanup` | `system:log:clean` | 立即执行一次清理 |
+| POST | `/api/files/upload` | 仅需登录 | 上传单个文件，multipart 字段名为 `file` |
 | GET | `/api/menus/mine` | 仅需登录 | 当前用户可见的菜单树，前端渲染侧边栏 |
 | GET | `/api/menus` | `system:menu:list` | 完整菜单树（管理端），含停用与隐藏节点 |
 | POST | `/api/menus` | `system:menu:create` | 新增菜单 |
@@ -277,6 +290,6 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 - **日志归档到冷存储**。目前超期日志是直接物理删除。若有合规要求需要长期留存，应在 `LogCleanupService` 删除前先导出到对象存储或归档表。
 - **部门表与数据权限**。`sys_role.data_scope` 已经落库但还没有任何地方消费它，需要先有 `sys_dept` 才能把「本部门」「本部门及以下」这些范围翻译成查询条件。
 - **Redis 的其他用途**。目前只有限流在用它，`RedisModule` 已经把客户端抽出来了，后续做缓存、分布式锁可以直接注入 `REDIS_CLIENT`。
-- **操作日志、文件上传、Redis 缓存、软删除**。
+- **Redis 业务缓存**。限流与清理任务分布式锁已经使用 Redis，用户和权限数据尚未做缓存。
 - **`JwtStrategy` 每请求回库**。当前每个受保护请求都会按主键查一次用户，好处是禁用/删除立即生效，量大时需要在这里加缓存。
 - **构建缓存**。包数量变多、CI 变慢时可以再引入 Turborepo，现在 pnpm 原生编排够用。

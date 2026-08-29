@@ -4,7 +4,20 @@ const booleanFromString = z
   .enum(['true', 'false'])
   .transform((value) => value === 'true');
 
-export const envSchema = z.object({
+const emptyStringToUndefined = (value: unknown): unknown =>
+  typeof value === 'string' ? value.trim() || undefined : value;
+
+const optionalString = z.preprocess(
+  emptyStringToUndefined,
+  z.string().optional(),
+);
+
+const optionalUrl = z.preprocess(
+  emptyStringToUndefined,
+  z.string().url().optional(),
+);
+
+const baseEnvSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
     .default('development'),
@@ -52,13 +65,49 @@ export const envSchema = z.object({
   /** 关掉定时清理。日志量小或想完全交给运维处理时使用 */
   LOG_CLEANUP_ENABLED: booleanFromString.default(true),
 
-  REDIS_URL: z
+  UPLOAD_DRIVER: z.enum(['local', 's3']).default('local'),
+  UPLOAD_MAX_FILE_SIZE_MB: z.coerce.number().int().min(1).max(100).default(10),
+  UPLOAD_ALLOWED_MIME_TYPES: z
     .string()
-    .trim()
-    // 把 REDIS_URL= 这种留空写法当作「不配置」。
-    // 留空是关掉一个可选依赖最自然的方式，不该让应用启动失败。
-    .transform((value) => value || undefined)
-    .pipe(z.string().url().optional()),
+    .default(
+      'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,application/zip',
+    ),
+  UPLOAD_LOCAL_DIR: z.string().min(1).default('.uploads'),
+  UPLOAD_LOCAL_URL_PREFIX: z.string().min(1).default('/uploads'),
+  UPLOAD_S3_ENDPOINT: optionalUrl,
+  UPLOAD_S3_REGION: z.string().min(1).default('us-east-1'),
+  UPLOAD_S3_BUCKET: optionalString,
+  UPLOAD_S3_ACCESS_KEY_ID: optionalString,
+  UPLOAD_S3_SECRET_ACCESS_KEY: optionalString,
+  UPLOAD_S3_FORCE_PATH_STYLE: booleanFromString.default(false),
+  UPLOAD_S3_PUBLIC_BASE_URL: optionalUrl,
+
+  REDIS_URL: optionalUrl,
+});
+
+export const envSchema = baseEnvSchema.superRefine((env, context) => {
+  if (env.UPLOAD_DRIVER === 's3' && !env.UPLOAD_S3_BUCKET) {
+    context.addIssue({
+      code: 'custom',
+      path: ['UPLOAD_S3_BUCKET'],
+      message: 'UPLOAD_DRIVER=s3 时必须配置 UPLOAD_S3_BUCKET',
+    });
+  }
+
+  const hasAccessKey = Boolean(env.UPLOAD_S3_ACCESS_KEY_ID);
+  const hasSecretKey = Boolean(env.UPLOAD_S3_SECRET_ACCESS_KEY);
+
+  if (hasAccessKey !== hasSecretKey) {
+    context.addIssue({
+      code: 'custom',
+      path: [
+        hasAccessKey
+          ? 'UPLOAD_S3_SECRET_ACCESS_KEY'
+          : 'UPLOAD_S3_ACCESS_KEY_ID',
+      ],
+      message: 'S3 Access Key 与 Secret Key 必须同时配置或同时留空',
+    });
+  }
 });
 
 export type Env = z.infer<typeof envSchema>;
