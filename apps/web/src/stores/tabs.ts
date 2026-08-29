@@ -28,13 +28,19 @@ export interface TabItem {
 }
 
 /**
- * 多页签状态。
+ * 多页签状态。页签 = 访问过的非公开路由。
  *
- * 页签 = 访问过的非公开路由。刻意不持久化：刷新后组件实例本来就没了，
- * 恢复出来的页签只是空壳，还会把上个用户会话的痕迹带进来。
- * 登录态失效时由 reset() 清空。
+ * 持久化的是「页签列表」而不是页面状态：刷新后 KeepAlive 的组件实例
+ * 本来就没有了，恢复出来的页签点开时组件重新挂载、数据重新拉取——
+ * 这是 KeepAlive 的天然边界，不是缺陷。权限漂移不需要专门校验：
+ * 点开一个已无权访问的旧页签，路由守卫会自然把它拦到 403。
+ *
+ * 登出时 reset() 清空（连着清掉持久化），换人登录不会看到上个
+ * 用户的页签；token 过期被踢回登录页则刻意保留，重新登录后继续。
  */
-export const useTabsStore = defineStore('tabs', () => {
+export const useTabsStore = defineStore(
+  'tabs',
+  () => {
   const tabs = ref<TabItem[]>([]);
 
   /** KeepAlive 的 include：当前开着、且声明了缓存的页签组件名 */
@@ -114,4 +120,9 @@ export const useTabsStore = defineStore('tabs', () => {
   }
 
   return { tabs, cachedNames, visit, close, closeOthers, closeAll, reset };
-});
+  },
+  {
+    // 只持久化页签数组；恢复后 KeepAlive 从零开始，无实例可复用
+    persist: { pick: ['tabs'] },
+  },
+);
