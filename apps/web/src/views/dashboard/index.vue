@@ -1,34 +1,17 @@
 <script setup lang="ts">
-import { BarChart, HeatmapChart, PieChart } from 'echarts/charts';
-import {
-  GridComponent,
-  TitleComponent,
-  TooltipComponent,
-  VisualMapComponent,
-} from 'echarts/components';
-import { use } from 'echarts/core';
-import { CanvasRenderer } from 'echarts/renderers';
-import { theme as antdvTheme } from 'antdv-next';
 import { computed } from 'vue';
-import VChart from 'vue-echarts';
 
 import AppIcon from '@/components/core/base/app-icon/index.vue';
-import { SEMANTIC_COLORS } from '@/constants/palette';
-import { useSettingsStore } from '@/stores/settings';
-
-use([
+import {
   BarChart,
   HeatmapChart,
   PieChart,
-  GridComponent,
-  TitleComponent,
-  TooltipComponent,
-  VisualMapComponent,
-  CanvasRenderer,
-]);
+  type HeatmapChartDatum,
+} from '@/components/core/charts';
+import { SEMANTIC_COLORS } from '@/constants/palette';
+import { useSettingsStore } from '@/stores/settings';
 
 const settings = useSettingsStore();
-const { token: designToken } = antdvTheme.useToken();
 
 /**
  * 图表消费的主题色，来源与 App.vue 的 token 相同（palette 单一来源）。
@@ -85,10 +68,15 @@ const deviceSegments = [
   { label: '桌面端', value: 1364, color: 'var(--dash-orange)' },
 ];
 const deviceTotal = deviceSegments.reduce((sum, s) => sum + s.value, 0);
+const deviceChartData = deviceSegments.map((segment) => ({
+  name: segment.label,
+  value: segment.value,
+}));
 
 /** 近 12 个月柱状图（0-50 刻度），值取自参考图目测比例 */
 const monthBars = [24, 12, 23, 29, 14, 23, 40, 22, 47, 23, 48, 38];
 const monthLabels = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
+const audienceSeries = [{ name: '访客数', data: monthBars }];
 
 const browsers = [
   { name: 'Chrome', alias: '谷歌浏览器', value: 1428, color: '#4080ff' },
@@ -116,177 +104,12 @@ const activities = [
 const heatLabels = ['12时', '19时', '15时', '0时', '8时', '4时'];
 const weekdayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const heatData = heatLabels.flatMap((_, row) =>
-  weekdayLabels.map((__, col) => {
+  weekdayLabels.map((__, col): HeatmapChartDatum => {
     const seed =
       Math.sin((row + 1) * 12.9898 + (col + 1) * 78.233) * 43758.5453;
     return [col, row, Math.round((seed - Math.floor(seed)) * 100)];
   }),
 );
-
-const tooltipTheme = computed(() => ({
-  backgroundColor: designToken.value.colorBgElevated,
-  borderColor: designToken.value.colorBorderSecondary,
-  textStyle: { color: designToken.value.colorText },
-}));
-
-const deviceChartOption = computed(() => ({
-  animation: true,
-  animationDuration: 1000,
-  animationDurationUpdate: 500,
-  animationEasing: 'cubicOut' as const,
-  animationEasingUpdate: 'cubicInOut' as const,
-  color: [
-    settings.primaryColor,
-    SEMANTIC_COLORS.success,
-    SEMANTIC_COLORS.warning,
-  ],
-  tooltip: {
-    trigger: 'item',
-    formatter: '{b}<br/>{c} ({d}%)',
-    ...tooltipTheme.value,
-  },
-  title: {
-    text: deviceTotal.toLocaleString(),
-    left: 'center',
-    top: 'center',
-    textStyle: {
-      color: designToken.value.colorText,
-      fontSize: 26,
-      fontWeight: 600,
-    },
-  },
-  series: [
-    {
-      type: 'pie',
-      radius: ['66%', '86%'],
-      center: ['50%', '50%'],
-      avoidLabelOverlap: false,
-      animationType: 'scale',
-      animationTypeUpdate: 'transition',
-      label: { show: false },
-      emphasis: { scaleSize: 6 },
-      data: deviceSegments.map((segment) => ({
-        name: segment.label,
-        value: segment.value,
-      })),
-    },
-  ],
-}));
-
-const audienceChartOption = computed(() => ({
-  animation: true,
-  animationDuration: 900,
-  animationDurationUpdate: 500,
-  animationEasing: 'cubicOut' as const,
-  animationEasingUpdate: 'cubicInOut' as const,
-  animationDelay: (index: number) => index * 55,
-  animationDelayUpdate: (index: number) => index * 25,
-  tooltip: {
-    trigger: 'axis',
-    axisPointer: { type: 'shadow' },
-    ...tooltipTheme.value,
-  },
-  grid: {
-    top: 12,
-    right: 8,
-    bottom: 4,
-    left: 4,
-    outerBoundsMode: 'same',
-    outerBoundsContain: 'axisLabel',
-  },
-  xAxis: {
-    type: 'category',
-    data: monthLabels,
-    axisTick: { show: false },
-    axisLine: { lineStyle: { color: designToken.value.colorBorderSecondary } },
-    axisLabel: { color: designToken.value.colorTextSecondary },
-  },
-  yAxis: {
-    type: 'value',
-    max: 50,
-    interval: 10,
-    axisLabel: { color: designToken.value.colorTextSecondary },
-    splitLine: {
-      lineStyle: {
-        color: designToken.value.colorBorderSecondary,
-        type: 'dashed',
-      },
-    },
-  },
-  series: [
-    {
-      type: 'bar',
-      data: monthBars,
-      barMaxWidth: 28,
-      itemStyle: {
-        color: settings.primaryColor,
-        borderRadius: [4, 4, 0, 0],
-      },
-    },
-  ],
-}));
-
-const activityChartOption = computed(() => ({
-  animation: true,
-  animationDuration: 700,
-  animationDurationUpdate: 400,
-  animationEasing: 'cubicOut' as const,
-  animationEasingUpdate: 'cubicInOut' as const,
-  animationDelay: (index: number) => index * 12,
-  animationDelayUpdate: (index: number) => index * 6,
-  tooltip: {
-    position: 'top',
-    ...tooltipTheme.value,
-  },
-  grid: {
-    top: 8,
-    right: 4,
-    bottom: 4,
-    left: 4,
-    outerBoundsMode: 'same',
-    outerBoundsContain: 'axisLabel',
-  },
-  xAxis: {
-    type: 'category',
-    data: weekdayLabels,
-    axisTick: { show: false },
-    axisLine: { show: false },
-    axisLabel: { color: designToken.value.colorTextSecondary },
-  },
-  yAxis: {
-    type: 'category',
-    data: heatLabels,
-    axisTick: { show: false },
-    axisLine: { show: false },
-    axisLabel: { color: designToken.value.colorTextSecondary },
-  },
-  visualMap: {
-    min: 0,
-    max: 100,
-    show: false,
-    inRange: {
-      color: [designToken.value.colorFillSecondary, SEMANTIC_COLORS.success],
-    },
-  },
-  series: [
-    {
-      type: 'heatmap',
-      data: heatData,
-      itemStyle: {
-        borderColor: designToken.value.colorBgContainer,
-        borderWidth: 4,
-        borderRadius: 6,
-      },
-      emphasis: {
-        itemStyle: {
-          borderColor: settings.primaryColor,
-          shadowBlur: 8,
-          shadowColor: settings.primaryColor,
-        },
-      },
-    },
-  ],
-}));
 
 defineOptions({ name: 'DashboardPage' });
 </script>
@@ -322,10 +145,13 @@ defineOptions({ name: 'DashboardPage' });
             <template #extra>
               <a class="card-link">查看详情</a>
             </template>
-            <v-chart
+            <PieChart
               class="h-60 w-full"
-              :option="deviceChartOption"
-              autoresize
+              :data="deviceChartData"
+              :center-value="deviceTotal.toLocaleString()"
+              inner-radius="66%"
+              outer-radius="86%"
+              aria-label="终端会话占比"
             />
             <div class="donut-stats">
               <div v-for="seg in deviceSegments" :key="seg.label">
@@ -345,10 +171,13 @@ defineOptions({ name: 'DashboardPage' });
             <template #extra>
               <a class="card-link">查看详情</a>
             </template>
-            <v-chart
+            <BarChart
               class="min-h-60 w-full flex-1"
-              :option="audienceChartOption"
-              autoresize
+              :categories="monthLabels"
+              :series="audienceSeries"
+              :y-axis-max="50"
+              :y-axis-interval="10"
+              aria-label="近十二个月受众趋势"
             />
           </a-card>
         </div>
@@ -465,10 +294,13 @@ defineOptions({ name: 'DashboardPage' });
         </a-card>
 
         <a-card title="一周活跃时段" class="dash-card">
-          <v-chart
+          <HeatmapChart
             class="h-60 w-full"
-            :option="activityChartOption"
-            autoresize
+            :x-labels="weekdayLabels"
+            :y-labels="heatLabels"
+            :data="heatData"
+            :max="100"
+            aria-label="一周活跃时段"
           />
         </a-card>
       </div>
