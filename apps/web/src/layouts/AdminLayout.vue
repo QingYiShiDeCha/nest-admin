@@ -147,12 +147,16 @@ const tabs = useTabsStore();
           <!-- 主色切换：点色板弹出色卡，选择即时生效并持久化 -->
           <a-popover trigger="click" placement="bottomRight">
             <template #content>
-              <div class="theme-swatches">
+              <div class="grid grid-cols-4 gap-2.5">
                 <button
                   v-for="color in BRAND_COLORS"
                   :key="color.value"
-                  class="theme-swatch"
-                  :class="{ active: settings.primaryColor === color.value }"
+                  class="w-7 h-7 rounded-md border-none cursor-pointer"
+                  :class="
+                    settings.primaryColor === color.value
+                      ? 'ring-2 ring-offset-2 ring-[#1d2129]'
+                      : []
+                  "
                   :style="{ background: color.value }"
                   :title="color.name"
                   type="button"
@@ -161,7 +165,7 @@ const tabs = useTabsStore();
               </div>
             </template>
             <button
-              class="theme-trigger"
+              class="w-5.5 h-5.5 rounded-full border-2 border-white shadow-[0_0_0_1px_#e5e6eb] cursor-pointer"
               :style="{ background: settings.primaryColor }"
               type="button"
               title="主题色"
@@ -197,34 +201,3 @@ const tabs = useTabsStore();
     </a-layout>
   </a-layout>
 </template>
-
-<style scoped>
-/* 主色切换的色卡。选中态用外圈描边，不依赖图标组件 */
-.theme-swatches {
-  display: grid;
-  grid-template-columns: repeat(4, 28px);
-  gap: 10px;
-}
-
-.theme-swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-}
-
-.theme-swatch.active {
-  outline: 2px solid #1d2129;
-  outline-offset: 2px;
-}
-
-.theme-trigger {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 1px #e5e6eb;
-  cursor: pointer;
-}
-</style>

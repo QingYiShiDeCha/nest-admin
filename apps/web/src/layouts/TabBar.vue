@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { theme as antdvTheme } from 'antdv-next';
-import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import type { TabItem } from '@/stores/tabs';
@@ -9,15 +7,6 @@ import { useTabsStore } from '@/stores/tabs';
 const route = useRoute();
 const router = useRouter();
 const tabs = useTabsStore();
-
-const { token: designToken } = antdvTheme.useToken();
-
-/** 激活页签用主题色描边/着色，来源与全局 token 一致 */
-const activeStyle = computed(() => ({
-  color: designToken.value.colorPrimary,
-  borderColor: designToken.value.colorPrimary,
-  background: `color-mix(in srgb, ${designToken.value.colorPrimary} 10%, #fff)`,
-}));
 
 function isActive(tab: TabItem): boolean {
   return tab.path === route.fullPath;
@@ -55,22 +44,25 @@ function handleMore({ key }: { key: string | number }): void {
 </script>
 
 <template>
-  <div class="tab-bar">
-    <div class="tab-list">
+  <div class="flex items-center gap-2 px-6 h-10">
+    <div class="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <button
         v-for="tab in tabs.tabs"
         :key="tab.path"
-        class="tab-chip"
-        :class="{ active: isActive(tab) }"
-        :style="isActive(tab) ? activeStyle : undefined"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 border border-[#e5e6eb] rounded text-13px leading-20px whitespace-nowrap cursor-pointer shrink-0 transition-colors"
+        :class="
+          isActive(tab)
+            ? 'text-primary border-primary bg-[color-mix(in_srgb,var(--ant-color-primary)_10%,#fff)]'
+            : 'bg-white text-[#4e5969] hover:text-primary'
+        "
         type="button"
         @click="open(tab)"
       >
         <i v-if="tab.iconClass" :class="tab.iconClass" />
-        <span class="tab-title">{{ tab.title }}</span>
+        <span class="max-w-30 truncate">{{ tab.title }}</span>
         <span
           v-if="!tab.affix"
-          class="tab-close"
+          class="inline-grid place-items-center w-4 h-4 rounded-[3px] text-10px hover:bg-[#f53f3f] hover:text-white"
           title="关闭"
           @click.stop="handleClose(tab)"
         >
@@ -80,82 +72,13 @@ function handleMore({ key }: { key: string | number }): void {
     </div>
 
     <a-dropdown :trigger="['click']" :menu="{ items: moreItems, onClick: handleMore }">
-      <button class="tab-more" type="button" title="标签操作">
+      <button
+        class="inline-grid place-items-center w-7 h-7 border border-[#e5e6eb] rounded bg-white text-[#4e5969] text-12px cursor-pointer shrink-0"
+        type="button"
+        title="标签操作"
+      >
         <i class="i-ant-design:down-outlined" />
       </button>
     </a-dropdown>
   </div>
 </template>
-
-<style scoped>
-/* 与头栏同一层布局底色（不设背景），白底页签浮在灰底上 */
-.tab-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 24px;
-  height: 40px;
-}
-
-.tab-list {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.tab-list::-webkit-scrollbar { display: none; }
-
-.tab-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border: 1px solid #e5e6eb;
-  border-radius: 4px;
-  background: #fff;
-  color: #4e5969;
-  font-size: 13px;
-  line-height: 20px;
-  white-space: nowrap;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: color 0.2s, border-color 0.2s, background 0.2s;
-}
-
-.tab-chip:hover { color: var(--ant-color-primary, #5d87ff); }
-
-.tab-title { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
-
-.tab-close {
-  display: inline-grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  font-size: 10px;
-  color: inherit;
-}
-
-.tab-close:hover {
-  background: #f53f3f;
-  color: #fff;
-}
-
-.tab-more {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid #e5e6eb;
-  border-radius: 4px;
-  background: #fff;
-  color: #4e5969;
-  font-size: 12px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-</style>
