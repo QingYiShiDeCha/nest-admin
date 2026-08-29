@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="F extends object = Record<string, unknown>">
 import { computed } from 'vue';
 
-import type { FilterField, SearchableTable } from './pro-search.types';
+import type { FilterField, SearchableTable } from './types';
 
 /**
  * 查询区卡片：字段配置驱动，label 左置横排换行，重置/查询右置。
@@ -21,7 +21,9 @@ const props = defineProps<{
 }>();
 
 /** filters 是泛型，统一按字符串键值视图读写 */
-const filterValues = computed(() => props.table.filters as Record<string, unknown>);
+const filterValues = computed(
+  () => props.table.filters as Record<string, unknown>,
+);
 
 function setFilter(key: string, value: unknown): void {
   filterValues.value[key] = value;
@@ -33,9 +35,17 @@ function reset(): void {
 </script>
 
 <template>
-  <div class="a-bg-container rounded-lg p-4 flex flex-wrap items-center gap-x-6 gap-y-3">
-    <div v-for="field in fields" :key="field.key" class="flex items-center gap-2">
-      <span class="text-sm a-color-text-secondary whitespace-nowrap">{{ field.label }}</span>
+  <div
+    class="a-bg-container rounded-lg border border-solid a-border-border-secondary p-4 flex flex-wrap items-center gap-x-6 gap-y-3"
+  >
+    <div
+      v-for="field in fields"
+      :key="field.key"
+      class="flex items-center gap-2"
+    >
+      <span class="text-sm a-color-text-secondary whitespace-nowrap">{{
+        field.label
+      }}</span>
       <a-input
         v-if="(field.type ?? 'input') === 'input'"
         class="w-52"

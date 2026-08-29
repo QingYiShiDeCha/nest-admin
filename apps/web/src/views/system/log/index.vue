@@ -12,9 +12,9 @@ import {
   type LogQuery,
 } from '@/api/logs';
 import type { OperationLog } from '@nest-admin/shared';
-import ProSearch from '@/components/ProSearch.vue';
-import ProTable from '@/components/ProTable.vue';
-import type { FilterField } from '@/components/pro-search.types';
+import ProSearch from '@/components/core/tables/pro-search/index.vue';
+import type { FilterField } from '@/components/core/tables/pro-search/types';
+import ProTable from '@/components/core/tables/pro-table/index.vue';
 import { useTable } from '@/composables/use-table';
 import { OPERATION_STATUS_META } from '@/constants/dicts';
 import { formatDateTime } from '@/utils/format';
@@ -35,15 +35,21 @@ const table = useTable<OperationLog, LogQuery>({
       key: 'request',
       ellipsis: true,
       render: (_value, record) =>
-        h('span', { class: 'font-mono text-xs' }, `${record.method} ${record.path}`),
+        h(
+          'span',
+          { class: 'font-mono text-xs' },
+          `${record.method} ${record.path}`,
+        ),
     },
     {
       title: '结果',
       key: 'status',
       width: 90,
       render: (_value, record) =>
-        h(Tag, { color: OPERATION_STATUS_META[record.status].color }, () =>
-          OPERATION_STATUS_META[record.status].label,
+        h(
+          Tag,
+          { color: OPERATION_STATUS_META[record.status].color },
+          () => OPERATION_STATUS_META[record.status].label,
         ),
     },
     {
@@ -66,7 +72,13 @@ const table = useTable<OperationLog, LogQuery>({
     },
   ],
   fetcher: (query) => apiLogPage(query),
-  filters: { username: '', module: '', status: '', startAt: undefined, endAt: undefined },
+  filters: {
+    username: '',
+    module: '',
+    status: '',
+    startAt: undefined,
+    endAt: undefined,
+  },
   onError: (text) => void message.error(text),
 });
 
@@ -141,7 +153,10 @@ function prettyPrint(raw: string | null): string {
 // ---- 手动清理 ----
 
 const cleanupOpen = ref(false);
-const cleanupPreview = ref<{ operationLogs: number; refreshTokens: number } | null>(null);
+const cleanupPreview = ref<{
+  operationLogs: number;
+  refreshTokens: number;
+} | null>(null);
 const cleanupBusy = ref(false);
 
 async function openCleanup(): Promise<void> {
@@ -154,7 +169,9 @@ async function runCleanup(): Promise<void> {
   cleanupBusy.value = true;
   try {
     const result = await apiLogCleanup();
-    void message.success(`已清理 ${result.operationLogs} 条日志、${result.refreshTokens} 个过期令牌`);
+    void message.success(
+      `已清理 ${result.operationLogs} 条日志、${result.refreshTokens} 个过期令牌`,
+    );
     cleanupOpen.value = false;
     await table.reload();
   } finally {
@@ -167,59 +184,80 @@ defineOptions({ name: 'LogPage' });
 
 <template>
   <div class="flex flex-col flex-1 min-h-0 gap-4">
-  <ProSearch :table="table" :fields="filterFields">
-    <template #filter-range>
-      <a-range-picker v-model:value="range" value-format="YYYY-MM-DD" @change="applyRange" />
-    </template>
-  </ProSearch>
+    <ProSearch :table="table" :fields="filterFields">
+      <template #filter-range>
+        <a-range-picker
+          v-model:value="range"
+          value-format="YYYY-MM-DD"
+          @change="applyRange"
+        />
+      </template>
+    </ProSearch>
 
-  <ProTable :table="table" row-key="id">
-    <template #toolbar>
-      <a-button v-permission="PERMISSIONS.LOG_CLEAN" danger @click="openCleanup">
-        清理过期日志
-      </a-button>
-    </template>
+    <ProTable :table="table" row-key="id">
+      <template #toolbar>
+        <a-button
+          v-permission="PERMISSIONS.LOG_CLEAN"
+          danger
+          @click="openCleanup"
+        >
+          清理过期日志
+        </a-button>
+      </template>
+    </ProTable>
 
-  </ProTable>
-
-<!-- 详情 -->
+    <!-- 详情 -->
     <a-drawer
       v-model:open="drawerOpen"
       title="日志详情"
-      :width="520"
+      :size="520"
       destroy-on-hidden
     >
       <template v-if="current">
         <a-descriptions :column="1" size="small" bordered>
-          <a-descriptions-item label="时间">{{ formatDateTime(current.createdAt) }}</a-descriptions-item>
+          <a-descriptions-item label="时间">{{
+            formatDateTime(current.createdAt)
+          }}</a-descriptions-item>
           <a-descriptions-item label="操作人">
-            {{ current.username ?? `（未登录，userId=${current.userId ?? '无'}）` }}
+            {{
+              current.username ?? `（未登录，userId=${current.userId ?? '无'}）`
+            }}
           </a-descriptions-item>
           <a-descriptions-item label="模块 / 操作">
             {{ current.module ?? '—' }} / {{ current.action ?? '—' }}
           </a-descriptions-item>
           <a-descriptions-item label="请求">
-            <span class="font-mono">{{ current.method }} {{ current.path }}</span>
+            <span class="font-mono"
+              >{{ current.method }} {{ current.path }}</span
+            >
           </a-descriptions-item>
           <a-descriptions-item label="结果">
             {{ OPERATION_STATUS_META[current.status].label }}
-            <span v-if="current.statusCode">（HTTP {{ current.statusCode }}）</span>
+            <span v-if="current.statusCode"
+              >（HTTP {{ current.statusCode }}）</span
+            >
           </a-descriptions-item>
           <a-descriptions-item v-if="current.errorMessage" label="错误信息">
             <span class="text-red-500">{{ current.errorMessage }}</span>
           </a-descriptions-item>
-          <a-descriptions-item label="IP">{{ current.ip ?? '—' }}</a-descriptions-item>
+          <a-descriptions-item label="IP">{{
+            current.ip ?? '—'
+          }}</a-descriptions-item>
           <a-descriptions-item label="耗时">
             {{ current.durationMs === null ? '—' : `${current.durationMs}ms` }}
           </a-descriptions-item>
           <a-descriptions-item label="User-Agent">
-            <span class="break-all text-xs">{{ current.userAgent ?? '—' }}</span>
+            <span class="break-all text-xs">{{
+              current.userAgent ?? '—'
+            }}</span>
           </a-descriptions-item>
         </a-descriptions>
 
         <template v-if="current.params">
           <h4 class="mt-4 mb-2 font-medium">请求参数（已脱敏）</h4>
-          <pre class="max-h-80 overflow-auto rounded a-bg-fill-tertiary p-3 text-xs">{{ prettyPrint(current.params) }}</pre>
+          <pre
+            class="max-h-80 overflow-auto rounded a-bg-fill-tertiary p-3 text-xs"
+            >{{ prettyPrint(current.params) }}</pre>
         </template>
       </template>
     </a-drawer>
@@ -240,7 +278,9 @@ defineOptions({ name: 'LogPage' });
           <strong>{{ cleanupPreview.refreshTokens }}</strong>
           个过期登录令牌。
         </p>
-        <p class="text-xs a-color-text-tertiary">删除不可恢复；与定时任务共用同一把分布式锁，不会重复执行。</p>
+        <p class="text-xs a-color-text-tertiary">
+          删除不可恢复；与定时任务共用同一把分布式锁，不会重复执行。
+        </p>
       </template>
       <a-skeleton v-else active :paragraph="{ rows: 2 }" />
     </a-modal>

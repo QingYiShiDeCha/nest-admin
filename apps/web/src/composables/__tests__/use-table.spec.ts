@@ -11,7 +11,10 @@ const pageOf = <T>(list: T[], total: number): PaginatedResult<T> => ({
 });
 
 function makeFetcher<T>(
-  impl: (query: { page: number; pageSize: number }) => Promise<PaginatedResult<T>>,
+  impl: (query: {
+    page: number;
+    pageSize: number;
+  }) => Promise<PaginatedResult<T>>,
 ) {
   return vi.fn(impl);
 }
@@ -82,12 +85,34 @@ describe('useTable', () => {
 
   it('支持自定义默认页大小', async () => {
     const fetcher = makeFetcher(async () => pageOf([], 0));
-    const table = useTable<string>({ columns: [], fetcher, defaultPageSize: 25 });
+    const table = useTable<string>({
+      columns: [],
+      fetcher,
+      defaultPageSize: 25,
+    });
 
     await table.reload();
 
     expect(fetcher).toHaveBeenCalledWith({ page: 1, pageSize: 25 });
     expect(table.pagination.value.pageSize).toBe(25);
+  });
+
+  it('非分页模式直接加载列表且不注入分页参数', async () => {
+    const fetcher = vi.fn(async () => [{ id: 1, name: '系统管理' }]);
+    const table = useTable<{ id: number; name: string }, { keyword: string }>({
+      columns: [],
+      pagination: false,
+      fetcher,
+      filters: { keyword: '系统' },
+    });
+
+    await expect(table.reload()).resolves.toBe(true);
+
+    expect(fetcher).toHaveBeenCalledWith({ keyword: '系统' });
+    expect(table.list.value).toEqual([{ id: 1, name: '系统管理' }]);
+    expect(table.pagination).toBeUndefined();
+    expect(table.rowOffset).toBeUndefined();
+    expect(table.loading.value).toBe(false);
   });
 
   it('慢的旧响应被丢弃，不覆盖新数据', async () => {
@@ -169,7 +194,11 @@ describe('useTable', () => {
 
     expect(table.filters.keyword).toBe('');
     expect('unexpected' in table.filters).toBe(false);
-    expect(fetcher).toHaveBeenLastCalledWith({ page: 1, pageSize: 10, keyword: '' });
+    expect(fetcher).toHaveBeenLastCalledWith({
+      page: 1,
+      pageSize: 10,
+      keyword: '',
+    });
   });
 
   it('请求失败保留旧数据、返回 false 并通知错误适配器', async () => {

@@ -17,9 +17,9 @@ import {
 } from '@/api/users';
 import type { BasicUser, Role } from '@nest-admin/shared';
 import { apiRolePage } from '@/api/roles';
-import ProSearch from '@/components/ProSearch.vue';
-import ProTable from '@/components/ProTable.vue';
-import type { FilterField } from '@/components/pro-search.types';
+import ProSearch from '@/components/core/tables/pro-search/index.vue';
+import type { FilterField } from '@/components/core/tables/pro-search/types';
+import ProTable from '@/components/core/tables/pro-table/index.vue';
 import { usePermission } from '@/composables/use-permission';
 import { useTable } from '@/composables/use-table';
 import { STATUS_META, STATUS_OPTIONS } from '@/constants/dicts';

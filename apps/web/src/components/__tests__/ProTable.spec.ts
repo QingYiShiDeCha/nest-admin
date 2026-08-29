@@ -4,7 +4,7 @@ import { computed, nextTick, ref, shallowRef } from 'vue';
 import type { DefineComponent } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 
-import ProTable from '@/components/ProTable.vue';
+import ProTable from '@/components/core/tables/pro-table/index.vue';
 import type { UseTableReturn } from '@/composables/use-table';
 
 interface Row {
@@ -20,6 +20,14 @@ const componentStubs = vi.hoisted(() => ({
   checkboxGroup: {
     name: 'ACheckboxGroup',
     template: '<div><slot /></div>',
+  },
+  dropdown: {
+    name: 'ADropdown',
+    props: {
+      menu: Object,
+      trigger: Array,
+    },
+    template: '<div data-testid="dropdown"><slot /></div>',
   },
   popover: {
     name: 'APopover',
@@ -46,6 +54,7 @@ const componentStubs = vi.hoisted(() => ({
 vi.mock('antdv-next', () => ({
   Checkbox: componentStubs.checkbox,
   CheckboxGroup: componentStubs.checkboxGroup,
+  Dropdown: componentStubs.dropdown,
   Popover: componentStubs.popover,
   Table: componentStubs.table,
 }));
@@ -103,7 +112,11 @@ describe('ProTable', () => {
     await nextTick();
 
     const renderedTable = wrapper.getComponent(componentStubs.table);
+    const tableCard = wrapper.get('.rounded-lg');
 
+    expect(tableCard.classes()).toEqual(
+      expect.arrayContaining(['border', 'border-solid', 'a-border-border-secondary']),
+    );
     expect(reload).toHaveBeenCalledOnce();
     expect(renderedTable.props('dataSource')).toEqual(table.list.value);
     expect(renderedTable.props('loading')).toBe(false);
@@ -111,8 +124,35 @@ describe('ProTable', () => {
       current: 3,
       pageSize: 10,
       total: 21,
+      size: 'large',
       showQuickJumper: true,
     });
+  });
+
+  it('表体内部滚动，并为工具栏和分页保留独立空间', async () => {
+    const { wrapper } = mountTable();
+    await nextTick();
+
+    const renderedTable = wrapper.getComponent(componentStubs.table);
+
+    expect(renderedTable.props('scroll')).toEqual({ y: 200 });
+    expect(wrapper.classes()).toEqual(
+      expect.arrayContaining([
+        '[&_.ant-table-wrapper]:flex-1',
+        '[&_.ant-table-wrapper]:min-h-0',
+        '[&_.ant-spin]:flex-1',
+        '[&_.ant-spin]:min-h-0',
+        '[&_.ant-spin]:overflow-hidden',
+        '[&_.ant-pagination]:shrink-0',
+        '[&_.ant-table-body]:!overflow-y-auto',
+      ]),
+    );
+    expect(wrapper.classes()).not.toContain(
+      '[&_.ant-spin-nested-loading]:flex-1',
+    );
+    expect(wrapper.classes()).not.toContain(
+      '[&_.ant-table-wrapper]:h-full',
+    );
   });
 
   it('序号使用 rowOffset，刷新按钮复用 reload', async () => {
@@ -128,8 +168,43 @@ describe('ProTable', () => {
 
     expect(indexColumn.render(undefined, { id: 1, name: 'admin' }, 2)).toBe('23');
 
-    await wrapper.get('button[title="刷新"]').trigger('click');
+    const refreshButton = wrapper.get('button[title="刷新"]');
+    expect(refreshButton.classes()).toEqual(
+      expect.arrayContaining(['w-8', 'h-8', 'text-base']),
+    );
+
+    await refreshButton.trigger('click');
     expect(reload).toHaveBeenCalledTimes(2);
+  });
+
+  it('通过下拉菜单切换表格密度', async () => {
+    const { wrapper } = mountTable();
+    await nextTick();
+
+    const renderedTable = wrapper.getComponent(componentStubs.table);
+    const dropdown = wrapper.getComponent(componentStubs.dropdown);
+    const menu = dropdown.props('menu') as {
+      items: Array<{ key: string; label: string }>;
+      onClick: (info: { key: string }) => void;
+      selectable: boolean;
+      selectedKeys: string[];
+    };
+
+    expect(menu.items).toEqual([
+      { key: 'large', label: '宽松' },
+      { key: 'middle', label: '默认' },
+      { key: 'small', label: '紧凑' },
+    ]);
+    expect(menu.selectable).toBe(true);
+    expect(menu.selectedKeys).toEqual(['large']);
+    expect(renderedTable.props('size')).toBe('large');
+
+    menu.onClick({ key: 'small' });
+    await nextTick();
+
+    expect(renderedTable.props('size')).toBe('small');
+    expect(renderedTable.props('pagination')).toMatchObject({ size: 'large' });
+    expect(wrapper.find('button[title="密度：紧凑"]').exists()).toBe(true);
   });
 
   it('继续向 a-table 转发 bodyCell 插槽', async () => {

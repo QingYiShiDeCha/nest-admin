@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends object">
-import type { TableColumnsType } from 'antdv-next';
+import type { MenuProps, TableColumnsType } from 'antdv-next';
 import { computed, onMounted, ref } from 'vue';
 
 import type { UseTableReturn } from '@/composables/use-table';
@@ -19,10 +19,8 @@ type RowKey = string | number;
  *
  * 查询区在独立的 ProSearch 里，页面按需组合两者。
  *
- * 撑满的实现：scroll.y 触发 antd 把表头/表体拆成两个区块，再用一条
- * flex 覆盖链让表体 flex-1——数据少时白底到底、分页钉在卡片底部，
- * 数据多时表体内部滚动。antd 内部类名属于第三方实现细节，
- * 这条链是组件与库版本之间的耦合点，升级 antdv-next 时需回归验证。
+ * scroll.y 触发 antd 拆分表头和表体；flex 高度链会先为工具栏和分页
+ * 保留空间，再让表体占满剩余高度并独立滚动。
  *
  * 样式约束：只用 UnoCSS 工具类，不写 <style> 块。
  */
@@ -57,26 +55,39 @@ onMounted(() => {
 
 // ---- 工具栏：密度 / 全屏 ----
 
-const DENSITY = ['large', 'middle', 'small'] as const;
-const densityIndex = ref(0);
-const tableSize = computed(() => DENSITY[densityIndex.value]!);
+type TableDensity = 'large' | 'middle' | 'small';
 
-function cycleDensity(): void {
-  densityIndex.value = (densityIndex.value + 1) % DENSITY.length;
-}
+const DENSITY_LABELS: Record<TableDensity, string> = {
+  large: '宽松',
+  middle: '默认',
+  small: '紧凑',
+};
+const densityItems: MenuProps['items'] = [
+  { key: 'large', label: DENSITY_LABELS.large },
+  { key: 'middle', label: DENSITY_LABELS.middle },
+  { key: 'small', label: DENSITY_LABELS.small },
+];
+const tableSize = ref<TableDensity>('middle');
+const densityLabel = computed(() => DENSITY_LABELS[tableSize.value]);
+
+const handleDensityChange: NonNullable<MenuProps['onClick']> = ({ key }) => {
+  if (key === 'large' || key === 'middle' || key === 'small') {
+    tableSize.value = key;
+  }
+};
 
 const fullscreen = ref(false);
 
 /** 根容器：常态随父容器撑满；全屏时脱离文档流铺满视口 */
 const rootClass = computed(() =>
   fullscreen.value
-    ? 'fixed inset-0 z-1000 overflow-auto a-bg-layout p-4'
+    ? 'fixed inset-0 z-1000 overflow-auto a-bg-layout p-4 flex flex-col min-h-0'
     : 'flex flex-col gap-4 flex-1 min-h-0',
 );
 
 /** 工具栏小方按钮的公共样式（无 <style> 块，只能集中在脚本里） */
 const iconBtn =
-  'inline-grid place-items-center w-7 h-7 border a-border-border rounded a-bg-container a-color-text-secondary text-14px cursor-pointer hover:text-primary hover:border-primary';
+  'inline-grid place-items-center w-8 h-8 border a-border-border rounded a-bg-container a-color-text-secondary text-base cursor-pointer hover:text-primary hover:border-primary';
 
 // ---- 列显隐 ----
 
@@ -100,7 +111,9 @@ const visibleColumns = computed<TableColumnsType<T>>(() => {
 
   // 序号列不在显隐清单里（始终显示），其余按勾选状态过滤
   return base.filter(
-    (col) => columnKey(col) === '__index' || visibleKeys.value.includes(columnKey(col)),
+    (col) =>
+      columnKey(col) === '__index' ||
+      visibleKeys.value.includes(columnKey(col)),
   );
 });
 
@@ -109,43 +122,55 @@ const resolvedPagination = computed(() => {
     return false;
   }
 
-  return { ...props.table.pagination.value, showQuickJumper: true };
+  return {
+    ...props.table.pagination.value,
+    size: 'middle' as const,
+    showQuickJumper: true,
+    pageSizeOptions: ['10', '20', '50', '100'],
+    pageSize: props.table.pagination.value.pageSize ?? 20,
+  };
 });
 
 function handleExpandedRowKeys(keys: readonly RowKey[]): void {
   emit('update:expandedRowKeys', [...keys]);
 }
 
-/**
- * 让 antd 表格在卡片内撑满的覆盖链：
- * wrapper/Spin/容器逐层 flex，表体 flex-1 且解除 scroll.y 的 max-height，
- * 分页保持在卡片底部。
- */
 const stretchChain =
-  '[&_.ant-table-wrapper]:h-full [&_.ant-table-wrapper]:flex [&_.ant-table-wrapper]:flex-col ' +
-  '[&_.ant-spin]:flex-1 [&_.ant-spin]:min-h-0 [&_.ant-spin]:overflow-hidden ' +
-  '[&_.ant-spin-container]:h-full [&_.ant-spin-container]:flex [&_.ant-spin-container]:flex-col ' +
+  '[&_.ant-table-wrapper]:flex-1 [&_.ant-table-wrapper]:min-h-0 [&_.ant-table-wrapper]:flex [&_.ant-table-wrapper]:flex-col ' +
+  '[&_.ant-spin]:flex-1 [&_.ant-spin]:min-h-0 [&_.ant-spin]:overflow-hidden [&_.ant-spin]:flex [&_.ant-spin]:flex-col ' +
+  '[&_.ant-spin-container]:flex-1 [&_.ant-spin-container]:min-h-0 [&_.ant-spin-container]:flex [&_.ant-spin-container]:flex-col ' +
   '[&_.ant-table]:flex-1 [&_.ant-table]:min-h-0 [&_.ant-table]:flex [&_.ant-table]:flex-col ' +
   '[&_.ant-table-container]:flex-1 [&_.ant-table-container]:min-h-0 [&_.ant-table-container]:flex [&_.ant-table-container]:flex-col ' +
   '[&_.ant-table-header]:shrink-0 ' +
-  '[&_.ant-table-body]:flex-1 [&_.ant-table-body]:min-h-0 [&_.ant-table-body]:!max-h-none [&_.ant-table-body]:!overflow-y-auto';
+  '[&_.ant-table-body]:flex-1 [&_.ant-table-body]:min-h-0 [&_.ant-table-body]:!max-h-none [&_.ant-table-body]:!overflow-y-auto ' +
+  '[&_.ant-pagination]:shrink-0';
 </script>
 
 <template>
   <div :class="[rootClass, stretchChain]">
     <!-- 表格卡片 -->
-    <div class="a-bg-container rounded-lg p-4 flex-1 min-h-0 flex flex-col">
+    <div
+      class="a-bg-container rounded-lg border border-solid a-border-border-secondary p-4 flex-1 min-h-0 overflow-hidden flex flex-col"
+    >
       <div class="flex items-center justify-between pb-4 shrink-0">
         <slot name="toolbar" />
 
         <div class="flex items-center gap-2 ml-auto">
-          <button :class="iconBtn" type="button" title="刷新" @click="table.reload()">
+          <button
+            :class="iconBtn"
+            type="button"
+            title="刷新"
+            @click="table.reload()"
+          >
             <i class="i-ri:refresh-line" />
           </button>
 
           <a-popover trigger="click" placement="bottomRight">
             <template #content>
-              <a-checkbox-group v-model:value="visibleKeys" class="flex flex-col gap-1.5">
+              <a-checkbox-group
+                v-model:value="visibleKeys"
+                class="flex flex-col gap-1.5"
+              >
                 <a-checkbox
                   v-for="col in table.columns"
                   :key="columnKey(col)"
@@ -160,17 +185,41 @@ const stretchChain =
             </button>
           </a-popover>
 
-          <button :class="iconBtn" type="button" :title="`密度：${tableSize}`" @click="cycleDensity">
-            <i class="i-ri:line-height" />
-          </button>
+          <a-dropdown
+            :trigger="['click']"
+            :menu="{
+              items: densityItems,
+              selectable: true,
+              selectedKeys: [tableSize],
+              onClick: handleDensityChange,
+            }"
+          >
+            <button
+              class="inline-flex items-center justify-center gap-0.5 h-8 px-2 border a-border-border rounded a-bg-container a-color-text-secondary text-base cursor-pointer hover:text-primary hover:border-primary"
+              type="button"
+              :title="`密度：${densityLabel}`"
+            >
+              <i class="i-ri:line-height" />
+            </button>
+          </a-dropdown>
 
-          <button :class="iconBtn" type="button" :title="fullscreen ? '退出全屏' : '全屏'" @click="fullscreen = !fullscreen">
-            <i :class="fullscreen ? 'i-ri:fullscreen-exit-line' : 'i-ri:fullscreen-line'" />
+          <button
+            :class="iconBtn"
+            type="button"
+            :title="fullscreen ? '退出全屏' : '全屏'"
+            @click="fullscreen = !fullscreen"
+          >
+            <i
+              :class="
+                fullscreen
+                  ? 'i-ri:fullscreen-exit-line'
+                  : 'i-ri:fullscreen-line'
+              "
+            />
           </button>
         </div>
       </div>
 
-      <!-- scroll.y 只为触发表头/表体分离，高度由覆盖链接管 -->
       <a-table
         :row-key="rowKey"
         :columns="visibleColumns"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Button, Popconfirm, Space, Tag, Tooltip, message } from 'antdv-next';
+import { Button, Popconfirm, Space, Tooltip, message } from 'antdv-next';
 import type { FormInstance, TableColumnsType } from 'antdv-next';
-import { computed, h, reactive, ref } from 'vue';
+import { computed, h, reactive, ref, watch } from 'vue';
 
 import { PERMISSIONS, type MenuNode } from '@nest-admin/shared';
 
@@ -12,8 +12,10 @@ import {
   apiMenuUpdate,
   type MenuPayload,
 } from '@/api/menu';
-import ProTable from '@/components/ProTable.vue';
+import AppTag from '@/components/core/base/app-tag/index.vue';
+import ProTable from '@/components/core/tables/pro-table/index.vue';
 import { usePermission } from '@/composables/use-permission';
+import { useTable } from '@/composables/use-table';
 import { MENU_ICONS } from '@/layouts/menu-icons';
 import {
   MENU_TYPE_META,
@@ -31,8 +33,10 @@ const columns: TableColumnsType<MenuNode> = [
     key: 'type',
     width: 90,
     render: (_value, record) =>
-      h(Tag, { color: MENU_TYPE_META[record.type].color }, () =>
-        MENU_TYPE_META[record.type].label,
+      h(
+        AppTag,
+        { tone: MENU_TYPE_META[record.type].color },
+        () => MENU_TYPE_META[record.type].label,
       ),
   },
   { title: '路由路径', dataIndex: 'path', key: 'path' },
@@ -42,15 +46,17 @@ const columns: TableColumnsType<MenuNode> = [
     key: 'visible',
     width: 90,
     render: (_value, record) =>
-      record.visible ? '显示' : h(Tag, { color: 'orange' }, () => '隐藏'),
+      record.visible ? '显示' : h(AppTag, { tone: 'warning' }, () => '隐藏'),
   },
   {
     title: '状态',
     key: 'status',
     width: 90,
     render: (_value, record) =>
-      h(Tag, { color: STATUS_META[record.status].color }, () =>
-        STATUS_META[record.status].label,
+      h(
+        AppTag,
+        { tone: STATUS_META[record.status].color },
+        () => STATUS_META[record.status].label,
       ),
   },
   {
@@ -63,7 +69,11 @@ const columns: TableColumnsType<MenuNode> = [
           can(PERMISSIONS.MENU_UPDATE)
             ? h(
                 Button,
-                { type: 'link', size: 'small', onClick: () => openEdit(record) },
+                {
+                  type: 'link',
+                  size: 'small',
+                  onClick: () => openEdit(record),
+                },
                 () => '编辑',
               )
             : null,
@@ -104,7 +114,12 @@ const columns: TableColumnsType<MenuNode> = [
                     h('span', null, [
                       h(
                         Button,
-                        { type: 'link', size: 'small', danger: true, disabled: true },
+                        {
+                          type: 'link',
+                          size: 'small',
+                          danger: true,
+                          disabled: true,
+                        },
                         () => '删除',
                       ),
                     ]),
@@ -116,23 +131,19 @@ const columns: TableColumnsType<MenuNode> = [
   },
 ];
 
-const tree = ref<MenuNode[]>([]);
-const loading = ref(false);
-
 /** 受控展开：数据回来后展开全部目录节点，新弹窗里选父节点也一目了然 */
 const expandedKeys = ref<number[]>([]);
 
-async function load(): Promise<void> {
-  loading.value = true;
-  try {
-    tree.value = await apiMenuTree();
-    expandedKeys.value = collectDirectoryKeys(tree.value);
-  } finally {
-    loading.value = false;
-  }
-}
+const table = useTable<MenuNode>({
+  columns,
+  pagination: false,
+  fetcher: apiMenuTree,
+  onError: (text) => void message.error(text),
+});
 
-const table = { columns, list: tree, loading, reload: load };
+watch(table.list, (nodes) => {
+  expandedKeys.value = collectDirectoryKeys(nodes);
+});
 
 function collectDirectoryKeys(nodes: MenuNode[], acc: number[] = []): number[] {
   for (const node of nodes) {
@@ -190,13 +201,18 @@ const rules = computed(() => ({
 
 /** 父节点选择：只有目录可以当父节点，其他类型禁选 */
 const parentTreeData = computed(() =>
-  toParentTreeData(tree.value, editing.value?.id),
+  toParentTreeData(table.list.value, editing.value?.id),
 );
 
 function toParentTreeData(
   nodes: MenuNode[],
   excludeId: number | undefined,
-): { value: number; label: string; disabled?: boolean; children?: unknown[] }[] {
+): {
+  value: number;
+  label: string;
+  disabled?: boolean;
+  children?: unknown[];
+}[] {
   return nodes.map((node) => ({
     value: node.id,
     label:
@@ -273,7 +289,7 @@ async function submit(): Promise<void> {
     }
 
     modalOpen.value = false;
-    await load();
+    await table.reload();
   } finally {
     submitting.value = false;
   }
@@ -282,7 +298,7 @@ async function submit(): Promise<void> {
 async function remove(record: MenuNode): Promise<void> {
   await apiMenuRemove(record.id);
   void message.success(`已删除菜单 ${record.name}`);
-  await load();
+  await table.reload();
 }
 
 const iconKeys = Object.keys(MENU_ICONS);
@@ -339,7 +355,11 @@ defineOptions({ name: 'MenuPage' });
             tree-default-expand-all
             placeholder="不选则为顶层节点"
             :tree-data="parentTreeData"
-            :field-names="{ label: 'label', value: 'value', children: 'children' }"
+            :field-names="{
+              label: 'label',
+              value: 'value',
+              children: 'children',
+            }"
           />
         </a-form-item>
         <a-form-item label="类型" name="type">
@@ -353,14 +373,27 @@ defineOptions({ name: 'MenuPage' });
         <a-form-item label="名称" name="name">
           <a-input v-model:value="form.name" />
         </a-form-item>
-        <a-form-item v-if="form.type !== 'directory'" label="路由路径" name="path">
+        <a-form-item
+          v-if="form.type !== 'directory'"
+          label="路由路径"
+          name="path"
+        >
           <a-input
             v-model:value="form.path"
-            :placeholder="form.type === 'external' ? 'https://example.com' : '/system/user'"
+            :placeholder="
+              form.type === 'external' ? 'https://example.com' : '/system/user'
+            "
           />
         </a-form-item>
-        <a-form-item v-if="form.type === 'menu'" label="前端组件路径" name="component">
-          <a-input v-model:value="form.component" placeholder="仅存档参考，页面注册在前端路由表里" />
+        <a-form-item
+          v-if="form.type === 'menu'"
+          label="前端组件路径"
+          name="component"
+        >
+          <a-input
+            v-model:value="form.component"
+            placeholder="仅存档参考，页面注册在前端路由表里"
+          />
         </a-form-item>
         <a-form-item label="图标" name="icon">
           <a-select
@@ -373,14 +406,22 @@ defineOptions({ name: 'MenuPage' });
           />
         </a-form-item>
         <a-form-item label="排序" name="sort">
-          <a-input-number v-model:value="form.sort" :min="0" :max="9999" class="w-full" />
+          <a-input-number
+            v-model:value="form.sort"
+            :min="0"
+            :max="9999"
+            class="w-full"
+          />
         </a-form-item>
         <a-form-item label="显示选项">
           <a-checkbox v-model:checked="form.visible">在侧边栏显示</a-checkbox>
           <a-checkbox v-model:checked="form.keepAlive">缓存页面</a-checkbox>
         </a-form-item>
         <a-form-item label="状态" name="status">
-          <a-radio-group v-model:value="form.status" :options="STATUS_OPTIONS" />
+          <a-radio-group
+            v-model:value="form.status"
+            :options="STATUS_OPTIONS"
+          />
         </a-form-item>
       </a-form>
     </a-modal>

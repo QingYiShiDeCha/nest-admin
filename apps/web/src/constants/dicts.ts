@@ -1,6 +1,7 @@
 import type { DATA_SCOPE, MENU_TYPE, STATUS } from '@nest-admin/shared';
 
 import { SEMANTIC_COLORS } from '@/constants/palette';
+import type { ThemeTone } from '@/constants/palette';
 
 export type Status = (typeof STATUS)[number];
 export type MenuType = (typeof MENU_TYPE)[number];
@@ -13,20 +14,24 @@ interface Option<T> {
 
 /** 状态 → 展示文案与标签色，用户/角色/菜单三处共用 */
 // Tag 的 color 用状态预设而不是具体色值，让它们跟随全局语义色 token
-export const STATUS_META: Record<Status, { label: string; color: string }> = {
-  active: { label: '启用', color: 'success' },
-  disabled: { label: '禁用', color: 'error' },
-};
+export const STATUS_META: Record<Status, { label: string; color: ThemeTone }> =
+  {
+    active: { label: '启用', color: 'success' },
+    disabled: { label: '禁用', color: 'error' },
+  };
 
 export const STATUS_OPTIONS: Option<Status>[] = [
   { label: '启用', value: 'active' },
   { label: '禁用', value: 'disabled' },
 ];
 
-export const MENU_TYPE_META: Record<MenuType, { label: string; color: string }> = {
-  directory: { label: '目录', color: 'blue' },
-  menu: { label: '菜单', color: 'green' },
-  external: { label: '外链', color: 'purple' },
+export const MENU_TYPE_META: Record<
+  MenuType,
+  { label: string; color: ThemeTone }
+> = {
+  directory: { label: '目录', color: 'primary' },
+  menu: { label: '菜单', color: 'success' },
+  external: { label: '外链', color: 'info' },
 };
 
 export const MENU_TYPE_OPTIONS: Option<MenuType>[] = [

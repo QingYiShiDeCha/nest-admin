@@ -3,11 +3,11 @@ import { reactive } from 'vue';
 import type { DefineComponent } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 
-import ProSearch from '@/components/ProSearch.vue';
+import ProSearch from '@/components/core/tables/pro-search/index.vue';
 import type {
   FilterField,
   SearchableTable,
-} from '@/components/pro-search.types';
+} from '@/components/core/tables/pro-search/types';
 
 interface Filters {
   keyword: string;
@@ -59,6 +59,10 @@ function mountSearch() {
 describe('ProSearch', () => {
   it('把输入值写回 filters，并在回车和查询按钮触发 search', async () => {
     const { filters, search, wrapper } = mountSearch();
+
+    expect(wrapper.classes()).toEqual(
+      expect.arrayContaining(['border', 'border-solid', 'a-border-border-secondary']),
+    );
 
     await wrapper.get('[data-testid="filter-input"]').setValue('admin');
     await wrapper.get('[data-testid="filter-input"]').trigger('keyup.enter');
