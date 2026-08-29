@@ -44,7 +44,7 @@ async function handleSubmit(): Promise<void> {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-100">
+  <div class="min-h-screen flex items-center justify-center a-bg-layout">
     <a-card class="w-96">
       <template #title>
         <div class="flex items-center gap-3">

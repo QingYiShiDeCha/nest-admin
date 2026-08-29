@@ -27,7 +27,7 @@
   "devDependencies": {
     "@antdv-next/auto-import-resolver": "^1.1.1",
     "@antdv-next/unocss": "^1.1.1",
-    "@iconify-json/ant-design": "^1.2.8",
+    "@iconify-json/ri": "^1.2.10",
     "@tsconfig/node24": "^24.0.4",
     "@types/jsdom": "^28.0.3",
     "@types/node": "^24.13.3",

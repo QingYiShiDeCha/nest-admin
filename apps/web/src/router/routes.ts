@@ -25,7 +25,7 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('@/views/dashboard/index.vue'),
         meta: {
           title: '首页',
-          icon: 'DashboardOutlined',
+          icon: 'RiDashboardLine',
           affix: true,
           keepAlive: true,
           cacheName: 'DashboardPage',

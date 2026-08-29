@@ -23,7 +23,7 @@ declare module 'vue-router' {
     title: string;
     public?: boolean;
     permission?: PermissionCode;
-    /** 侧边栏图标，antdv 图标名（menu-icons 注册表的键） */
+    /** 侧边栏图标，Remix Icon 名称（menu-icons 注册表的键） */
     icon?: string;
     affix?: boolean;
     keepAlive?: boolean;

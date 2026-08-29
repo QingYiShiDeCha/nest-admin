@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import type { MenuNode } from '@nest-admin/shared';
-import { findAncestorKeys, findByKey, menuKeyOf, toMenuItems } from '@/layouts/menu-tree';
+import {
+  findAncestorKeys,
+  findByKey,
+  findMenuTrail,
+  menuKeyOf,
+  toMenuItems,
+} from '@/layouts/menu-tree';
+import { resolveMenuIcon } from '@/layouts/menu-icons';
 
 const node = (overrides: Partial<MenuNode> & Pick<MenuNode, 'id' | 'name'>): MenuNode => ({
   parentId: null,
@@ -21,12 +28,12 @@ const node = (overrides: Partial<MenuNode> & Pick<MenuNode, 'id' | 'name'>): Men
 
 /** 首页 + 系统管理（含两个子项），贴近 seed 出来的真实结构 */
 const tree: MenuNode[] = [
-  node({ id: 1, name: '首页', path: '/dashboard', icon: 'DashboardOutlined' }),
+  node({ id: 1, name: '首页', path: '/dashboard', icon: 'RiDashboardLine' }),
   node({
     id: 2,
     name: '系统管理',
     type: 'directory',
-    icon: 'SettingOutlined',
+    icon: 'RiSettings3Line',
     children: [
       node({ id: 3, name: '用户管理', path: '/system/user', parentId: 2 }),
       node({ id: 4, name: '角色管理', path: '/system/role', parentId: 2 }),
@@ -77,6 +84,16 @@ describe('toMenuItems', () => {
   });
 });
 
+describe('resolveMenuIcon', () => {
+  it('解析 Remix Icon 名称', () => {
+    expect(resolveMenuIcon('RiDashboardLine')).toBe('i-ri:dashboard-line');
+  });
+
+  it('兼容数据库里已有的旧图标名', () => {
+    expect(resolveMenuIcon('DashboardOutlined')).toBe('i-ri:dashboard-line');
+  });
+});
+
 describe('findByKey', () => {
   it('能深入子树找到节点', () => {
     expect(findByKey(tree, '/system/role')?.name).toBe('角色管理');
@@ -100,5 +117,18 @@ describe('findAncestorKeys', () => {
     // 个人中心这类 visible:false 的页面不在侧边栏树里，
     // 进这种页时侧边栏不该乱展开一块
     expect(findAncestorKeys(tree, '/profile')).toEqual([]);
+  });
+});
+
+describe('findMenuTrail', () => {
+  it('返回目录到当前页面的完整节点链', () => {
+    expect(findMenuTrail(tree, '/system/user').map((item) => item.name)).toEqual([
+      '系统管理',
+      '用户管理',
+    ]);
+  });
+
+  it('路径不在菜单树时返回空数组', () => {
+    expect(findMenuTrail(tree, '/profile')).toEqual([]);
   });
 });

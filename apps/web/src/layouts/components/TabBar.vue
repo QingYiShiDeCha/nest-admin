@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
 
-import type { TabItem } from '@/stores/tabs';
-import { useTabsStore } from '@/stores/tabs';
+import { useTabsStore, type TabItem } from '@/stores/tabs';
 
 const route = useRoute();
 const router = useRouter();
@@ -49,11 +48,11 @@ function handleMore({ key }: { key: string | number }): void {
       <button
         v-for="tab in tabs.tabs"
         :key="tab.path"
-        class="inline-flex items-center gap-1.5 px-2.5 py-1 border border-[#e5e6eb] rounded text-13px leading-20px whitespace-nowrap cursor-pointer shrink-0 transition-colors"
+        class="inline-flex items-center gap-1.5 px-2.5 py-1 border rounded text-13px leading-20px whitespace-nowrap cursor-pointer shrink-0 transition-colors"
         :class="
           isActive(tab)
-            ? 'text-primary border-primary bg-[color-mix(in_srgb,var(--ant-color-primary)_10%,#fff)]'
-            : 'bg-white text-[#4e5969] hover:text-primary'
+            ? 'text-primary border-primary a-bg-primary-bg'
+            : 'a-bg-container a-color-text-secondary a-border-border hover:text-primary hover:border-primary'
         "
         type="button"
         @click="open(tab)"
@@ -62,22 +61,22 @@ function handleMore({ key }: { key: string | number }): void {
         <span class="max-w-30 truncate">{{ tab.title }}</span>
         <span
           v-if="!tab.affix"
-          class="inline-grid place-items-center w-4 h-4 rounded-[3px] text-10px hover:bg-[#f53f3f] hover:text-white"
+          class="inline-grid place-items-center w-4 h-4 rounded-[3px] text-10px hover:a-bg-error hover:text-white"
           title="关闭"
           @click.stop="handleClose(tab)"
         >
-          <i class="i-ant-design:close-outlined" />
+          <i class="i-ri:close-line" />
         </span>
       </button>
     </div>
 
     <a-dropdown :trigger="['click']" :menu="{ items: moreItems, onClick: handleMore }">
       <button
-        class="inline-grid place-items-center w-7 h-7 border border-[#e5e6eb] rounded bg-white text-[#4e5969] text-12px cursor-pointer shrink-0"
+        class="inline-grid place-items-center w-7 h-7 border a-border-border rounded a-bg-container a-color-text-secondary text-12px cursor-pointer shrink-0 hover:text-primary hover:border-primary"
         type="button"
         title="标签操作"
       >
-        <i class="i-ant-design:down-outlined" />
+        <i class="i-ri:arrow-down-s-line" />
       </button>
     </a-dropdown>
   </div>

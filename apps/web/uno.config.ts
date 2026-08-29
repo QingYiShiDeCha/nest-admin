@@ -8,7 +8,7 @@ export default defineConfig({
     presetWind4(),
     presetIcons({
       // mask 模式下图标继承 currentColor（菜单/按钮换色自动跟随），
-      // inline-block 让 <i class="i-ant-design:xxx" /> 与文字对齐
+      // inline-block 让 <i class="i-ri:xxx" /> 与文字对齐
       extraProperties: {
         display: 'inline-block',
         'vertical-align': 'middle',

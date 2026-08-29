@@ -1,7 +1,6 @@
 /**
- * 侧边栏图标注册表：sys_menu.icon 存的是这里的键名（antd 风格的
- * PascalCase 名，与库里已有数据保持一致），值是 UnoCSS presetIcons
- * 的图标 class（ant-design 集合，kebab-case）。
+ * 侧边栏图标注册表：sys_menu.icon 存的是这里的键名（Remix Icon 的
+ * PascalCase 组件名），值是 UnoCSS presetIcons 的图标 class。
  *
  * 这个文件必须保持零依赖：uno.config.ts 会 import 它生成 safelist——
  * presetIcons 是编译期扫描 class 名生成 CSS，菜单图标是运行时从
@@ -14,14 +13,24 @@
  * 没登记的名字被当成「没有图标」渲染，不会让菜单崩掉：
  * 图标是装饰，不该因为数据库里写错一个名字就打不开后台。
  */
-export const MENU_ICONS: Readonly<Record<string, string>> = {
-  DashboardOutlined: 'i-ant-design:dashboard-outlined',
-  SettingOutlined: 'i-ant-design:setting-outlined',
-  UserOutlined: 'i-ant-design:user-outlined',
-  TeamOutlined: 'i-ant-design:team-outlined',
-  MenuOutlined: 'i-ant-design:menu-outlined',
-  FileTextOutlined: 'i-ant-design:file-text-outlined',
-  IdcardOutlined: 'i-ant-design:idcard-outlined',
+export const MENU_ICONS = {
+  RiDashboardLine: 'i-ri:dashboard-line',
+  RiSettings3Line: 'i-ri:settings-3-line',
+  RiUser3Line: 'i-ri:user-3-line',
+  RiTeamLine: 'i-ri:team-line',
+  RiMenu2Line: 'i-ri:menu-2-line',
+  RiFileList3Line: 'i-ri:file-list-3-line',
+  RiIdCardLine: 'i-ri:id-card-line',
+} as const satisfies Readonly<Record<string, string>>;
+
+const LEGACY_MENU_ICON_NAMES: Readonly<Record<string, keyof typeof MENU_ICONS>> = {
+  DashboardOutlined: 'RiDashboardLine',
+  SettingOutlined: 'RiSettings3Line',
+  UserOutlined: 'RiUser3Line',
+  TeamOutlined: 'RiTeamLine',
+  MenuOutlined: 'RiMenu2Line',
+  FileTextOutlined: 'RiFileList3Line',
+  IdcardOutlined: 'RiIdCardLine',
 };
 
 export function resolveMenuIcon(name: string | null): string | undefined {
@@ -29,7 +38,10 @@ export function resolveMenuIcon(name: string | null): string | undefined {
     return undefined;
   }
 
-  const iconClass = MENU_ICONS[name];
+  const normalizedName = LEGACY_MENU_ICON_NAMES[name] ?? name;
+  const iconClass = (MENU_ICONS as Readonly<Record<string, string>>)[
+    normalizedName
+  ];
 
   if (!iconClass && import.meta.env.DEV) {
     console.warn(`[menu] 未登记的图标名 "${name}"，请在 menu-icons.ts 补充`);

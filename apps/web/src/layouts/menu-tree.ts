@@ -57,23 +57,26 @@ export function findByKey(nodes: MenuNode[], key: string): MenuNode | undefined 
   return undefined;
 }
 
-/** 找到则返回从当前层到目标的父级 key 链，找不到返回 null */
-function ancestorTrail(nodes: MenuNode[], targetPath: string): string[] | null {
+/** 找到则返回从当前层到目标节点的完整路径，找不到返回 null */
+function menuTrail(nodes: MenuNode[], targetPath: string): MenuNode[] | null {
   for (const node of nodes) {
     if (node.path === targetPath) {
-      // 自己就是目标，它是叶子，没有需要展开的祖先
-      return [];
+      return [node];
     }
 
-    const deeper = ancestorTrail(node.children, targetPath);
+    const deeper = menuTrail(node.children, targetPath);
 
-    // 注意判空要区分 [] 与 null：空数组表示「找到了且无祖先」
     if (deeper) {
-      return [menuKeyOf(node), ...deeper];
+      return [node, ...deeper];
     }
   }
 
   return null;
+}
+
+/** 当前路径在菜单树里的完整节点链，供侧栏展开和面包屑共用 */
+export function findMenuTrail(nodes: MenuNode[], targetPath: string): MenuNode[] {
+  return menuTrail(nodes, targetPath) ?? [];
 }
 
 /**
@@ -81,5 +84,5 @@ function ancestorTrail(nodes: MenuNode[], targetPath: string): string[] | null {
  * 直接访问 /system/user 时若不展开「系统管理」，侧边栏看着像是没有这一项。
  */
 export function findAncestorKeys(nodes: MenuNode[], targetPath: string): string[] {
-  return ancestorTrail(nodes, targetPath) ?? [];
+  return findMenuTrail(nodes, targetPath).slice(0, -1).map(menuKeyOf);
 }

@@ -27,10 +27,10 @@ const themeVars = computed(() => ({
 
 /** 顶部四张统计卡 */
 const statCards = [
-  { icon: 'i-ant-design:user-outlined', tint: 'blue', label: '总访客数', value: '48,260', trend: '1.18%', up: true },
-  { icon: 'i-ant-design:message-outlined', tint: 'cyan', label: '总会话数', value: '156K', trend: '3.04%', up: true },
-  { icon: 'i-ant-design:thunderbolt-outlined', tint: 'green', label: '跳出率', value: '38.2%', trend: '1.12%', up: false },
-  { icon: 'i-ant-design:clock-circle-outlined', tint: 'orange', label: '平均会话时长', value: '4分12秒', trend: '0.84%', up: true },
+  { icon: 'i-ri:user-3-line', tint: 'blue', label: '总访客数', value: '48,260', trend: '1.18%', up: true },
+  { icon: 'i-ri:message-3-line', tint: 'cyan', label: '总会话数', value: '156K', trend: '3.04%', up: true },
+  { icon: 'i-ri:pulse-line', tint: 'green', label: '跳出率', value: '38.2%', trend: '1.12%', up: false },
+  { icon: 'i-ri:time-line', tint: 'orange', label: '平均会话时长', value: '4分12秒', trend: '0.84%', up: true },
 ];
 
 /** 终端会话占比：分段比例与底部分类统计一致，中心是总量 */
@@ -220,10 +220,10 @@ defineOptions({ name: 'DashboardPage' });
                   <td class="ta-r">
                     <a-space :size="4">
                       <a-button type="text" size="small">
-                        <i class="i-ant-design:edit-outlined" />
+                        <i class="i-ri:edit-line" />
                       </a-button>
                       <a-button type="text" size="small" danger>
-                        <i class="i-ant-design:delete-outlined" />
+                        <i class="i-ri:delete-bin-line" />
                       </a-button>
                     </a-space>
                   </td>
@@ -265,7 +265,7 @@ defineOptions({ name: 'DashboardPage' });
                   v-for="(v, c) in row"
                   :key="c"
                   class="heat-cell"
-                  :style="{ background: `color-mix(in srgb, var(--dash-green) ${Math.round((0.15 + v * 0.85) * 100)}%, #fff)` }"
+                  :style="{ background: `color-mix(in srgb, var(--dash-green) ${Math.round((0.15 + v * 0.85) * 100)}%, var(--dash-container))` }"
                 />
               </div>
             </div>
@@ -281,6 +281,12 @@ defineOptions({ name: 'DashboardPage' });
 .dash {
   /* --dash-blue/green/cyan/orange/danger 由模板 :style 注入 */
   --dash-radius: 8px;
+  --dash-container: var(--ant-color-bg-container);
+  --dash-text: var(--ant-color-text);
+  --dash-text-secondary: var(--ant-color-text-secondary);
+  --dash-border: var(--ant-color-border-secondary);
+  --dash-fill: var(--ant-color-fill-tertiary);
+  color: var(--dash-text);
 }
 
 /* 左主体 + 右通栏；右栏定宽，窄屏折行 */
@@ -314,7 +320,7 @@ defineOptions({ name: 'DashboardPage' });
 }
 
 .panel {
-  background: #fff;
+  background: var(--dash-container);
   border-radius: var(--dash-radius);
   padding: 20px;
 }
@@ -336,12 +342,12 @@ defineOptions({ name: 'DashboardPage' });
 }
 
 /* 浅色底用 color-mix 从语义色自动生成，跟随主题不必逐个调 */
-.tint-blue { background: color-mix(in srgb, var(--dash-blue) 12%, #fff); color: var(--dash-blue); }
-.tint-cyan { background: color-mix(in srgb, var(--dash-cyan) 12%, #fff); color: var(--dash-cyan); }
-.tint-green { background: color-mix(in srgb, var(--dash-green) 12%, #fff); color: var(--dash-green); }
-.tint-orange { background: color-mix(in srgb, var(--dash-orange) 12%, #fff); color: var(--dash-orange); }
+.tint-blue { background: color-mix(in srgb, var(--dash-blue) 12%, var(--dash-container)); color: var(--dash-blue); }
+.tint-cyan { background: color-mix(in srgb, var(--dash-cyan) 12%, var(--dash-container)); color: var(--dash-cyan); }
+.tint-green { background: color-mix(in srgb, var(--dash-green) 12%, var(--dash-container)); color: var(--dash-green); }
+.tint-orange { background: color-mix(in srgb, var(--dash-orange) 12%, var(--dash-container)); color: var(--dash-orange); }
 
-.stat-label { font-size: 13px; color: #86909c; }
+.stat-label { font-size: 13px; color: var(--dash-text-secondary); }
 .stat-value { font-size: 24px; font-weight: 600; line-height: 1.4; white-space: nowrap; }
 .stat-trend { font-size: 12px; }
 .stat-trend.up { color: var(--dash-green); }
@@ -360,24 +366,24 @@ defineOptions({ name: 'DashboardPage' });
 .donut-center {
   position: absolute;
   inset: 17%;
-  background: #fff;
+  background: var(--dash-container);
   border-radius: 50%;
   display: grid;
   place-items: center;
   font-size: 26px;
   font-weight: 600;
-  color: #4e5969;
+  color: var(--dash-text);
 }
 .donut-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-top: 1px solid #f2f3f5;
+  border-top: 1px solid var(--dash-border);
   padding-top: 14px;
   text-align: center;
 }
-.donut-stats > div + div { border-left: 1px solid #f2f3f5; }
+.donut-stats > div + div { border-left: 1px solid var(--dash-border); }
 .donut-num { font-size: 20px; font-weight: 600; }
-.donut-label { margin-top: 4px; font-size: 13px; color: #86909c; }
+.donut-label { margin-top: 4px; font-size: 13px; color: var(--dash-text-secondary); }
 .dot {
   display: inline-block;
   width: 8px;
@@ -393,7 +399,7 @@ defineOptions({ name: 'DashboardPage' });
   flex-direction: column;
   justify-content: space-between;
   font-size: 12px;
-  color: #86909c;
+  color: var(--dash-text-secondary);
   text-align: right;
 }
 .bars-plot { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -403,7 +409,7 @@ defineOptions({ name: 'DashboardPage' });
   align-items: flex-end;
   justify-content: space-around;
   gap: 6px;
-  border-bottom: 1px solid #f2f3f5;
+  border-bottom: 1px solid var(--dash-border);
 }
 .bar {
   width: 18px;
@@ -416,7 +422,7 @@ defineOptions({ name: 'DashboardPage' });
   justify-content: space-around;
   margin-top: 8px;
   font-size: 12px;
-  color: #86909c;
+  color: var(--dash-text-secondary);
 }
 
 /* ---- 轻量表格 ---- */
@@ -424,21 +430,21 @@ defineOptions({ name: 'DashboardPage' });
 .mini-table th {
   text-align: left;
   font-weight: 500;
-  color: #86909c;
+  color: var(--dash-text-secondary);
   padding: 8px 4px;
-  border-bottom: 1px solid #f2f3f5;
+  border-bottom: 1px solid var(--dash-border);
 }
-.mini-table td { padding: 10px 4px; border-bottom: 1px solid #f7f8fa; }
+.mini-table td { padding: 10px 4px; border-bottom: 1px solid var(--dash-border); }
 .mini-table tr:last-child td { border-bottom: none; }
 .ta-r { text-align: right !important; }
 .w-12 { width: 48px; }
 .flag { margin-right: 6px; }
-.code { color: #86909c; margin-right: 6px; font-size: 12px; }
+.code { color: var(--dash-text-secondary); margin-right: 6px; font-size: 12px; }
 .trend-up { color: var(--dash-green); margin-right: 6px; font-size: 12px; }
 .trend-down { color: var(--dash-danger); margin-right: 6px; font-size: 12px; }
-.owner-avatar { background: #ecf2ff; color: var(--dash-blue); margin-right: 8px; vertical-align: middle; }
+.owner-avatar { background: color-mix(in srgb, var(--dash-blue) 12%, var(--dash-container)); color: var(--dash-blue); margin-right: 8px; vertical-align: middle; }
 .owner-name { vertical-align: middle; margin-right: 8px; }
-.owner-dept { color: #86909c; font-size: 12px; vertical-align: middle; }
+.owner-dept { color: var(--dash-text-secondary); font-size: 12px; vertical-align: middle; }
 
 /* ---- 浏览器洞察 ---- */
 .browser-list { list-style: none; margin: 0; padding: 0; }
@@ -455,12 +461,12 @@ defineOptions({ name: 'DashboardPage' });
   flex-shrink: 0;
 }
 .browser-name { flex: 1; font-weight: 500; }
-.browser-name small { display: block; font-weight: 400; color: #86909c; }
+.browser-name small { display: block; font-weight: 400; color: var(--dash-text-secondary); }
 .browser-value { font-weight: 600; }
 .browser-bar {
   height: 4px;
   border-radius: 2px;
-  background: #f2f3f5;
+  background: var(--dash-fill);
   margin-top: 8px;
   margin-left: 46px;
   overflow: hidden;
@@ -470,7 +476,7 @@ defineOptions({ name: 'DashboardPage' });
 /* ---- 热力图 ---- */
 .heat-row { display: flex; align-items: center; gap: 8px; }
 .heat-row + .heat-row { margin-top: 8px; }
-.heat-label { width: 36px; font-size: 12px; color: #86909c; text-align: right; flex-shrink: 0; }
+.heat-label { width: 36px; font-size: 12px; color: var(--dash-text-secondary); text-align: right; flex-shrink: 0; }
 .heat-cells { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; flex: 1; }
 .heat-cell { aspect-ratio: 1; border-radius: 4px; }
 
