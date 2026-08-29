@@ -1,17 +1,34 @@
 <script setup lang="ts">
+import { BarChart, HeatmapChart, PieChart } from 'echarts/charts';
+import {
+  GridComponent,
+  TitleComponent,
+  TooltipComponent,
+  VisualMapComponent,
+} from 'echarts/components';
+import { use } from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
+import { theme as antdvTheme } from 'antdv-next';
+import { computed } from 'vue';
+import VChart from 'vue-echarts';
+
+import AppIcon from '@/components/core/base/app-icon/index.vue';
 import { SEMANTIC_COLORS } from '@/constants/palette';
 import { useSettingsStore } from '@/stores/settings';
-import { computed } from 'vue';
 
-/**
- * 看板布局复刻：网格结构、卡片视觉与参考设计一致。
- *
- * 所有数据都是静态示例（本页不存在对应统计接口），图表用纯 CSS 画占位
- * ——布局定型后接统计接口时，把对应区块换成 echarts 即可，
- * 网格与卡片样式不用动。
- */
+use([
+  BarChart,
+  HeatmapChart,
+  PieChart,
+  GridComponent,
+  TitleComponent,
+  TooltipComponent,
+  VisualMapComponent,
+  CanvasRenderer,
+]);
 
 const settings = useSettingsStore();
+const { token: designToken } = antdvTheme.useToken();
 
 /**
  * 图表消费的主题色，来源与 App.vue 的 token 相同（palette 单一来源）。
@@ -27,10 +44,38 @@ const themeVars = computed(() => ({
 
 /** 顶部四张统计卡 */
 const statCards = [
-  { icon: 'i-ri:user-3-line', tint: 'blue', label: '总访客数', value: '48,260', trend: '1.18%', up: true },
-  { icon: 'i-ri:message-3-line', tint: 'cyan', label: '总会话数', value: '156K', trend: '3.04%', up: true },
-  { icon: 'i-ri:pulse-line', tint: 'green', label: '跳出率', value: '38.2%', trend: '1.12%', up: false },
-  { icon: 'i-ri:time-line', tint: 'orange', label: '平均会话时长', value: '4分12秒', trend: '0.84%', up: true },
+  {
+    icon: 'i-ri:user-3-line',
+    tint: 'blue',
+    label: '总访客数',
+    value: '48,260',
+    trend: '1.18%',
+    up: true,
+  },
+  {
+    icon: 'i-ri:message-3-line',
+    tint: 'cyan',
+    label: '总会话数',
+    value: '156K',
+    trend: '3.04%',
+    up: true,
+  },
+  {
+    icon: 'i-ri:pulse-line',
+    tint: 'green',
+    label: '跳出率',
+    value: '38.2%',
+    trend: '1.12%',
+    up: false,
+  },
+  {
+    icon: 'i-ri:time-line',
+    tint: 'orange',
+    label: '平均会话时长',
+    value: '4分12秒',
+    trend: '0.84%',
+    up: true,
+  },
 ];
 
 /** 终端会话占比：分段比例与底部分类统计一致，中心是总量 */
@@ -41,20 +86,8 @@ const deviceSegments = [
 ];
 const deviceTotal = deviceSegments.reduce((sum, s) => sum + s.value, 0);
 
-/** 按分段值生成 conic-gradient 的角度停靠点 */
-const donutGradient = (() => {
-  let cursor = 0;
-  const stops = deviceSegments.map((s) => {
-    const from = cursor;
-    cursor += (s.value / deviceTotal) * 360;
-    return `${s.color} ${from}deg ${cursor}deg`;
-  });
-  return `conic-gradient(${stops.join(', ')})`;
-})();
-
 /** 近 12 个月柱状图（0-50 刻度），值取自参考图目测比例 */
 const monthBars = [24, 12, 23, 29, 14, 23, 40, 22, 47, 23, 48, 38];
-const yTicks = [50, 40, 30, 20, 10, 0];
 const monthLabels = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
 
 const browsers = [
@@ -79,15 +112,181 @@ const activities = [
   { owner: '李娜', dept: '渠道运营', amount: '¥ 8,930', target: '41.7%' },
 ];
 
-/** 热力图：6 行 × 8 列，0-1 强度（确定性伪随机，避免每次渲染闪动） */
+/** 热力图使用确定性数据，避免每次渲染时随机闪动 */
 const heatLabels = ['12时', '19时', '15时', '0时', '8时', '4时'];
-const heatColumns = 8;
-const heatRows = heatLabels.map((_, row) =>
-  Array.from({ length: heatColumns }, (_, col) => {
-    const seed = Math.sin((row + 1) * 12.9898 + (col + 1) * 78.233) * 43758.5453;
-    return seed - Math.floor(seed);
+const weekdayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+const heatData = heatLabels.flatMap((_, row) =>
+  weekdayLabels.map((__, col) => {
+    const seed =
+      Math.sin((row + 1) * 12.9898 + (col + 1) * 78.233) * 43758.5453;
+    return [col, row, Math.round((seed - Math.floor(seed)) * 100)];
   }),
 );
+
+const tooltipTheme = computed(() => ({
+  backgroundColor: designToken.value.colorBgElevated,
+  borderColor: designToken.value.colorBorderSecondary,
+  textStyle: { color: designToken.value.colorText },
+}));
+
+const deviceChartOption = computed(() => ({
+  animation: true,
+  animationDuration: 1000,
+  animationDurationUpdate: 500,
+  animationEasing: 'cubicOut' as const,
+  animationEasingUpdate: 'cubicInOut' as const,
+  color: [
+    settings.primaryColor,
+    SEMANTIC_COLORS.success,
+    SEMANTIC_COLORS.warning,
+  ],
+  tooltip: {
+    trigger: 'item',
+    formatter: '{b}<br/>{c} ({d}%)',
+    ...tooltipTheme.value,
+  },
+  title: {
+    text: deviceTotal.toLocaleString(),
+    left: 'center',
+    top: 'center',
+    textStyle: {
+      color: designToken.value.colorText,
+      fontSize: 26,
+      fontWeight: 600,
+    },
+  },
+  series: [
+    {
+      type: 'pie',
+      radius: ['66%', '86%'],
+      center: ['50%', '50%'],
+      avoidLabelOverlap: false,
+      animationType: 'scale',
+      animationTypeUpdate: 'transition',
+      label: { show: false },
+      emphasis: { scaleSize: 6 },
+      data: deviceSegments.map((segment) => ({
+        name: segment.label,
+        value: segment.value,
+      })),
+    },
+  ],
+}));
+
+const audienceChartOption = computed(() => ({
+  animation: true,
+  animationDuration: 900,
+  animationDurationUpdate: 500,
+  animationEasing: 'cubicOut' as const,
+  animationEasingUpdate: 'cubicInOut' as const,
+  animationDelay: (index: number) => index * 55,
+  animationDelayUpdate: (index: number) => index * 25,
+  tooltip: {
+    trigger: 'axis',
+    axisPointer: { type: 'shadow' },
+    ...tooltipTheme.value,
+  },
+  grid: {
+    top: 12,
+    right: 8,
+    bottom: 4,
+    left: 4,
+    outerBoundsMode: 'same',
+    outerBoundsContain: 'axisLabel',
+  },
+  xAxis: {
+    type: 'category',
+    data: monthLabels,
+    axisTick: { show: false },
+    axisLine: { lineStyle: { color: designToken.value.colorBorderSecondary } },
+    axisLabel: { color: designToken.value.colorTextSecondary },
+  },
+  yAxis: {
+    type: 'value',
+    max: 50,
+    interval: 10,
+    axisLabel: { color: designToken.value.colorTextSecondary },
+    splitLine: {
+      lineStyle: {
+        color: designToken.value.colorBorderSecondary,
+        type: 'dashed',
+      },
+    },
+  },
+  series: [
+    {
+      type: 'bar',
+      data: monthBars,
+      barMaxWidth: 28,
+      itemStyle: {
+        color: settings.primaryColor,
+        borderRadius: [4, 4, 0, 0],
+      },
+    },
+  ],
+}));
+
+const activityChartOption = computed(() => ({
+  animation: true,
+  animationDuration: 700,
+  animationDurationUpdate: 400,
+  animationEasing: 'cubicOut' as const,
+  animationEasingUpdate: 'cubicInOut' as const,
+  animationDelay: (index: number) => index * 12,
+  animationDelayUpdate: (index: number) => index * 6,
+  tooltip: {
+    position: 'top',
+    ...tooltipTheme.value,
+  },
+  grid: {
+    top: 8,
+    right: 4,
+    bottom: 4,
+    left: 4,
+    outerBoundsMode: 'same',
+    outerBoundsContain: 'axisLabel',
+  },
+  xAxis: {
+    type: 'category',
+    data: weekdayLabels,
+    axisTick: { show: false },
+    axisLine: { show: false },
+    axisLabel: { color: designToken.value.colorTextSecondary },
+  },
+  yAxis: {
+    type: 'category',
+    data: heatLabels,
+    axisTick: { show: false },
+    axisLine: { show: false },
+    axisLabel: { color: designToken.value.colorTextSecondary },
+  },
+  visualMap: {
+    min: 0,
+    max: 100,
+    show: false,
+    inRange: {
+      color: [designToken.value.colorFillSecondary, SEMANTIC_COLORS.success],
+    },
+  },
+  series: [
+    {
+      type: 'heatmap',
+      data: heatData,
+      itemStyle: {
+        borderColor: designToken.value.colorBgContainer,
+        borderWidth: 4,
+        borderRadius: 6,
+      },
+      emphasis: {
+        itemStyle: {
+          borderColor: settings.primaryColor,
+          shadowBlur: 8,
+          shadowColor: settings.primaryColor,
+        },
+      },
+    },
+  ],
+}));
 
 defineOptions({ name: 'DashboardPage' });
 </script>
@@ -99,9 +298,13 @@ defineOptions({ name: 'DashboardPage' });
       <div class="dash-main">
         <!-- 统计卡行 -->
         <div class="dash-stats">
-          <div v-for="card in statCards" :key="card.label" class="panel stat-card">
+          <div
+            v-for="card in statCards"
+            :key="card.label"
+            class="panel stat-card"
+          >
             <div class="stat-icon" :class="`tint-${card.tint}`">
-              <i :class="card.icon" />
+              <AppIcon :icon="card.icon" />
             </div>
             <div class="stat-meta">
               <div class="stat-label">{{ card.label }}</div>
@@ -119,11 +322,11 @@ defineOptions({ name: 'DashboardPage' });
             <template #extra>
               <a class="card-link">查看详情</a>
             </template>
-            <div class="donut-wrap">
-              <div class="donut" :style="{ background: donutGradient }">
-                <div class="donut-center">{{ deviceTotal }}</div>
-              </div>
-            </div>
+            <v-chart
+              class="h-60 w-full"
+              :option="deviceChartOption"
+              autoresize
+            />
             <div class="donut-stats">
               <div v-for="seg in deviceSegments" :key="seg.label">
                 <div class="donut-num">{{ seg.value }}</div>
@@ -135,28 +338,18 @@ defineOptions({ name: 'DashboardPage' });
             </div>
           </a-card>
 
-          <a-card title="受众趋势" class="dash-card">
+          <a-card
+            title="受众趋势"
+            class="dash-card min-h-80 flex flex-col [&_.ant-card-body]:flex [&_.ant-card-body]:flex-1 [&_.ant-card-body]:min-h-0"
+          >
             <template #extra>
               <a class="card-link">查看详情</a>
             </template>
-            <div class="bars">
-              <div class="bars-y">
-                <span v-for="tick in yTicks" :key="tick">{{ tick }}</span>
-              </div>
-              <div class="bars-plot">
-                <div class="bars-area">
-                  <div
-                    v-for="(v, i) in monthBars"
-                    :key="i"
-                    class="bar"
-                    :style="{ height: `${(v / 50) * 100}%` }"
-                  />
-                </div>
-                <div class="bars-x">
-                  <span v-for="m in monthLabels" :key="m">{{ m }}</span>
-                </div>
-              </div>
-            </div>
+            <v-chart
+              class="min-h-60 w-full flex-1"
+              :option="audienceChartOption"
+              autoresize
+            />
           </a-card>
         </div>
 
@@ -184,7 +377,8 @@ defineOptions({ name: 'DashboardPage' });
                   </td>
                   <td class="ta-r">
                     <span :class="c.trend >= 0 ? 'trend-up' : 'trend-down'">
-                      ({{ c.trend >= 0 ? '↑' : '↓' }} {{ Math.abs(c.trend).toFixed(2) }}%)
+                      ({{ c.trend >= 0 ? '↑' : '↓' }}
+                      {{ Math.abs(c.trend).toFixed(2) }}%)
                     </span>
                     {{ c.visitors }}
                   </td>
@@ -210,20 +404,24 @@ defineOptions({ name: 'DashboardPage' });
               <tbody>
                 <tr v-for="act in activities" :key="act.owner">
                   <td>
-                    <a-avatar :size="32" class="owner-avatar">{{ act.owner[0] }}</a-avatar>
+                    <a-avatar :size="32" class="owner-avatar">{{
+                      act.owner[0]
+                    }}</a-avatar>
                     <span class="owner-name">{{ act.owner }}</span>
                     <span class="owner-dept">{{ act.dept }}</span>
                   </td>
                   <td>{{ act.amount }}</td>
-                  <td><a class="card-link">{{ act.target }}</a></td>
+                  <td>
+                    <a class="card-link">{{ act.target }}</a>
+                  </td>
                   <td><a-tag color="processing">进行中</a-tag></td>
                   <td class="ta-r">
                     <a-space :size="4">
                       <a-button type="text" size="small">
-                        <i class="i-ri:edit-line" />
+                        <AppIcon icon="i-ri:edit-line" />
                       </a-button>
                       <a-button type="text" size="small" danger>
-                        <i class="i-ri:delete-bin-line" />
+                        <AppIcon icon="i-ri:delete-bin-line" />
                       </a-button>
                     </a-space>
                   </td>
@@ -240,36 +438,38 @@ defineOptions({ name: 'DashboardPage' });
           <ul class="browser-list">
             <li v-for="b in browsers" :key="b.name">
               <div class="browser-row">
-                <span class="browser-avatar" :style="{ background: `${b.color}22`, color: b.color }">
+                <span
+                  class="browser-avatar"
+                  :style="{ background: `${b.color}22`, color: b.color }"
+                >
                   {{ b.name[0] }}
                 </span>
                 <span class="browser-name">
                   {{ b.name }}
                   <small>{{ b.alias }}</small>
                 </span>
-                <span class="browser-value">{{ b.value.toLocaleString() }}</span>
+                <span class="browser-value">{{
+                  b.value.toLocaleString()
+                }}</span>
               </div>
               <div class="browser-bar">
-                <span :style="{ width: `${(b.value / browserMax) * 100}%`, background: b.color }" />
+                <span
+                  :style="{
+                    width: `${(b.value / browserMax) * 100}%`,
+                    background: b.color,
+                  }"
+                />
               </div>
             </li>
           </ul>
         </a-card>
 
         <a-card title="一周活跃时段" class="dash-card">
-          <div class="heatmap">
-            <div v-for="(row, r) in heatRows" :key="r" class="heat-row">
-              <span class="heat-label">{{ heatLabels[r] }}</span>
-              <div class="heat-cells">
-                <span
-                  v-for="(v, c) in row"
-                  :key="c"
-                  class="heat-cell"
-                  :style="{ background: `color-mix(in srgb, var(--dash-green) ${Math.round((0.15 + v * 0.85) * 100)}%, var(--dash-container))` }"
-                />
-              </div>
-            </div>
-          </div>
+          <v-chart
+            class="h-60 w-full"
+            :option="activityChartOption"
+            autoresize
+          />
         </a-card>
       </div>
     </div>
@@ -321,6 +521,7 @@ defineOptions({ name: 'DashboardPage' });
 
 .panel {
   background: var(--dash-container);
+  border: 1px solid var(--dash-border);
   border-radius: var(--dash-radius);
   padding: 20px;
 }
@@ -342,38 +543,47 @@ defineOptions({ name: 'DashboardPage' });
 }
 
 /* 浅色底用 color-mix 从语义色自动生成，跟随主题不必逐个调 */
-.tint-blue { background: color-mix(in srgb, var(--dash-blue) 12%, var(--dash-container)); color: var(--dash-blue); }
-.tint-cyan { background: color-mix(in srgb, var(--dash-cyan) 12%, var(--dash-container)); color: var(--dash-cyan); }
-.tint-green { background: color-mix(in srgb, var(--dash-green) 12%, var(--dash-container)); color: var(--dash-green); }
-.tint-orange { background: color-mix(in srgb, var(--dash-orange) 12%, var(--dash-container)); color: var(--dash-orange); }
-
-.stat-label { font-size: 13px; color: var(--dash-text-secondary); }
-.stat-value { font-size: 24px; font-weight: 600; line-height: 1.4; white-space: nowrap; }
-.stat-trend { font-size: 12px; }
-.stat-trend.up { color: var(--dash-green); }
-.stat-trend.down { color: var(--dash-danger); }
-
-.card-link { font-size: 13px; }
-
-/* ---- 环形图 ---- */
-.donut-wrap { display: grid; place-items: center; padding: 12px 0 20px; }
-.donut {
-  width: 200px;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  position: relative;
+.tint-blue {
+  background: color-mix(in srgb, var(--dash-blue) 12%, var(--dash-container));
+  color: var(--dash-blue);
 }
-.donut-center {
-  position: absolute;
-  inset: 17%;
-  background: var(--dash-container);
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  font-size: 26px;
+.tint-cyan {
+  background: color-mix(in srgb, var(--dash-cyan) 12%, var(--dash-container));
+  color: var(--dash-cyan);
+}
+.tint-green {
+  background: color-mix(in srgb, var(--dash-green) 12%, var(--dash-container));
+  color: var(--dash-green);
+}
+.tint-orange {
+  background: color-mix(in srgb, var(--dash-orange) 12%, var(--dash-container));
+  color: var(--dash-orange);
+}
+
+.stat-label {
+  font-size: 13px;
+  color: var(--dash-text-secondary);
+}
+.stat-value {
+  font-size: 24px;
   font-weight: 600;
-  color: var(--dash-text);
+  line-height: 1.4;
+  white-space: nowrap;
 }
+.stat-trend {
+  font-size: 12px;
+}
+.stat-trend.up {
+  color: var(--dash-green);
+}
+.stat-trend.down {
+  color: var(--dash-danger);
+}
+
+.card-link {
+  font-size: 13px;
+}
+
 .donut-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -381,9 +591,18 @@ defineOptions({ name: 'DashboardPage' });
   padding-top: 14px;
   text-align: center;
 }
-.donut-stats > div + div { border-left: 1px solid var(--dash-border); }
-.donut-num { font-size: 20px; font-weight: 600; }
-.donut-label { margin-top: 4px; font-size: 13px; color: var(--dash-text-secondary); }
+.donut-stats > div + div {
+  border-left: 1px solid var(--dash-border);
+}
+.donut-num {
+  font-size: 20px;
+  font-weight: 600;
+}
+.donut-label {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--dash-text-secondary);
+}
 .dot {
   display: inline-block;
   width: 8px;
@@ -392,41 +611,12 @@ defineOptions({ name: 'DashboardPage' });
   margin-right: 4px;
 }
 
-/* ---- 柱状图 ---- */
-.bars { display: flex; gap: 8px; height: 240px; }
-.bars-y {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--dash-text-secondary);
-  text-align: right;
-}
-.bars-plot { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.bars-area {
-  flex: 1;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-around;
-  gap: 6px;
-  border-bottom: 1px solid var(--dash-border);
-}
-.bar {
-  width: 18px;
-  max-width: 28px;
-  background: var(--dash-blue);
-  border-radius: 4px 4px 0 0;
-}
-.bars-x {
-  display: flex;
-  justify-content: space-around;
-  margin-top: 8px;
-  font-size: 12px;
-  color: var(--dash-text-secondary);
-}
-
 /* ---- 轻量表格 ---- */
-.mini-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
 .mini-table th {
   text-align: left;
   font-weight: 500;
@@ -434,22 +624,67 @@ defineOptions({ name: 'DashboardPage' });
   padding: 8px 4px;
   border-bottom: 1px solid var(--dash-border);
 }
-.mini-table td { padding: 10px 4px; border-bottom: 1px solid var(--dash-border); }
-.mini-table tr:last-child td { border-bottom: none; }
-.ta-r { text-align: right !important; }
-.w-12 { width: 48px; }
-.flag { margin-right: 6px; }
-.code { color: var(--dash-text-secondary); margin-right: 6px; font-size: 12px; }
-.trend-up { color: var(--dash-green); margin-right: 6px; font-size: 12px; }
-.trend-down { color: var(--dash-danger); margin-right: 6px; font-size: 12px; }
-.owner-avatar { background: color-mix(in srgb, var(--dash-blue) 12%, var(--dash-container)); color: var(--dash-blue); margin-right: 8px; vertical-align: middle; }
-.owner-name { vertical-align: middle; margin-right: 8px; }
-.owner-dept { color: var(--dash-text-secondary); font-size: 12px; vertical-align: middle; }
+.mini-table td {
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--dash-border);
+}
+.mini-table tr:last-child td {
+  border-bottom: none;
+}
+.ta-r {
+  text-align: right !important;
+}
+.w-12 {
+  width: 48px;
+}
+.flag {
+  margin-right: 6px;
+}
+.code {
+  color: var(--dash-text-secondary);
+  margin-right: 6px;
+  font-size: 12px;
+}
+.trend-up {
+  color: var(--dash-green);
+  margin-right: 6px;
+  font-size: 12px;
+}
+.trend-down {
+  color: var(--dash-danger);
+  margin-right: 6px;
+  font-size: 12px;
+}
+.owner-avatar {
+  background: color-mix(in srgb, var(--dash-blue) 12%, var(--dash-container));
+  color: var(--dash-blue);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.owner-name {
+  vertical-align: middle;
+  margin-right: 8px;
+}
+.owner-dept {
+  color: var(--dash-text-secondary);
+  font-size: 12px;
+  vertical-align: middle;
+}
 
 /* ---- 浏览器洞察 ---- */
-.browser-list { list-style: none; margin: 0; padding: 0; }
-.browser-list li + li { margin-top: 16px; }
-.browser-row { display: flex; align-items: center; gap: 10px; }
+.browser-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.browser-list li + li {
+  margin-top: 16px;
+}
+.browser-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .browser-avatar {
   display: grid;
   place-items: center;
@@ -460,9 +695,18 @@ defineOptions({ name: 'DashboardPage' });
   font-weight: 600;
   flex-shrink: 0;
 }
-.browser-name { flex: 1; font-weight: 500; }
-.browser-name small { display: block; font-weight: 400; color: var(--dash-text-secondary); }
-.browser-value { font-weight: 600; }
+.browser-name {
+  flex: 1;
+  font-weight: 500;
+}
+.browser-name small {
+  display: block;
+  font-weight: 400;
+  color: var(--dash-text-secondary);
+}
+.browser-value {
+  font-weight: 600;
+}
 .browser-bar {
   height: 4px;
   border-radius: 2px;
@@ -471,23 +715,32 @@ defineOptions({ name: 'DashboardPage' });
   margin-left: 46px;
   overflow: hidden;
 }
-.browser-bar span { display: block; height: 100%; border-radius: 2px; }
-
-/* ---- 热力图 ---- */
-.heat-row { display: flex; align-items: center; gap: 8px; }
-.heat-row + .heat-row { margin-top: 8px; }
-.heat-label { width: 36px; font-size: 12px; color: var(--dash-text-secondary); text-align: right; flex-shrink: 0; }
-.heat-cells { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; flex: 1; }
-.heat-cell { aspect-ratio: 1; border-radius: 4px; }
+.browser-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+}
 
 /* 窄屏：右栏折到下方成两列，双列改单列，统计卡两列 */
 @media (max-width: 1280px) {
-  .dash-board { grid-template-columns: 1fr; }
-  .dash-rail { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+  .dash-board {
+    grid-template-columns: 1fr;
+  }
+  .dash-rail {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
 }
 @media (max-width: 900px) {
-  .dash-split { grid-template-columns: 1fr; }
-  .dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dash-rail { grid-template-columns: 1fr; }
+  .dash-split {
+    grid-template-columns: 1fr;
+  }
+  .dash-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .dash-rail {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
