@@ -111,6 +111,12 @@ Vue 3.5 + Vite 8 + TypeScript + vue-router 5 + Pinia 4 + antdv-next（按需自�
 
 **TypeScript 版本是故意分叉的**：后端 5.9.3（根依赖）、前端 6.0.x（本包依赖），pnpm 会各装一份。Volar（Vue 语言服务）用包自己的版本，不会互相干扰；但 VS Code 的 `typescript.tsdk` 指向根那份 5.9.3，只对 `.ts` 生效，Vue 文件由 Volar 接管。
 
+**HTTP 请求用 alova**（`src/api/http.ts`）。响应统一解包：后端的 `{ code: 0, data }` 直接解出 `data`，失败一律抛 `ApiError`（带 `httpStatus` 与 `bizCode`），断网超时归一成 `httpStatus: 0`。**204 空响应体视为成功**——后端有 10 个接口（登出、删除、改密、配置授权等）返回 204，对空体调 `json()` 会抛错。
+
+**401 会静默刷新并重试一次，且多个并发 401 只刷新一次。** 这不是性能优化而是必须：后端的 refreshToken 是轮换式的，第一个刷新成功后旧令牌立即作废，若每个 401 各自去刷，后面的全会失败，还会触发后端的**盗用检测把整个账号踢下线**。刷新本身用裸 fetch 而不是 alova 实例，否则会被自己的 401 逻辑拦住形成递归。`/auth/login`、`/auth/refresh` 等认证入口豁免重试。
+
+GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GET 挂 5 分钟内存缓存，后台管理场景下会变成「我明明改了怎么没变」；需要缓存的列表页自己开。
+
 开发时前端把 `/api` 代理到 `http://localhost:3000`（配置在 `vite.config.ts` 的 `server.proxy`），所以前端代码里统一写相对路径 `/api/...`，不需要关心后端端口也不存在跨域问题。
 
 样式入口是 `main.ts` 里的 `import 'virtual:uno.css'`，UnoCSS 靠这个虚拟模块注入生成的工具类，**漏掉这行插件就整个空跑**（脚手架默认不自带，是手工配的，漏过一次）。antdv 的组件不用手动 import，`AntdvNextResolver` 按需自动注册。
