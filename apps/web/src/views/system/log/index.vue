@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { message } from 'antdv-next';
-import type { TableColumnsType } from 'antdv-next';
+import { Button, Tag, message } from 'antdv-next';
 import dayjs from 'dayjs';
-import { ref, watch } from 'vue';
+import { h, ref, watch } from 'vue';
 
 import { PERMISSIONS } from '@nest-admin/shared';
 
@@ -13,30 +12,65 @@ import {
   type LogQuery,
 } from '@/api/logs';
 import type { OperationLog } from '@nest-admin/shared';
-import ProSearch, { type FilterField } from '@/components/ProSearch.vue';
+import ProSearch from '@/components/ProSearch.vue';
 import ProTable from '@/components/ProTable.vue';
+import type { FilterField } from '@/components/pro-search.types';
 import { useTable } from '@/composables/use-table';
 import { OPERATION_STATUS_META } from '@/constants/dicts';
 import { formatDateTime } from '@/utils/format';
 
-/** 列定义用 :columns + #bodyCell：a-table-column 的 #default 在 antdv-next 是嵌套列语法 */
-const columns: TableColumnsType<OperationLog> = [
-  { title: '时间', key: 'createdAt', width: 170 },
-  { title: '操作人', dataIndex: 'username', width: 110 },
-  { title: '模块', dataIndex: 'module', width: 110 },
-  { title: '操作', dataIndex: 'action', width: 130 },
-  { title: '请求', key: 'request', ellipsis: true },
-  { title: '结果', key: 'status', width: 90 },
-  { title: '耗时', key: 'duration', width: 90 },
-  { title: '', key: 'detail', width: 80 },
-];
-
 const table = useTable<OperationLog, LogQuery>({
+  columns: [
+    {
+      title: '时间',
+      key: 'createdAt',
+      width: 170,
+      render: (_value, record) => formatDateTime(record.createdAt),
+    },
+    { title: '操作人', dataIndex: 'username', width: 110 },
+    { title: '模块', dataIndex: 'module', width: 110 },
+    { title: '操作', dataIndex: 'action', width: 130 },
+    {
+      title: '请求',
+      key: 'request',
+      ellipsis: true,
+      render: (_value, record) =>
+        h('span', { class: 'font-mono text-xs' }, `${record.method} ${record.path}`),
+    },
+    {
+      title: '结果',
+      key: 'status',
+      width: 90,
+      render: (_value, record) =>
+        h(Tag, { color: OPERATION_STATUS_META[record.status].color }, () =>
+          OPERATION_STATUS_META[record.status].label,
+        ),
+    },
+    {
+      title: '耗时',
+      key: 'duration',
+      width: 90,
+      render: (_value, record) =>
+        record.durationMs === null ? '—' : `${record.durationMs}ms`,
+    },
+    {
+      title: '',
+      key: 'detail',
+      width: 80,
+      render: (_value, record) =>
+        h(
+          Button,
+          { type: 'link', size: 'small', onClick: () => openDetail(record) },
+          () => '详情',
+        ),
+    },
+  ],
   fetcher: (query) => apiLogPage(query),
   filters: { username: '', module: '', status: '', startAt: undefined, endAt: undefined },
+  onError: (text) => void message.error(text),
 });
 
-const filterFields: FilterField[] = [
+const filterFields: FilterField<LogQuery>[] = [
   { label: '操作人', key: 'username' },
   { label: '模块', key: 'module', placeholder: '如「用户管理」' },
   {
@@ -122,7 +156,7 @@ async function runCleanup(): Promise<void> {
     const result = await apiLogCleanup();
     void message.success(`已清理 ${result.operationLogs} 条日志、${result.refreshTokens} 个过期令牌`);
     cleanupOpen.value = false;
-    await table.run();
+    await table.reload();
   } finally {
     cleanupBusy.value = false;
   }
@@ -139,34 +173,13 @@ defineOptions({ name: 'LogPage' });
     </template>
   </ProSearch>
 
-  <ProTable :table="table" :columns="columns" row-key="id">
+  <ProTable :table="table" row-key="id">
     <template #toolbar>
       <a-button v-permission="PERMISSIONS.LOG_CLEAN" danger @click="openCleanup">
         清理过期日志
       </a-button>
     </template>
 
-    <template #bodyCell="{ column, record }: { column: { key: string }; record: OperationLog }">
-      <template v-if="column.key === 'createdAt'">
-        {{ formatDateTime(record.createdAt) }}
-      </template>
-      <template v-else-if="column.key === 'request'">
-        <span class="font-mono text-xs">
-          {{ record.method }} {{ record.path }}
-        </span>
-      </template>
-      <template v-else-if="column.key === 'status'">
-        <a-tag :color="OPERATION_STATUS_META[record.status].color">
-          {{ OPERATION_STATUS_META[record.status].label }}
-        </a-tag>
-      </template>
-      <template v-else-if="column.key === 'duration'">
-        {{ record.durationMs === null ? '—' : `${record.durationMs}ms` }}
-      </template>
-      <template v-else-if="column.key === 'detail'">
-        <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
-      </template>
-    </template>
   </ProTable>
 
 <!-- 详情 -->
@@ -206,7 +219,7 @@ defineOptions({ name: 'LogPage' });
 
         <template v-if="current.params">
           <h4 class="mt-4 mb-2 font-medium">请求参数（已脱敏）</h4>
-          <pre class="max-h-80 overflow-auto rounded bg-gray-50 p-3 text-xs">{{ prettyPrint(current.params) }}</pre>
+          <pre class="max-h-80 overflow-auto rounded a-bg-fill-tertiary p-3 text-xs">{{ prettyPrint(current.params) }}</pre>
         </template>
       </template>
     </a-drawer>
@@ -227,7 +240,7 @@ defineOptions({ name: 'LogPage' });
           <strong>{{ cleanupPreview.refreshTokens }}</strong>
           个过期登录令牌。
         </p>
-        <p class="text-xs text-gray-400">删除不可恢复；与定时任务共用同一把分布式锁，不会重复执行。</p>
+        <p class="text-xs a-color-text-tertiary">删除不可恢复；与定时任务共用同一把分布式锁，不会重复执行。</p>
       </template>
       <a-skeleton v-else active :paragraph="{ rows: 2 }" />
     </a-modal>

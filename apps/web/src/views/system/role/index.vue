@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { message } from 'antdv-next';
-import type { FormInstance, TableColumnsType } from 'antdv-next';
-import { computed, reactive, ref } from 'vue';
+import { Button, Popconfirm, Space, Tag, message } from 'antdv-next';
+import type { FormInstance } from 'antdv-next';
+import { computed, h, reactive, ref } from 'vue';
 
 import { PERMISSIONS } from '@nest-admin/shared';
 
@@ -18,8 +18,10 @@ import {
   apiRoleUpdate,
   type RoleQuery,
 } from '@/api/roles';
-import ProSearch, { type FilterField } from '@/components/ProSearch.vue';
+import ProSearch from '@/components/ProSearch.vue';
 import ProTable from '@/components/ProTable.vue';
+import type { FilterField } from '@/components/pro-search.types';
+import { usePermission } from '@/composables/use-permission';
 import { useTable } from '@/composables/use-table';
 import {
   DATA_SCOPE_META,
@@ -29,24 +31,95 @@ import {
 } from '@/constants/dicts';
 import { formatDateTime } from '@/utils/format';
 
-/** 列定义见 useTable 上方说明：antdv-next 必须用 :columns + #bodyCell，不能用 a-table-column 的 #default */
-const columns: TableColumnsType<Role> = [
-  { title: '角色码', dataIndex: 'code', key: 'code' },
-  { title: '名称', dataIndex: 'name' },
-  { title: '数据权限', key: 'dataScope', width: 130 },
-  { title: '排序', dataIndex: 'sort', width: 70 },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '备注', dataIndex: 'remark', ellipsis: true },
-  { title: '更新时间', key: 'updatedAt', width: 170 },
-  { title: '操作', key: 'action', width: 200 },
-];
+const { can } = usePermission();
 
 const table = useTable<Role, RoleQuery>({
+  columns: [
+    {
+      title: '角色码',
+      dataIndex: 'code',
+      key: 'code',
+      render: (_value, record) =>
+        h(Space, { size: 4 }, {
+          default: () => [
+            record.code,
+            record.isSystem ? h(Tag, { color: 'gold' }, () => '内置') : null,
+          ],
+        }),
+    },
+    { title: '名称', dataIndex: 'name' },
+    {
+      title: '数据权限',
+      key: 'dataScope',
+      width: 130,
+      render: (_value, record) => DATA_SCOPE_META[record.dataScope],
+    },
+    { title: '排序', dataIndex: 'sort', width: 70 },
+    {
+      title: '状态',
+      key: 'status',
+      width: 90,
+      render: (_value, record) =>
+        h(Tag, { color: STATUS_META[record.status].color }, () =>
+          STATUS_META[record.status].label,
+        ),
+    },
+    { title: '备注', dataIndex: 'remark', ellipsis: true },
+    {
+      title: '更新时间',
+      key: 'updatedAt',
+      width: 170,
+      render: (_value, record) => formatDateTime(record.updatedAt),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 200,
+      render: (_value, record) =>
+        h(Space, null, {
+          default: () => [
+            can(PERMISSIONS.ROLE_UPDATE)
+              ? h(
+                  Button,
+                  { type: 'link', size: 'small', onClick: () => openEdit(record) },
+                  () => '编辑',
+                )
+              : null,
+            can(PERMISSIONS.ROLE_ASSIGN)
+              ? h(
+                  Button,
+                  { type: 'link', size: 'small', onClick: () => openGrant(record) },
+                  () => '授权',
+                )
+              : null,
+            can(PERMISSIONS.ROLE_DELETE) && !record.isSystem
+              ? h(
+                  Popconfirm,
+                  {
+                    title: '确认删除该角色？',
+                    description: '删除后已关联的用户将失去该角色',
+                    onConfirm: () => remove(record),
+                  },
+                  {
+                    default: () =>
+                      h(
+                        Button,
+                        { type: 'link', size: 'small', danger: true },
+                        () => '删除',
+                      ),
+                  },
+                )
+              : null,
+          ],
+        }),
+    },
+  ],
   fetcher: (query) => apiRolePage(query),
   filters: { keyword: '', status: '' },
+  onError: (text) => void message.error(text),
 });
 
-const filterFields: FilterField[] = [
+const filterFields: FilterField<RoleQuery>[] = [
   { label: '关键词', key: 'keyword', placeholder: '角色码或名称搜索' },
   { label: '状态', key: 'status', type: 'select', options: STATUS_OPTIONS },
 ];
@@ -124,7 +197,7 @@ async function submit(): Promise<void> {
     }
 
     modalOpen.value = false;
-    await table.run();
+    await table.reload();
   } finally {
     submitting.value = false;
   }
@@ -133,7 +206,7 @@ async function submit(): Promise<void> {
 async function remove(record: Role): Promise<void> {
   await apiRoleRemove(record.id);
   void message.success(`已删除角色 ${record.name}`);
-  await table.run();
+  await table.reload();
 }
 
 // ---- 授权（权限码 + 菜单） ----
@@ -288,7 +361,7 @@ async function submitGrant(): Promise<void> {
 
     void message.success('授权已更新');
     grantModalOpen.value = false;
-    await table.run();
+    await table.reload();
   } finally {
     grantSubmitting.value = false;
   }
@@ -301,7 +374,7 @@ defineOptions({ name: 'RolePage' });
   <div class="flex flex-col flex-1 min-h-0 gap-4">
   <ProSearch :table="table" :fields="filterFields" />
 
-  <ProTable :table="table" :columns="columns" row-key="id" :filters="filterFields">
+  <ProTable :table="table" row-key="id">
     <template #toolbar>
       <a-button
         v-permission="PERMISSIONS.ROLE_CREATE"
@@ -312,53 +385,6 @@ defineOptions({ name: 'RolePage' });
       </a-button>
     </template>
 
-    <template #bodyCell="{ column, record }: { column: { key: string }; record: Role }">
-      <template v-if="column.key === 'code'">
-        {{ record.code }}
-        <a-tag v-if="record.isSystem" color="gold">内置</a-tag>
-      </template>
-      <template v-else-if="column.key === 'dataScope'">
-        {{ DATA_SCOPE_META[record.dataScope] }}
-      </template>
-      <template v-else-if="column.key === 'status'">
-        <a-tag :color="STATUS_META[record.status].color">
-          {{ STATUS_META[record.status].label }}
-        </a-tag>
-      </template>
-      <template v-else-if="column.key === 'updatedAt'">
-        {{ formatDateTime(record.updatedAt) }}
-      </template>
-      <template v-else-if="column.key === 'action'">
-        <a-space>
-          <a-button
-            v-permission="PERMISSIONS.ROLE_UPDATE"
-            type="link"
-            size="small"
-            @click="openEdit(record)"
-          >
-            编辑
-          </a-button>
-          <a-button
-            v-permission="PERMISSIONS.ROLE_ASSIGN"
-            type="link"
-            size="small"
-            @click="openGrant(record)"
-          >
-            授权
-          </a-button>
-          <a-popconfirm
-            v-if="!record.isSystem"
-            title="确认删除该角色？"
-            description="删除后已关联的用户将失去该角色"
-            @confirm="remove(record)"
-          >
-            <a-button v-permission="PERMISSIONS.ROLE_DELETE" type="link" size="small" danger>
-              删除
-            </a-button>
-          </a-popconfirm>
-        </a-space>
-      </template>
-    </template>
   </ProTable>
 
 <!-- 新增 / 编辑 -->
@@ -366,6 +392,7 @@ defineOptions({ name: 'RolePage' });
       v-model:open="modalOpen"
       :title="editing ? `编辑角色：${editing.name}` : '新增角色'"
       :confirm-loading="submitting"
+      width="600px"
       @ok="submit"
     >
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
@@ -385,7 +412,7 @@ defineOptions({ name: 'RolePage' });
         <a-form-item label="数据权限范围" name="dataScope">
           <a-select v-model:value="form.dataScope" :options="DATA_SCOPE_OPTIONS" />
           <!-- 部门体系尚未落地，如实告知而不是假装这个选项生效 -->
-          <p class="mb-0 text-xs text-gray-400">部门体系尚未实现，当前仅存储不生效</p>
+          <p class="mb-0 text-xs a-color-text-tertiary">部门体系尚未实现，当前仅存储不生效</p>
         </a-form-item>
         <a-form-item label="状态" name="status">
           <a-radio-group
@@ -405,11 +432,11 @@ defineOptions({ name: 'RolePage' });
       v-model:open="grantModalOpen"
       :title="`授权：${grantTarget?.name ?? ''}`"
       :confirm-loading="grantSubmitting"
-      width="720px"
+      width="880px"
       @ok="submitGrant"
     >
-      <div class="flex gap-4">
-        <div class="w-1/2">
+      <div class="flex flex-col gap-4 md:flex-row">
+        <div class="w-full md:w-1/2">
           <h4 class="mb-2 font-medium">权限码</h4>
           <a-collapse ghost>
             <a-collapse-panel
@@ -420,14 +447,14 @@ defineOptions({ name: 'RolePage' });
               <a-checkbox-group v-model:value="permissionIds" class="flex flex-col gap-1">
                 <a-checkbox v-for="item in group.items" :key="item.id" :value="item.id">
                   {{ item.name }}
-                  <span class="text-xs text-gray-400">{{ item.code }}</span>
+                  <span class="text-xs a-color-text-tertiary">{{ item.code }}</span>
                 </a-checkbox>
               </a-checkbox-group>
             </a-collapse-panel>
           </a-collapse>
         </div>
 
-        <div class="w-1/2">
+        <div class="w-full md:w-1/2">
           <h4 class="mb-2 font-medium">菜单（勾选父节点会带上全部子菜单）</h4>
           <div class="max-h-96 overflow-auto">
             <a-tree

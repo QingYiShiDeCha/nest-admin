@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { message } from 'antdv-next';
+import { Button, Popconfirm, Space, Tag, Tooltip, message } from 'antdv-next';
 import type { FormInstance, TableColumnsType } from 'antdv-next';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, h, reactive, ref } from 'vue';
 
 import { PERMISSIONS, type MenuNode } from '@nest-admin/shared';
 
@@ -12,6 +12,8 @@ import {
   apiMenuUpdate,
   type MenuPayload,
 } from '@/api/menu';
+import ProTable from '@/components/ProTable.vue';
+import { usePermission } from '@/composables/use-permission';
 import { MENU_ICONS } from '@/layouts/menu-icons';
 import {
   MENU_TYPE_META,
@@ -20,15 +22,98 @@ import {
   STATUS_OPTIONS,
 } from '@/constants/dicts';
 
-/** 列定义用 :columns + #bodyCell：a-table-column 的 #default 在 antdv-next 是嵌套列语法，无参调用会崩 */
+const { can } = usePermission();
+
 const columns: TableColumnsType<MenuNode> = [
   { title: '名称', dataIndex: 'name', key: 'name', width: 220 },
-  { title: '类型', key: 'type', width: 90 },
+  {
+    title: '类型',
+    key: 'type',
+    width: 90,
+    render: (_value, record) =>
+      h(Tag, { color: MENU_TYPE_META[record.type].color }, () =>
+        MENU_TYPE_META[record.type].label,
+      ),
+  },
   { title: '路由路径', dataIndex: 'path', key: 'path' },
   { title: '排序', dataIndex: 'sort', width: 70 },
-  { title: '侧边栏', key: 'visible', width: 90 },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '操作', key: 'action', width: 220 },
+  {
+    title: '侧边栏',
+    key: 'visible',
+    width: 90,
+    render: (_value, record) =>
+      record.visible ? '显示' : h(Tag, { color: 'orange' }, () => '隐藏'),
+  },
+  {
+    title: '状态',
+    key: 'status',
+    width: 90,
+    render: (_value, record) =>
+      h(Tag, { color: STATUS_META[record.status].color }, () =>
+        STATUS_META[record.status].label,
+      ),
+  },
+  {
+    title: '操作',
+    key: 'action',
+    width: 220,
+    render: (_value, record) =>
+      h(Space, null, {
+        default: () => [
+          can(PERMISSIONS.MENU_UPDATE)
+            ? h(
+                Button,
+                { type: 'link', size: 'small', onClick: () => openEdit(record) },
+                () => '编辑',
+              )
+            : null,
+          record.type === 'directory' && can(PERMISSIONS.MENU_CREATE)
+            ? h(
+                Button,
+                {
+                  type: 'link',
+                  size: 'small',
+                  onClick: () => openCreate(record),
+                },
+                () => '新增子项',
+              )
+            : null,
+          can(PERMISSIONS.MENU_DELETE) && record.children.length === 0
+            ? h(
+                Popconfirm,
+                {
+                  title: '确认删除该菜单？',
+                  onConfirm: () => remove(record),
+                },
+                {
+                  default: () =>
+                    h(
+                      Button,
+                      { type: 'link', size: 'small', danger: true },
+                      () => '删除',
+                    ),
+                },
+              )
+            : null,
+          can(PERMISSIONS.MENU_DELETE) && record.children.length > 0
+            ? h(
+                Tooltip,
+                { title: '存在子菜单，先删除子菜单' },
+                {
+                  default: () =>
+                    h('span', null, [
+                      h(
+                        Button,
+                        { type: 'link', size: 'small', danger: true, disabled: true },
+                        () => '删除',
+                      ),
+                    ]),
+                },
+              )
+            : null,
+        ],
+      }),
+  },
 ];
 
 const tree = ref<MenuNode[]>([]);
@@ -47,9 +132,7 @@ async function load(): Promise<void> {
   }
 }
 
-onMounted(() => {
-  void load();
-});
+const table = { columns, list: tree, loading, reload: load };
 
 function collectDirectoryKeys(nodes: MenuNode[], acc: number[] = []): number[] {
   for (const node of nodes) {
@@ -208,90 +291,46 @@ defineOptions({ name: 'MenuPage' });
 </script>
 
 <template>
-  <a-card>
-    <div class="mb-4 flex items-center gap-2">
-      <span class="text-sm text-gray-400">
-        侧边栏由这里的菜单驱动；path 需与前端静态路由一致才会出现在侧边栏
-      </span>
-      <a-button
-        v-permission="PERMISSIONS.MENU_CREATE"
-        class="ml-auto"
-        type="primary"
-        @click="openCreate()"
-      >
-        新增菜单
-      </a-button>
-    </div>
-
-    <a-table
-      row-key="id"
-      :columns="columns"
-      :data-source="tree"
-      :loading="loading"
-      :pagination="false"
+  <section class="flex flex-col flex-1 min-h-0 gap-4">
+    <ProTable
       v-model:expanded-row-keys="expandedKeys"
+      :table="table"
+      row-key="id"
+      :pagination="false"
+      :show-index="false"
     >
-      <template #bodyCell="{ column, record }: { column: { key: string }; record: MenuNode }">
-        <template v-if="column.key === 'type'">
-          <a-tag :color="MENU_TYPE_META[record.type].color">
-            {{ MENU_TYPE_META[record.type].label }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'visible'">
-          <a-tag v-if="!record.visible" color="orange">隐藏</a-tag>
-          <span v-else>显示</span>
-        </template>
-        <template v-else-if="column.key === 'status'">
-          <a-tag :color="STATUS_META[record.status].color">
-            {{ STATUS_META[record.status].label }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button
-              v-permission="PERMISSIONS.MENU_UPDATE"
-              type="link"
-              size="small"
-              @click="openEdit(record)"
-            >
-              编辑
-            </a-button>
-            <a-button
-              v-if="record.type === 'directory'"
-              v-permission="PERMISSIONS.MENU_CREATE"
-              type="link"
-              size="small"
-              @click="openCreate(record)"
-            >
-              新增子项
-            </a-button>
-            <a-popconfirm
-              v-if="record.children.length === 0"
-              title="确认删除该菜单？"
-              @confirm="remove(record)"
-            >
-              <a-button v-permission="PERMISSIONS.MENU_DELETE" type="link" size="small" danger>
-                删除
-              </a-button>
-            </a-popconfirm>
-            <a-tooltip v-else title="存在子菜单，先删除子菜单">
-              <a-button v-permission="PERMISSIONS.MENU_DELETE" type="link" size="small" danger disabled>
-                删除
-              </a-button>
-            </a-tooltip>
-          </a-space>
-        </template>
+      <template #toolbar>
+        <div class="flex items-center gap-3 min-w-0 flex-1">
+          <a-button
+            v-permission="PERMISSIONS.MENU_CREATE"
+            class="shrink-0"
+            type="primary"
+            @click="openCreate()"
+          >
+            新增菜单
+          </a-button>
+          <span class="min-w-0 truncate text-sm a-color-text-tertiary">
+            侧边栏由这里的菜单驱动；path 需与前端静态路由一致才会出现在侧边栏
+          </span>
+        </div>
       </template>
-    </a-table>
+    </ProTable>
 
     <!-- 新增 / 编辑 -->
     <a-modal
       v-model:open="modalOpen"
       :title="editing ? `编辑菜单：${editing.name}` : '新增菜单'"
       :confirm-loading="submitting"
+      width="820px"
       @ok="submit"
     >
-      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
+      <a-form
+        ref="formRef"
+        class="grid grid-cols-1 gap-x-5 md:grid-cols-2"
+        :model="form"
+        :rules="rules"
+        layout="vertical"
+      >
         <a-form-item label="父节点" name="parentId">
           <a-tree-select
             v-model:value="form.parentId"
@@ -345,5 +384,5 @@ defineOptions({ name: 'MenuPage' });
         </a-form-item>
       </a-form>
     </a-modal>
-  </a-card>
+  </section>
 </template>

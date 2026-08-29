@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { message } from 'antdv-next';
-import type { FormInstance, TableColumnsType } from 'antdv-next';
-import { reactive, ref } from 'vue';
+import { Button, Popconfirm, Space, Tag, message } from 'antdv-next';
+import type { FormInstance } from 'antdv-next';
+import { h, reactive, ref } from 'vue';
 
 import { PERMISSIONS } from '@nest-admin/shared';
 
@@ -17,8 +17,9 @@ import {
 } from '@/api/users';
 import type { BasicUser, Role } from '@nest-admin/shared';
 import { apiRolePage } from '@/api/roles';
-import ProSearch, { type FilterField } from '@/components/ProSearch.vue';
+import ProSearch from '@/components/ProSearch.vue';
 import ProTable from '@/components/ProTable.vue';
+import type { FilterField } from '@/components/pro-search.types';
 import { usePermission } from '@/composables/use-permission';
 import { useTable } from '@/composables/use-table';
 import { STATUS_META, STATUS_OPTIONS } from '@/constants/dicts';
@@ -28,27 +29,99 @@ import { formatDateTime } from '@/utils/format';
 const auth = useAuthStore();
 const { can } = usePermission();
 
-/**
- * 列定义用 :columns 数组 + #bodyCell 插槽。
- * 不能用 <a-table-column> 子组件里写 #default：antdv-next 会把列组件的
- * default 插槽当成「嵌套列定义」在收集列时无参调用，解构 record 直接崩。
- */
-const columns: TableColumnsType<BasicUser> = [
-  { title: '用户名', dataIndex: 'username' },
-  { title: '昵称', dataIndex: 'nickname' },
-  { title: '邮箱', dataIndex: 'email' },
-  { title: '手机号', dataIndex: 'phone' },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 90 },
-  { title: '最后登录', key: 'lastLoginAt', width: 170 },
-  { title: '操作', key: 'action', width: 300 },
-];
-
 const table = useTable<BasicUser, UserQuery>({
+  columns: [
+    { title: '用户名', dataIndex: 'username' },
+    { title: '昵称', dataIndex: 'nickname' },
+    { title: '邮箱', dataIndex: 'email' },
+    { title: '手机号', dataIndex: 'phone' },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 90,
+      render: (_value, record) =>
+        h(Tag, { color: STATUS_META[record.status].color }, () =>
+          STATUS_META[record.status].label,
+        ),
+    },
+    {
+      title: '最后登录',
+      key: 'lastLoginAt',
+      width: 170,
+      render: (_value, record) => formatDateTime(record.lastLoginAt),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 300,
+      render: (_value, record) =>
+        h(Space, null, {
+          default: () => [
+            can(PERMISSIONS.USER_UPDATE)
+              ? h(
+                  Button,
+                  { type: 'link', size: 'small', onClick: () => openEdit(record) },
+                  () => '编辑',
+                )
+              : null,
+            can(PERMISSIONS.USER_ASSIGN_ROLE) && !isSelf(record)
+              ? h(
+                  Button,
+                  {
+                    type: 'link',
+                    size: 'small',
+                    onClick: () => openAssignRoles(record),
+                  },
+                  () => '分配角色',
+                )
+              : null,
+            can(PERMISSIONS.USER_FORCE_LOGOUT)
+              ? h(
+                  Popconfirm,
+                  {
+                    title: '确认强制下线该用户？',
+                    description: '将吊销其全部登录会话',
+                    onConfirm: () => forceLogout(record),
+                  },
+                  {
+                    default: () =>
+                      h(
+                        Button,
+                        { type: 'link', size: 'small', danger: true },
+                        () => '强制下线',
+                      ),
+                  },
+                )
+              : null,
+            can(PERMISSIONS.USER_DELETE) && !isSelf(record)
+              ? h(
+                  Popconfirm,
+                  {
+                    title: '确认删除该用户？',
+                    description: '删除后该账号无法登录',
+                    onConfirm: () => remove(record),
+                  },
+                  {
+                    default: () =>
+                      h(
+                        Button,
+                        { type: 'link', size: 'small', danger: true },
+                        () => '删除',
+                      ),
+                  },
+                )
+              : null,
+          ],
+        }),
+    },
+  ],
   fetcher: (query) => apiUserPage(query),
   filters: { keyword: '', status: '' },
+  onError: (text) => void message.error(text),
 });
 
-const filterFields: FilterField[] = [
+const filterFields: FilterField<UserQuery>[] = [
   { label: '用户名', key: 'keyword' },
   { label: '状态', key: 'status', type: 'select', options: STATUS_OPTIONS },
 ];
@@ -142,7 +215,7 @@ async function submit(): Promise<void> {
     }
 
     modalOpen.value = false;
-    await table.run();
+    await table.reload();
   } finally {
     submitting.value = false;
   }
@@ -151,7 +224,7 @@ async function submit(): Promise<void> {
 async function remove(record: BasicUser): Promise<void> {
   await apiUserRemove(record.id);
   void message.success(`已删除用户 ${record.username}`);
-  await table.run();
+  await table.reload();
 }
 
 // ---- 分配角色 ----
@@ -195,7 +268,7 @@ async function submitRoles(): Promise<void> {
     await apiUserSetRoles(roleTarget.value.id, roleIds.value);
     void message.success('角色已更新');
     roleModalOpen.value = false;
-    await table.run();
+    await table.reload();
   } finally {
     roleSubmitting.value = false;
   }
@@ -215,12 +288,7 @@ defineOptions({ name: 'UserPage' });
   <div class="flex flex-col flex-1 min-h-0 gap-4">
     <ProSearch :table="table" :fields="filterFields" />
 
-    <ProTable
-      :table="table"
-      :columns="columns"
-      row-key="id"
-      :filters="filterFields"
-    >
+    <ProTable :table="table" row-key="id">
       <template #toolbar>
         <a-button
           v-permission="PERMISSIONS.USER_CREATE"
@@ -231,60 +299,6 @@ defineOptions({ name: 'UserPage' });
         </a-button>
       </template>
 
-      <template
-        #bodyCell="{
-          column,
-          record,
-        }: {
-          column: { key: string };
-          record: BasicUser;
-        }"
-      >
-        <template v-if="column.key === 'status'">
-          <a-tag :color="STATUS_META[record.status].color">
-            {{ STATUS_META[record.status].label }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'lastLoginAt'">
-          {{ formatDateTime(record.lastLoginAt) }}
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button
-              v-permission="PERMISSIONS.USER_UPDATE"
-              type="link"
-              size="small"
-              @click="openEdit(record)"
-            >
-              编辑
-            </a-button>
-            <a-button
-              v-if="can(PERMISSIONS.USER_ASSIGN_ROLE) && !isSelf(record)"
-              type="link"
-              size="small"
-              @click="openAssignRoles(record)"
-            >
-              分配角色
-            </a-button>
-            <a-popconfirm
-              v-if="can(PERMISSIONS.USER_FORCE_LOGOUT)"
-              title="确认强制下线该用户？"
-              description="将吊销其全部登录会话"
-              @confirm="forceLogout(record)"
-            >
-              <a-button type="link" size="small" danger>强制下线</a-button>
-            </a-popconfirm>
-            <a-popconfirm
-              v-if="can(PERMISSIONS.USER_DELETE) && !isSelf(record)"
-              title="确认删除该用户？"
-              description="删除后该账号无法登录"
-              @confirm="remove(record)"
-            >
-              <a-button type="link" size="small" danger>删除</a-button>
-            </a-popconfirm>
-          </a-space>
-        </template>
-      </template>
     </ProTable>
 
     <!-- 新增 / 编辑 -->
@@ -292,9 +306,16 @@ defineOptions({ name: 'UserPage' });
       v-model:open="modalOpen"
       :title="editing ? `编辑用户 ${editing.username}` : '新增用户'"
       :confirm-loading="submitting"
+      width="760px"
       @ok="submit"
     >
-      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
+      <a-form
+        ref="formRef"
+        class="grid grid-cols-1 gap-x-5 md:grid-cols-2"
+        :model="form"
+        :rules="rules"
+        layout="vertical"
+      >
         <a-form-item label="用户名" name="username">
           <a-input v-model:value="form.username" :disabled="!!editing" />
         </a-form-item>
@@ -319,7 +340,7 @@ defineOptions({ name: 'UserPage' });
             :options="STATUS_OPTIONS"
           />
         </a-form-item>
-        <p v-if="editing" class="text-xs text-gray-400">
+        <p v-if="editing" class="text-xs a-color-text-tertiary md:col-span-2">
           密码不在此处修改：本人用右上角头像菜单，管理员可强制下线后由用户自行重置
         </p>
       </a-form>
@@ -330,15 +351,16 @@ defineOptions({ name: 'UserPage' });
       v-model:open="roleModalOpen"
       :title="`分配角色：${roleTarget?.username ?? ''}`"
       :confirm-loading="roleSubmitting"
+      width="720px"
       @ok="submitRoles"
     >
       <a-checkbox-group
         v-model:value="roleIds"
-        class="flex flex-col gap-2 py-2"
+        class="grid grid-cols-1 gap-x-5 gap-y-2 py-2 sm:grid-cols-2"
       >
         <a-checkbox v-for="role in roleOptions" :key="role.id" :value="role.id">
           {{ role.name }}
-          <span class="text-xs text-gray-400">{{ role.code }}</span>
+          <span class="text-xs a-color-text-tertiary">{{ role.code }}</span>
           <a-tag v-if="role.isSystem" class="ml-1" color="gold">内置</a-tag>
         </a-checkbox>
       </a-checkbox-group>
