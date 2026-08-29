@@ -36,6 +36,7 @@ pnpm db:migrate / db:seed                       # seed 幂等，可重复执行
   - 覆盖第三方库的内联样式要用 `!` 前缀（如 `[&_.ant-table-body]:!max-h-none`），普通类压不过内联样式
   - 常用形态：隐藏滚动条 `[scrollbar-width:none]` + `[&::-webkit-scrollbar]:hidden`；作用到 antd 内部节点的任意变体 `[&_.ant-xxx]:flex`；主题色工具类 `text-primary`/`border-primary`（随 ConfigProvider 换主题自动跟随）
 - **图标**：UnoCSS presetIcons，class 形如 `i-ant-design:xxx-outlined`，数据源 `@iconify-json/ant-design`。菜单图标注册表 `apps/web/src/layouts/menu-icons.ts`（键=DB 里的字符串，值=class），它的值同时生成 uno.config 的 safelist——运行时拼的 class 必须进 safelist 否则不生成 CSS
+- **单根节点**：每个 .vue SFC 模板只允许一个根元素（`vue/no-multiple-template-root` 在 lint 强制）。多块内容（如 ProTable + 弹窗）用一个语义容器包裹，且容器要接住 flex 高度链（`flex flex-col flex-1 min-h-0`），否则 ProTable 的纵向撑满会断
 - **表格页**：查询区用 `ProSearch`、表格用 `ProTable`（`apps/web/src/components/`），数据能力在 `useTable`（竞态防护/翻页回拉/失败保数据）。组件对 filters 的回写走 `setFilter` 函数，不在模板里 v-model props（vue/no-mutating-props）
 
 ## 已知坑

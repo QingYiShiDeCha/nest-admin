@@ -132,6 +132,7 @@ defineOptions({ name: 'LogPage' });
 </script>
 
 <template>
+  <div class="flex flex-col flex-1 min-h-0">
   <ProSearch :table="table" :fields="filterFields">
     <template #filter-range>
       <a-range-picker v-model:value="range" value-format="YYYY-MM-DD" @change="applyRange" />
@@ -230,4 +231,5 @@ defineOptions({ name: 'LogPage' });
       </template>
       <a-skeleton v-else active :paragraph="{ rows: 2 }" />
     </a-modal>
+  </div>
 </template>

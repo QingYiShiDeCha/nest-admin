@@ -26,6 +26,9 @@ export default defineConfigWithVueTs(
       // 看 URL 就知道找哪个文件。这个约定下文件名必然单词单一，规则不适用。
       // 可复用组件仍应用多词命名（放在 components/ 下，不受此影响）。
       'vue/multi-word-component-names': 'off',
+      // SFC 只允许单根节点：多根组件无法透传 attrs/插槽定位，
+      // 也让父容器的 flex 高度链断在多余的兄弟节点上
+      'vue/no-multiple-template-root': 'error',
     },
   },
 );

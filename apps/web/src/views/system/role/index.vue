@@ -298,6 +298,7 @@ defineOptions({ name: 'RolePage' });
 </script>
 
 <template>
+  <div class="flex flex-col flex-1 min-h-0">
   <ProSearch :table="table" :fields="filterFields" />
 
   <ProTable :table="table" :columns="columns" row-key="id" :filters="filterFields">
@@ -443,4 +444,5 @@ defineOptions({ name: 'RolePage' });
         </div>
       </div>
     </a-modal>
+  </div>
 </template>
