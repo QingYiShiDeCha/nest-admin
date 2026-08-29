@@ -8,6 +8,7 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 
 import App from './App.vue';
 import router from './router';
+import { vPermission } from './directives/permission';
 import { onUnauthorized } from './utils/auth-events';
 
 const app = createApp(App);
@@ -19,6 +20,9 @@ pinia.use(piniaPluginPersistedstate);
 
 app.use(pinia);
 app.use(router);
+
+// 指令内部会 useAuthStore()，所以必须在 app.use(pinia) 之后注册
+app.directive('permission', vPermission);
 
 // http 层救不回登录态时会发这个事件。放在这里订阅而不是让 http 直接
 // import router，避免一个纯请求模块反向依赖路由

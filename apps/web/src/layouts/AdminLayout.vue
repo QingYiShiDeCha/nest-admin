@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { MenuProps } from 'antdv-next';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import type { MenuNode } from '@/api/menu';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
+import { findAncestorKeys, findByKey, toMenuItems, type MenuItems } from './menu-tree';
 
 const route = useRoute();
 const router = useRouter();
@@ -14,60 +14,47 @@ const menu = useMenuStore();
 
 const collapsed = ref(false);
 
-/** 当前选中项用 path 匹配，与后端菜单的 path 字段对齐 */
+/** 选中项用 path 匹配，与后端菜单的 path 字段、也与 menuKeyOf 对齐 */
 const selectedKeys = computed(() => [route.path]);
 
-/** a-menu 的 items 类型，Menu 的 ItemType 没有单独导出，只能从 props 上索引 */
-type MenuItems = NonNullable<MenuProps['items']>;
-
 /**
- * 后端菜单树转成 antdv 的 items 结构。
- *
- * 用 items 而不是模板里嵌套 a-sub-menu：菜单深度由后端数据决定，
- * 模板写死两层的话第三层就渲染不出来，递归组件又比一个纯函数更绕。
+ * 侧边栏完全由后端菜单驱动，不再写死「首页」。
+ * 写死的入口会和 seed 出来的同名菜单重复，而且让侧边栏不再忠实反映
+ * 后端授权——排查「为什么这个人能看到这一项」时会多绕一层。
  */
-function toMenuItems(nodes: MenuNode[]): MenuItems {
-  return nodes.map((node) => {
-    const key = node.path ?? `node-${node.id}`;
-
-    if (node.children.length > 0) {
-      return { key, label: node.name, children: toMenuItems(node.children) };
-    }
-
-    // title 是侧栏收起后 tooltip 显示的文字，不给的话收起时只剩图标位
-    return { key, label: node.name, title: node.name };
-  });
-}
-
-const sidebarItems = computed<MenuItems>(() => [
-  { key: '/dashboard', label: '首页', title: '首页' },
-  ...toMenuItems(menu.sidebarTree),
-]);
+const sidebarItems = computed<MenuItems>(() => toMenuItems(menu.sidebarTree));
 
 const hasMenus = computed(() => menu.sidebarTree.length > 0);
 
-/** 拿 key 反查节点，用于区分外链与内部路由 */
-function findByKey(nodes: MenuNode[], key: string): MenuNode | undefined {
-  for (const node of nodes) {
-    if ((node.path ?? `node-${node.id}`) === key) {
-      return node;
+/**
+ * 展开的目录。用 v-model 双向绑定，用户手动收起后不会被下面的 watch 强行掀开。
+ */
+const openKeys = ref<string[]>([]);
+
+/**
+ * 进入某页时把它所在的目录补进 openKeys。
+ *
+ * 同时监听菜单树：菜单是登录后异步拉回来的，只监听路由的话首次加载时
+ * 树还是空的，算出来的祖先链为空，刷新页面后当前项所在目录就是收起的。
+ * 用并集而不是覆盖，避免把用户自己展开的其他目录收起来。
+ */
+watch(
+  [() => route.path, () => menu.sidebarTree],
+  ([path, tree]) => {
+    const trail = findAncestorKeys(tree, path);
+
+    if (trail.length > 0) {
+      openKeys.value = [...new Set([...openKeys.value, ...trail])];
     }
-
-    const hit = findByKey(node.children, key);
-
-    if (hit) {
-      return hit;
-    }
-  }
-
-  return undefined;
-}
+  },
+  { immediate: true },
+);
 
 function handleMenuClick({ key }: { key: string | number }): void {
   const path = String(key);
   const node = findByKey(menu.sidebarTree, path);
 
-  // external 类型的 path 是完整 URL，不能交给 router
+  // external 类型的 path 是完整 URL，交给 router 会被当成站内路径
   if (node?.type === 'external' && node.path) {
     window.open(node.path, '_blank', 'noopener');
     return;
@@ -93,6 +80,11 @@ async function handleUserMenuClick({ key }: { key: string | number }): Promise<v
   menu.reset();
   await router.push({ name: 'login' });
 }
+
+/** a-menu 的 openChange 回调签名，抽出来让模板不必写内联类型 */
+const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
+  openKeys.value = keys as string[];
+};
 </script>
 
 <template>
@@ -107,11 +99,13 @@ async function handleUserMenuClick({ key }: { key: string | number }): Promise<v
         mode="inline"
         :items="sidebarItems"
         :selected-keys="selectedKeys"
+        :open-keys="openKeys"
+        @open-change="handleOpenChange"
         @click="handleMenuClick"
       />
 
       <div v-if="!hasMenus && !collapsed" class="px-4 py-3 text-xs text-white/50">
-        还没有配置菜单，可在「菜单管理」中添加
+        还没有配置菜单，可执行 pnpm db:seed 录入默认菜单
       </div>
     </a-layout-sider>
 

@@ -6,7 +6,7 @@ import {
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 import { createDatabaseClient } from '../src/client';
-import { permissions, roles, userRoles, users } from '../src/schema';
+import { menus, permissions, roles, userRoles, users } from '../src/schema';
 import type { DrizzleDB } from '../src/types';
 import { resolveDatabaseOptions } from './env';
 
@@ -21,6 +21,81 @@ const SUPER_ADMIN_ROLE = {
   name: '超级管理员',
   remark: '内置角色，拥有全部权限，不参与权限校验',
 };
+
+interface MenuSeed {
+  name: string;
+  type: 'directory' | 'menu';
+  /** 与前端静态路由的 path 一致。目录没有 path */
+  path?: string;
+  /** 前端 menu-icons.ts 注册表里的键名，未登记的名字前端会当成无图标 */
+  icon?: string;
+  sort: number;
+  /** false = 路由可达但不进侧边栏 */
+  visible?: boolean;
+  children?: readonly MenuSeed[];
+}
+
+/**
+ * 默认菜单树，与 router/routes.ts 的静态路由一一对应。
+ *
+ * component 一律留空：前端用静态路由注册页面，菜单只负责渲染侧边栏和
+ * 决定可达性。数据库里存组件路径的话，写错一个字是运行时白屏且没有提示。
+ */
+const MENU_TREE: readonly MenuSeed[] = [
+  {
+    name: '首页',
+    type: 'menu',
+    path: '/dashboard',
+    icon: 'DashboardOutlined',
+    sort: 0,
+  },
+  {
+    name: '系统管理',
+    type: 'directory',
+    icon: 'SettingOutlined',
+    sort: 10,
+    children: [
+      {
+        name: '用户管理',
+        type: 'menu',
+        path: '/system/user',
+        icon: 'UserOutlined',
+        sort: 0,
+      },
+      {
+        name: '角色管理',
+        type: 'menu',
+        path: '/system/role',
+        icon: 'TeamOutlined',
+        sort: 10,
+      },
+      {
+        name: '菜单管理',
+        type: 'menu',
+        path: '/system/menu',
+        icon: 'MenuOutlined',
+        sort: 20,
+      },
+      {
+        name: '操作日志',
+        type: 'menu',
+        path: '/system/log',
+        icon: 'FileTextOutlined',
+        sort: 30,
+      },
+    ],
+  },
+  {
+    // visible: false 的示例：路由可达但不出现在侧边栏，
+    // 入口在右上角头像的下拉里。前端 sidebarTree 会过滤掉它
+    name: '个人中心',
+    type: 'menu',
+    path: '/profile',
+    icon: 'IdcardOutlined',
+    sort: 20,
+    visible: false,
+  },
+];
 
 /** 返回管理员用户 id，不存在则创建 */
 async function ensureAdminUser(db: DrizzleDB): Promise<number> {
@@ -140,11 +215,73 @@ async function ensurePermissions(db: DrizzleDB): Promise<void> {
 }
 
 /**
+ * 幂等录入菜单树，返回新建条数。
+ *
+ * 匹配已有记录的方式：有 path 的按 path 认（path 就是路由，全局唯一），
+ * 目录没有 path，按「同一父节点下的同名节点」认。也就是说在后台把菜单
+ * 改了名又重跑 seed，会被当成新节点插一条——seed 只保证「默认菜单存在」，
+ * 不做双向同步。
+ *
+ * 必须串行：子节点要用父节点的自增 id 当 parentId。
+ */
+async function ensureMenuTree(
+  db: DrizzleDB,
+  seeds: readonly MenuSeed[],
+  parentId: number | null = null,
+): Promise<number> {
+  let created = 0;
+
+  for (const seed of seeds) {
+    const matcher = seed.path
+      ? eq(menus.path, seed.path)
+      : and(
+          eq(menus.name, seed.name),
+          parentId === null
+            ? isNull(menus.parentId)
+            : eq(menus.parentId, parentId),
+        );
+
+    const [existing] = await db
+      .select({ id: menus.id })
+      .from(menus)
+      .where(and(isNull(menus.deletedAt), matcher))
+      .limit(1);
+
+    let id: number;
+
+    if (existing) {
+      id = existing.id;
+    } else {
+      const [result] = await db.insert(menus).values({
+        parentId,
+        name: seed.name,
+        type: seed.type,
+        path: seed.path ?? null,
+        icon: seed.icon ?? null,
+        sort: seed.sort,
+        visible: seed.visible ?? true,
+        status: 'active',
+      });
+
+      id = result.insertId;
+      created += 1;
+    }
+
+    if (seed.children?.length) {
+      created += await ensureMenuTree(db, seed.children, id);
+    }
+  }
+
+  return created;
+}
+
+/**
  * 幂等的初始化脚本，重复执行不会产生副作用。
  * 用 pnpm db:seed 执行，前提是已经跑过 db:migrate。
  *
- * 超管角色不需要绑定权限码——PermissionGuard 对它直接短路放行。
- * 权限码目录仍要录入，因为分配给普通角色时要从这张表里挑。
+ * 超管角色不需要绑定权限码或菜单——PermissionGuard 对它直接短路放行，
+ * findUserMenuTree 也对它返回全部启用菜单。
+ * 权限码目录与菜单树仍要录入，因为分配给普通角色时要从这两张表里挑。
  */
 async function seed(): Promise<void> {
   const { pool, db } = createDatabaseClient(resolveDatabaseOptions());
@@ -154,6 +291,14 @@ async function seed(): Promise<void> {
     const roleId = await ensureSuperAdminRole(db);
     await ensureUserRole(db, userId, roleId);
     await ensurePermissions(db);
+
+    const createdMenus = await ensureMenuTree(db, MENU_TREE);
+    console.log(
+      createdMenus > 0
+        ? `已录入 ${createdMenus} 个菜单节点`
+        : '默认菜单已存在，跳过',
+    );
+
     console.log('初始化完成');
   } finally {
     await pool.end();
