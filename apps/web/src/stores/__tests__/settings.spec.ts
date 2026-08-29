@@ -1,4 +1,12 @@
-import { BRAND_COLORS, DEFAULT_PRIMARY, SEMANTIC_COLORS } from '@/constants/palette';
+import {
+  BRAND_COLORS,
+  DARK_GRAY_COLORS,
+  DARK_THEME_COLORS,
+  DEFAULT_PRIMARY,
+  GRAY_COLORS,
+  LIGHT_THEME_COLORS,
+  SEMANTIC_COLORS,
+} from '@/constants/palette';
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -102,5 +110,72 @@ describe('settings store', () => {
     expect(SEMANTIC_COLORS.danger).toBe('#FF4D4F');
     expect(SEMANTIC_COLORS.error).toBe('#FA896B');
     expect(SEMANTIC_COLORS.info).toBe('#38C0FC');
+  });
+
+  it('浅色主题背景、灰阶、边框和菜单颜色来自统一调色板', () => {
+    expect(GRAY_COLORS).toMatchObject({
+      100: '#F9FAFB',
+      500: '#949EB7',
+      900: '#323251',
+    });
+    expect(LIGHT_THEME_COLORS).toMatchObject({
+      background: {
+        layout: '#FAFBFC',
+        container: '#FFFFFF',
+        hover: '#EDEFF0',
+        active: '#F2F4F5',
+      },
+      border: {
+        default: '#E2E8EE',
+        dashed: '#DBDFE9',
+      },
+      menu: {
+        background: '#FFFFFF',
+        text: '#29343D',
+        icon: '#6B6B6B',
+        systemName: '#383853',
+      },
+    });
+  });
+
+  it('深色主题、传统深色菜单和编辑器颜色来自统一调色板', () => {
+    expect(DARK_GRAY_COLORS).toMatchObject({
+      100: '#110F0F',
+      500: '#73738C',
+      900: '#E3E3E8',
+    });
+    expect(DARK_THEME_COLORS).toMatchObject({
+      background: {
+        layout: '#070707',
+        container: '#161618',
+        hover: '#252530',
+        active: '#202226',
+        elementActive: '#2E2E38',
+        base: '#000000',
+      },
+      border: {
+        default: 'rgba(255, 255, 255, 0.1)',
+        card: 'rgba(255, 255, 255, 0.08)',
+        dashed: '#363843',
+      },
+      menu: {
+        background: '#161618',
+        systemName: '#DDDDDD',
+        icon: '#BABBBD',
+        text: 'rgba(255, 255, 255, 0.7)',
+      },
+      traditionalMenu: {
+        background: '#191A23',
+        systemName: '#D9DADB',
+        icon: '#BABBBD',
+        text: '#BABBBD',
+      },
+      editor: {
+        toolbarBackground: '#18191C',
+        contentBackground: '#090909',
+        toolbarActiveBackground: '#25262B',
+        text: 'rgba(255, 255, 255, 0.85)',
+      },
+    });
   });
 });

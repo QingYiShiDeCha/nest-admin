@@ -17,6 +17,106 @@ body {
     'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
 }
 
+:where(
+  *:not(
+    .admin-sidebar,
+    .admin-sidebar *,
+    .admin-header,
+    .admin-header *,
+    .admin-tabbar,
+    .admin-tabbar *,
+    .ant-menu,
+    .ant-menu *
+  )
+) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ant-color-fill) var(--ant-color-fill-quaternary);
+}
+
+:where(
+  *:not(
+    .admin-sidebar,
+    .admin-sidebar *,
+    .admin-header,
+    .admin-header *,
+    .admin-tabbar,
+    .admin-tabbar *,
+    .ant-menu,
+    .ant-menu *
+  )
+)::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:where(
+  *:not(
+    .admin-sidebar,
+    .admin-sidebar *,
+    .admin-header,
+    .admin-header *,
+    .admin-tabbar,
+    .admin-tabbar *,
+    .ant-menu,
+    .ant-menu *
+  )
+)::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+:where(
+  *:not(
+    .admin-sidebar,
+    .admin-sidebar *,
+    .admin-header,
+    .admin-header *,
+    .admin-tabbar,
+    .admin-tabbar *,
+    .ant-menu,
+    .ant-menu *
+  )
+)::-webkit-scrollbar-track {
+  background-color: var(--ant-color-fill-quaternary);
+}
+
+:where(
+  *:not(
+    .admin-sidebar,
+    .admin-sidebar *,
+    .admin-header,
+    .admin-header *,
+    .admin-tabbar,
+    .admin-tabbar *,
+    .ant-menu,
+    .ant-menu *
+  )
+)::-webkit-scrollbar-thumb {
+  background-color: var(--ant-color-fill);
+  border-radius: 4px;
+}
+
+:where(
+    *:not(
+      .admin-sidebar,
+      .admin-sidebar *,
+      .admin-header,
+      .admin-header *,
+      .admin-tabbar,
+      .admin-tabbar *,
+      .ant-menu,
+      .ant-menu *
+    )
+  )::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ant-color-fill-secondary);
+}
+
+::-webkit-scrollbar-button {
+  width: 0;
+  height: 0;
+}
+
 .layout-settings-trigger:hover .layout-settings-icon {
   animation: rotate180 0.5s;
 }

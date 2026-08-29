@@ -15,6 +15,9 @@ export interface BrandColor {
   value: string;
 }
 
+export type ThemeTone =
+  'default' | 'primary' | 'success' | 'warning' | 'error' | 'info';
+
 export const BRAND_COLORS: readonly BrandColor[] = [
   { name: '默认蓝', value: '#5D87FF' },
   { name: '淡紫色', value: '#B48DF3' },
@@ -26,6 +29,89 @@ export const BRAND_COLORS: readonly BrandColor[] = [
 ];
 
 export const DEFAULT_PRIMARY = '#5D87FF';
+
+export const GRAY_COLORS = {
+  100: '#F9FAFB',
+  200: '#F2F4F5',
+  300: '#E6EAEB',
+  400: '#DBDFE1',
+  500: '#949EB7',
+  600: '#7987A1',
+  700: '#4D5875',
+  800: '#383853',
+  900: '#323251',
+} as const;
+
+export const DARK_GRAY_COLORS = {
+  100: '#110F0F',
+  200: '#17171C',
+  300: '#393946',
+  400: '#505062',
+  500: '#73738C',
+  600: '#8F8FA3',
+  700: '#ABABBA',
+  800: '#C7C7D1',
+  900: '#E3E3E8',
+} as const;
+
+export const LIGHT_THEME_COLORS = {
+  background: {
+    layout: '#FAFBFC',
+    container: '#FFFFFF',
+    level1: GRAY_COLORS[100],
+    level2: GRAY_COLORS[200],
+    hover: '#EDEFF0',
+    active: GRAY_COLORS[200],
+  },
+  border: {
+    default: '#E2E8EE',
+    dashed: '#DBDFE9',
+    card: 'rgba(0, 0, 0, 0.08)',
+    previewDivider: '#EDEEF0',
+  },
+  menu: {
+    background: '#FFFFFF',
+    text: '#29343D',
+    icon: '#6B6B6B',
+    systemName: GRAY_COLORS[800],
+  },
+} as const;
+
+export const DARK_THEME_COLORS = {
+  background: {
+    layout: '#070707',
+    container: '#161618',
+    level1: DARK_GRAY_COLORS[100],
+    level2: DARK_GRAY_COLORS[200],
+    hover: '#252530',
+    active: '#202226',
+    elementActive: '#2E2E38',
+    base: '#000000',
+  },
+  border: {
+    default: 'rgba(255, 255, 255, 0.1)',
+    card: 'rgba(255, 255, 255, 0.08)',
+    dashed: '#363843',
+  },
+  menu: {
+    background: '#161618',
+    systemName: '#DDDDDD',
+    icon: '#BABBBD',
+    text: 'rgba(255, 255, 255, 0.7)',
+  },
+  traditionalMenu: {
+    background: '#191A23',
+    systemName: '#D9DADB',
+    icon: '#BABBBD',
+    text: '#BABBBD',
+  },
+  editor: {
+    toolbarBackground: '#18191C',
+    contentBackground: '#090909',
+    toolbarActiveBackground: '#25262B',
+    text: 'rgba(255, 255, 255, 0.85)',
+  },
+} as const;
 
 export const SEMANTIC_COLORS = {
   success: '#13DEB9',
