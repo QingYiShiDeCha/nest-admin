@@ -1,24 +1,18 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
 
+import type { RouteMeta } from 'vue-router';
+
 import { resolveMenuIcon } from '@/layouts/menu-icons';
 
 /**
- * 页签关心的路由切片，本地声明而非依赖 vue-router 的 RouteMeta 全局增强。
- * 原因：增强声明在 router/routes.ts，而 vitest 项目只为 spec 编译本文件
- * （tsconfig.vitest 只 include __tests__），那个程序里没有 routes.ts，
- * 依赖增强会让同一个文件在两种编译模式下行为不一致。
- * 结构化类型：afterEach 的真实路由对象可直接传入。
+ * 页签关心的路由切片（afterEach 的真实路由对象可直接传入）。
+ * meta 直接用增强后的 RouteMeta：增强声明在 src/types/router.d.ts，
+ * 所有 tsconfig 项目都会包含，不再有「vitest 项目里看不到增强」的问题。
  */
 export interface TabRoute {
   fullPath: string;
-  meta: {
-    title?: string;
-    icon?: string;
-    public?: boolean;
-    affix?: boolean;
-    cacheName?: string;
-  };
+  meta: RouteMeta;
 }
 
 /** 页签条上的一个标签 */
@@ -63,13 +57,13 @@ export const useTabsStore = defineStore('tabs', () => {
 
     if (existing) {
       // 菜单改名这类场景：标题跟着路由刷新
-      existing.title = route.meta.title ?? existing.title;
+      existing.title = route.meta.title;
       return;
     }
 
     tabs.value.push({
       path,
-      title: route.meta.title ?? path,
+      title: route.meta.title,
       iconClass: route.meta.icon ? resolveMenuIcon(route.meta.icon) : undefined,
       affix: route.meta.affix === true,
       cacheName: route.meta.cacheName,

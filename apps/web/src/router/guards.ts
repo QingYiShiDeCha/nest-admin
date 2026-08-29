@@ -54,6 +54,6 @@ export function setupGuards(router: Router): void {
   });
 
   router.afterEach((to) => {
-    document.title = to.meta.title ? `${to.meta.title} · ${APP_TITLE}` : APP_TITLE;
+    document.title = `${to.meta.title} · ${APP_TITLE}`;
   });
 }

@@ -2,26 +2,6 @@ import type { RouteRecordRaw } from 'vue-router';
 import { PERMISSIONS } from '@nest-admin/shared';
 
 /**
- * 路由的额外信息。声明式地写在这里，守卫统一消费。
- * public: 无需登录（登录页、错误页）
- * permission: 进入该页所需的权限码，缺省表示只要登录即可
- */
-declare module 'vue-router' {
-  interface RouteMeta {
-    title?: string;
-    public?: boolean;
-    permission?: string;
-    /** 侧边栏图标，antdv 图标名 */
-    icon?: string;
-    /** 页签钉住：不可关闭、不受「关闭全部」影响 */
-    affix?: boolean;
-    /** 该页参与 KeepAlive 缓存，cacheName 是组件的 defineOptions 名 */
-    keepAlive?: boolean;
-    cacheName?: string;
-  }
-}
-
-/**
  * 静态路由表。刻意不用后端菜单动态注册：
  * 写在代码里能被 vue-tsc 检查、组件路径写错在构建期就暴露，
  * 而 DB 里配错一个 component 是运行时白屏且毫无提示。
