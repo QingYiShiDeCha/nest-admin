@@ -189,7 +189,8 @@ const tabs = useTabsStore();
 
       <TabBar />
 
-      <a-layout-content class="p-6">
+      <!-- flex-col + min-h-0：让页面的表格卡片能撑满剩余高度（ProTable 依赖） -->
+      <a-layout-content class="p-6 flex flex-col min-h-0">
         <RouterView v-slot="{ Component }">
           <!-- include 用页签的组件名：关掉页签 = 移出缓存 = 状态丢弃，
                页签里开着的页面在切换间保持实例 -->

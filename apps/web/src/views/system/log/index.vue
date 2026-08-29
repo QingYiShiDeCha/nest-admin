@@ -13,7 +13,8 @@ import {
   type LogQuery,
 } from '@/api/logs';
 import type { OperationLog } from '@nest-admin/shared';
-import ProTable, { type FilterField } from '@/components/ProTable.vue';
+import ProSearch, { type FilterField } from '@/components/ProSearch.vue';
+import ProTable from '@/components/ProTable.vue';
 import { useTable } from '@/composables/use-table';
 import { OPERATION_STATUS_META } from '@/constants/dicts';
 import { formatDateTime } from '@/utils/format';
@@ -131,11 +132,13 @@ defineOptions({ name: 'LogPage' });
 </script>
 
 <template>
-  <ProTable :table="table" :columns="columns" row-key="id" :filters="filterFields">
+  <ProSearch :table="table" :fields="filterFields">
     <template #filter-range>
       <a-range-picker v-model:value="range" value-format="YYYY-MM-DD" @change="applyRange" />
     </template>
+  </ProSearch>
 
+  <ProTable :table="table" :columns="columns" row-key="id">
     <template #toolbar>
       <a-button v-permission="PERMISSIONS.LOG_CLEAN" danger @click="openCleanup">
         清理过期日志

@@ -18,7 +18,8 @@ import {
   apiRoleUpdate,
   type RoleQuery,
 } from '@/api/roles';
-import ProTable, { type FilterField } from '@/components/ProTable.vue';
+import ProSearch, { type FilterField } from '@/components/ProSearch.vue';
+import ProTable from '@/components/ProTable.vue';
 import { useTable } from '@/composables/use-table';
 import {
   DATA_SCOPE_META,
@@ -297,6 +298,8 @@ defineOptions({ name: 'RolePage' });
 </script>
 
 <template>
+  <ProSearch :table="table" :fields="filterFields" />
+
   <ProTable :table="table" :columns="columns" row-key="id" :filters="filterFields">
     <template #toolbar>
       <a-button

@@ -17,7 +17,8 @@ import {
 } from '@/api/users';
 import type { BasicUser, Role } from '@nest-admin/shared';
 import { apiRolePage } from '@/api/roles';
-import ProTable, { type FilterField } from '@/components/ProTable.vue';
+import ProSearch, { type FilterField } from '@/components/ProSearch.vue';
+import ProTable from '@/components/ProTable.vue';
 import { usePermission } from '@/composables/use-permission';
 import { useTable } from '@/composables/use-table';
 import { STATUS_META, STATUS_OPTIONS } from '@/constants/dicts';
@@ -210,6 +211,8 @@ defineOptions({ name: 'UserPage' });
 </script>
 
 <template>
+  <ProSearch :table="table" :fields="filterFields" />
+
   <ProTable :table="table" :columns="columns" row-key="id" :filters="filterFields">
     <template #toolbar>
       <a-button
