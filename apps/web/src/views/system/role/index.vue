@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { message } from 'antdv-next';
 import type { FormInstance, TableColumnsType } from 'antdv-next';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
 import { PERMISSIONS } from '@nest-admin/shared';
 
@@ -18,6 +18,7 @@ import {
   apiRoleUpdate,
   type RoleQuery,
 } from '@/api/roles';
+import ProTable, { type FilterField } from '@/components/ProTable.vue';
 import { useTable } from '@/composables/use-table';
 import {
   DATA_SCOPE_META,
@@ -39,20 +40,15 @@ const columns: TableColumnsType<Role> = [
   { title: '操作', key: 'action', width: 200 },
 ];
 
-const { filters, list, loading, pagination, run, search } = useTable<Role, RoleQuery>({
+const table = useTable<Role, RoleQuery>({
   fetcher: (query) => apiRolePage(query),
   filters: { keyword: '', status: '' },
 });
 
-onMounted(() => {
-  void run();
-});
-
-function resetFilters(): void {
-  filters.keyword = '';
-  filters.status = '';
-  void search();
-}
+const filterFields: FilterField[] = [
+  { label: '关键词', key: 'keyword', placeholder: '角色码或名称搜索' },
+  { label: '状态', key: 'status', type: 'select', options: STATUS_OPTIONS },
+];
 
 // ---- 新增 / 编辑 ----
 
@@ -127,7 +123,7 @@ async function submit(): Promise<void> {
     }
 
     modalOpen.value = false;
-    await run();
+    await table.run();
   } finally {
     submitting.value = false;
   }
@@ -136,7 +132,7 @@ async function submit(): Promise<void> {
 async function remove(record: Role): Promise<void> {
   await apiRoleRemove(record.id);
   void message.success(`已删除角色 ${record.name}`);
-  await run();
+  await table.run();
 }
 
 // ---- 授权（权限码 + 菜单） ----
@@ -291,7 +287,7 @@ async function submitGrant(): Promise<void> {
 
     void message.success('授权已更新');
     grantModalOpen.value = false;
-    await run();
+    await table.run();
   } finally {
     grantSubmitting.value = false;
   }
@@ -301,92 +297,67 @@ defineOptions({ name: 'RolePage' });
 </script>
 
 <template>
-  <a-card>
-    <div class="mb-4 flex flex-wrap items-center gap-2">
-      <a-input
-        v-model:value="filters.keyword"
-        class="w-56"
-        placeholder="角色码或名称搜索"
-        allow-clear
-        @press-enter="search()"
-      />
-      <a-select
-        v-model:value="filters.status"
-        class="w-32"
-        placeholder="状态"
-        allow-clear
-        :options="STATUS_OPTIONS"
-      />
-      <a-button type="primary" @click="search()">查询</a-button>
-      <a-button @click="resetFilters">重置</a-button>
-
+  <ProTable :table="table" :columns="columns" row-key="id" :filters="filterFields">
+    <template #toolbar>
       <a-button
         v-permission="PERMISSIONS.ROLE_CREATE"
-        class="ml-auto"
         type="primary"
         @click="openCreate"
       >
         新增角色
       </a-button>
-    </div>
+    </template>
 
-    <a-table
-      row-key="id"
-      :columns="columns"
-      :data-source="list"
-      :loading="loading"
-      :pagination="pagination"
-    >
-      <template #bodyCell="{ column, record }: { column: { key: string }; record: Role }">
-        <template v-if="column.key === 'code'">
-          {{ record.code }}
-          <a-tag v-if="record.isSystem" color="gold">内置</a-tag>
-        </template>
-        <template v-else-if="column.key === 'dataScope'">
-          {{ DATA_SCOPE_META[record.dataScope] }}
-        </template>
-        <template v-else-if="column.key === 'status'">
-          <a-tag :color="STATUS_META[record.status].color">
-            {{ STATUS_META[record.status].label }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'updatedAt'">
-          {{ formatDateTime(record.updatedAt) }}
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button
-              v-permission="PERMISSIONS.ROLE_UPDATE"
-              type="link"
-              size="small"
-              @click="openEdit(record)"
-            >
-              编辑
-            </a-button>
-            <a-button
-              v-permission="PERMISSIONS.ROLE_ASSIGN"
-              type="link"
-              size="small"
-              @click="openGrant(record)"
-            >
-              授权
-            </a-button>
-            <a-popconfirm
-              v-if="!record.isSystem"
-              title="确认删除该角色？"
-              description="删除后已关联的用户将失去该角色"
-              @confirm="remove(record)"
-            >
-              <a-button v-permission="PERMISSIONS.ROLE_DELETE" type="link" size="small" danger>
-                删除
-              </a-button>
-            </a-popconfirm>
-          </a-space>
-        </template>
+    <template #bodyCell="{ column, record }: { column: { key: string }; record: Role }">
+      <template v-if="column.key === 'code'">
+        {{ record.code }}
+        <a-tag v-if="record.isSystem" color="gold">内置</a-tag>
       </template>
-    </a-table>
+      <template v-else-if="column.key === 'dataScope'">
+        {{ DATA_SCOPE_META[record.dataScope] }}
+      </template>
+      <template v-else-if="column.key === 'status'">
+        <a-tag :color="STATUS_META[record.status].color">
+          {{ STATUS_META[record.status].label }}
+        </a-tag>
+      </template>
+      <template v-else-if="column.key === 'updatedAt'">
+        {{ formatDateTime(record.updatedAt) }}
+      </template>
+      <template v-else-if="column.key === 'action'">
+        <a-space>
+          <a-button
+            v-permission="PERMISSIONS.ROLE_UPDATE"
+            type="link"
+            size="small"
+            @click="openEdit(record)"
+          >
+            编辑
+          </a-button>
+          <a-button
+            v-permission="PERMISSIONS.ROLE_ASSIGN"
+            type="link"
+            size="small"
+            @click="openGrant(record)"
+          >
+            授权
+          </a-button>
+          <a-popconfirm
+            v-if="!record.isSystem"
+            title="确认删除该角色？"
+            description="删除后已关联的用户将失去该角色"
+            @confirm="remove(record)"
+          >
+            <a-button v-permission="PERMISSIONS.ROLE_DELETE" type="link" size="small" danger>
+              删除
+            </a-button>
+          </a-popconfirm>
+        </a-space>
+      </template>
+    </template>
+  </ProTable>
 
-    <!-- 新增 / 编辑 -->
+<!-- 新增 / 编辑 -->
     <a-modal
       v-model:open="modalOpen"
       :title="editing ? `编辑角色：${editing.name}` : '新增角色'"
@@ -469,5 +440,4 @@ defineOptions({ name: 'RolePage' });
         </div>
       </div>
     </a-modal>
-  </a-card>
 </template>

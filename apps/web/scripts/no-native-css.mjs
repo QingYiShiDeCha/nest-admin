@@ -51,7 +51,8 @@ for (const file of walk(SRC)) {
     continue;
   }
 
-  if (/<style\b/.test(readFileSync(file, 'utf8'))) {
+  // 只认行首的标签：注释里提到「<style>」字样的不算样式块
+  if (/^[ \t]*<style\b/m.test(readFileSync(file, 'utf8'))) {
     violations.push(rel);
   }
 }

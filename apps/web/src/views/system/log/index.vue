@@ -2,7 +2,7 @@
 import { message } from 'antdv-next';
 import type { TableColumnsType } from 'antdv-next';
 import dayjs from 'dayjs';
-import { onMounted, ref } from 'vue';
+import { ref, watch } from 'vue';
 
 import { PERMISSIONS } from '@nest-admin/shared';
 
@@ -13,6 +13,7 @@ import {
   type LogQuery,
 } from '@/api/logs';
 import type { OperationLog } from '@nest-admin/shared';
+import ProTable, { type FilterField } from '@/components/ProTable.vue';
 import { useTable } from '@/composables/use-table';
 import { OPERATION_STATUS_META } from '@/constants/dicts';
 import { formatDateTime } from '@/utils/format';
@@ -29,21 +30,26 @@ const columns: TableColumnsType<OperationLog> = [
   { title: '', key: 'detail', width: 80 },
 ];
 
-const {
-  filters,
-  list,
-  loading,
-  pagination,
-  run,
-  search,
-} = useTable<OperationLog, LogQuery>({
+const table = useTable<OperationLog, LogQuery>({
   fetcher: (query) => apiLogPage(query),
   filters: { username: '', module: '', status: '', startAt: undefined, endAt: undefined },
 });
 
-onMounted(() => {
-  void run();
-});
+const filterFields: FilterField[] = [
+  { label: '操作人', key: 'username' },
+  { label: '模块', key: 'module', placeholder: '如「用户管理」' },
+  {
+    label: '结果',
+    key: 'status',
+    type: 'select',
+    options: [
+      { label: '成功', value: 'success' },
+      { label: '失败', value: 'failure' },
+    ],
+  },
+  // 时间范围是自定义控件（见 #filter-range 插槽），写入 startAt/endAt
+  { label: '时间范围', key: 'range', type: 'custom' },
+];
 
 /** range-picker 用 valueFormat 拿到的是字符串，无需 dayjs 对象 */
 const range = ref<[string, string] | null>(null);
@@ -52,22 +58,23 @@ function applyRange(): void {
   if (range.value) {
     // 截止时间取当天末尾：后端 IsDate 收 ISO 8601，
     // 直接传 2026-08-29 会漏掉当天的日志
-    filters.startAt = dayjs(range.value[0]).startOf('day').toISOString();
-    filters.endAt = dayjs(range.value[1]).endOf('day').toISOString();
+    table.filters.startAt = dayjs(range.value[0]).startOf('day').toISOString();
+    table.filters.endAt = dayjs(range.value[1]).endOf('day').toISOString();
   } else {
-    filters.startAt = undefined;
-    filters.endAt = undefined;
+    table.filters.startAt = undefined;
+    table.filters.endAt = undefined;
   }
 }
 
-function resetFilters(): void {
-  filters.username = '';
-  filters.module = '';
-  filters.status = '';
-  range.value = null;
-  applyRange();
-  void search();
-}
+// ProTable 的重置只还原 filters；范围选择器是页面自己的 UI 状态，跟着清
+watch(
+  () => table.filters.startAt,
+  (startAt) => {
+    if (!startAt) {
+      range.value = null;
+    }
+  },
+);
 
 // ---- 详情抽屉 ----
 
@@ -114,7 +121,7 @@ async function runCleanup(): Promise<void> {
     const result = await apiLogCleanup();
     void message.success(`已清理 ${result.operationLogs} 条日志、${result.refreshTokens} 个过期令牌`);
     cleanupOpen.value = false;
-    await run();
+    await table.run();
   } finally {
     cleanupBusy.value = false;
   }
@@ -124,77 +131,41 @@ defineOptions({ name: 'LogPage' });
 </script>
 
 <template>
-  <a-card>
-    <div class="mb-4 flex flex-wrap items-center gap-2">
-      <a-input
-        v-model:value="filters.username"
-        class="w-40"
-        placeholder="操作人"
-        allow-clear
-        @press-enter="search()"
-      />
-      <a-input
-        v-model:value="filters.module"
-        class="w-40"
-        placeholder="模块，如「用户管理」"
-        allow-clear
-        @press-enter="search()"
-      />
-      <a-select
-        v-model:value="filters.status"
-        class="w-28"
-        placeholder="结果"
-        allow-clear
-        :options="[
-          { label: '成功', value: 'success' },
-          { label: '失败', value: 'failure' },
-        ]"
-      />
+  <ProTable :table="table" :columns="columns" row-key="id" :filters="filterFields">
+    <template #filter-range>
       <a-range-picker v-model:value="range" value-format="YYYY-MM-DD" @change="applyRange" />
-      <a-button type="primary" @click="search()">查询</a-button>
-      <a-button @click="resetFilters">重置</a-button>
+    </template>
 
-      <a-button
-        v-permission="PERMISSIONS.LOG_CLEAN"
-        class="ml-auto"
-        danger
-        @click="openCleanup"
-      >
+    <template #toolbar>
+      <a-button v-permission="PERMISSIONS.LOG_CLEAN" danger @click="openCleanup">
         清理过期日志
       </a-button>
-    </div>
+    </template>
 
-    <a-table
-      row-key="id"
-      :columns="columns"
-      :data-source="list"
-      :loading="loading"
-      :pagination="pagination"
-    >
-      <template #bodyCell="{ column, record }: { column: { key: string }; record: OperationLog }">
-        <template v-if="column.key === 'createdAt'">
-          {{ formatDateTime(record.createdAt) }}
-        </template>
-        <template v-else-if="column.key === 'request'">
-          <span class="font-mono text-xs">
-            {{ record.method }} {{ record.path }}
-          </span>
-        </template>
-        <template v-else-if="column.key === 'status'">
-          <a-tag :color="OPERATION_STATUS_META[record.status].color">
-            {{ OPERATION_STATUS_META[record.status].label }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'duration'">
-          {{ record.durationMs === null ? '—' : `${record.durationMs}ms` }}
-        </template>
-        <template v-else-if="column.key === 'detail'">
-          <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
-        </template>
+    <template #bodyCell="{ column, record }: { column: { key: string }; record: OperationLog }">
+      <template v-if="column.key === 'createdAt'">
+        {{ formatDateTime(record.createdAt) }}
       </template>
-    </a-table>
+      <template v-else-if="column.key === 'request'">
+        <span class="font-mono text-xs">
+          {{ record.method }} {{ record.path }}
+        </span>
+      </template>
+      <template v-else-if="column.key === 'status'">
+        <a-tag :color="OPERATION_STATUS_META[record.status].color">
+          {{ OPERATION_STATUS_META[record.status].label }}
+        </a-tag>
+      </template>
+      <template v-else-if="column.key === 'duration'">
+        {{ record.durationMs === null ? '—' : `${record.durationMs}ms` }}
+      </template>
+      <template v-else-if="column.key === 'detail'">
+        <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
+      </template>
+    </template>
+  </ProTable>
 
-    <!-- 详情 -->
+<!-- 详情 -->
     <a-drawer
       v-model:open="drawerOpen"
       title="日志详情"
@@ -256,5 +227,4 @@ defineOptions({ name: 'LogPage' });
       </template>
       <a-skeleton v-else active :paragraph="{ rows: 2 }" />
     </a-modal>
-  </a-card>
 </template>

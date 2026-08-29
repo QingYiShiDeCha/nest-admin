@@ -50,6 +50,7 @@ declare module 'vue' {
     ATooltip: typeof import('antdv-next')['Tooltip']
     ATree: typeof import('antdv-next')['Tree']
     ATreeSelect: typeof import('antdv-next')['TreeSelect']
+    ProTable: typeof import('./src/components/ProTable.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
   }
@@ -95,6 +96,7 @@ declare global {
   const ATooltip: typeof import('antdv-next')['Tooltip']
   const ATree: typeof import('antdv-next')['Tree']
   const ATreeSelect: typeof import('antdv-next')['TreeSelect']
+  const ProTable: typeof import('./src/components/ProTable.vue')['default']
   const RouterLink: typeof import('vue-router')['RouterLink']
   const RouterView: typeof import('vue-router')['RouterView']
 }

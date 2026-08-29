@@ -34,6 +34,8 @@ interface UseTableOptions<T, F extends object> {
 export function useTable<T, F extends object = Record<string, unknown>>(
   options: UseTableOptions<T, F>,
 ) {
+  // 重置要回到调用方声明的初值，留存一份
+  const initialFilters = { ...options.filters };
   const filters = reactive({ ...options.filters }) as F;
   const page = ref(1);
   const pageSize = ref(options.defaultPageSize ?? 10);
@@ -94,6 +96,11 @@ export function useTable<T, F extends object = Record<string, unknown>>(
     await run();
   }
 
+  /** 筛选条件回到声明时的初值（ProTable 的重置按钮用） */
+  function resetFilters(): void {
+    Object.assign(filters, initialFilters);
+  }
+
   /** a-table 的 pagination.onChange。翻页/改每页条数后立即重新查询 */
   function onPaginationChange(current: number, size: number): void {
     // 每页条数变化时回到第一页：不同页高下 data 的切片完全对不上
@@ -122,6 +129,11 @@ export function useTable<T, F extends object = Record<string, unknown>>(
     pagination,
     run,
     search,
+    resetFilters,
     onPaginationChange,
   };
 }
+
+/** useTable 的返回类型，供 ProTable 等封装层消费 */
+export type UseTableReturn<T, F extends object = Record<string, unknown>> =
+  ReturnType<typeof useTable<T, F>>;

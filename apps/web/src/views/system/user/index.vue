@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { message } from 'antdv-next';
 import type { FormInstance, TableColumnsType } from 'antdv-next';
-import { onMounted, reactive, ref } from 'vue';
+import { reactive, ref } from 'vue';
 
 import { PERMISSIONS } from '@nest-admin/shared';
 
@@ -17,6 +17,7 @@ import {
 } from '@/api/users';
 import type { BasicUser, Role } from '@nest-admin/shared';
 import { apiRolePage } from '@/api/roles';
+import ProTable, { type FilterField } from '@/components/ProTable.vue';
 import { usePermission } from '@/composables/use-permission';
 import { useTable } from '@/composables/use-table';
 import { STATUS_META, STATUS_OPTIONS } from '@/constants/dicts';
@@ -41,21 +42,15 @@ const columns: TableColumnsType<BasicUser> = [
   { title: '操作', key: 'action', width: 300 },
 ];
 
-const {
-  filters,
-  list,
-  loading,
-  pagination,
-  run,
-  search,
-} = useTable<BasicUser, UserQuery>({
+const table = useTable<BasicUser, UserQuery>({
   fetcher: (query) => apiUserPage(query),
   filters: { keyword: '', status: '' },
 });
 
-onMounted(() => {
-  void run();
-});
+const filterFields: FilterField[] = [
+  { label: '用户名', key: 'keyword' },
+  { label: '状态', key: 'status', type: 'select', options: STATUS_OPTIONS },
+];
 
 // ---- 新增 / 编辑 ----
 
@@ -146,7 +141,7 @@ async function submit(): Promise<void> {
     }
 
     modalOpen.value = false;
-    await run();
+    await table.run();
   } finally {
     submitting.value = false;
   }
@@ -155,7 +150,7 @@ async function submit(): Promise<void> {
 async function remove(record: BasicUser): Promise<void> {
   await apiUserRemove(record.id);
   void message.success(`已删除用户 ${record.username}`);
-  await run();
+  await table.run();
 }
 
 // ---- 分配角色 ----
@@ -199,7 +194,7 @@ async function submitRoles(): Promise<void> {
     await apiUserSetRoles(roleTarget.value.id, roleIds.value);
     void message.success('角色已更新');
     roleModalOpen.value = false;
-    await run();
+    await table.run();
   } finally {
     roleSubmitting.value = false;
   }
@@ -210,147 +205,115 @@ async function forceLogout(record: BasicUser): Promise<void> {
   void message.success(`已下线 ${record.username} 的 ${revokedSessions} 个会话`);
 }
 
-function resetFilters(): void {
-  filters.keyword = '';
-  filters.status = '';
-  void search();
-}
 
 defineOptions({ name: 'UserPage' });
 </script>
 
 <template>
-  <a-card>
-    <!-- 筛选栏 -->
-    <div class="mb-4 flex flex-wrap items-center gap-2">
-      <a-input
-        v-model:value="filters.keyword"
-        class="w-56"
-        placeholder="用户名模糊搜索"
-        allow-clear
-        @press-enter="search()"
-      />
-      <a-select
-        v-model:value="filters.status"
-        class="w-32"
-        placeholder="状态"
-        allow-clear
-        :options="STATUS_OPTIONS"
-      />
-      <a-button type="primary" @click="search()">查询</a-button>
-      <a-button @click="resetFilters">重置</a-button>
-
+  <ProTable :table="table" :columns="columns" row-key="id" :filters="filterFields">
+    <template #toolbar>
       <a-button
         v-permission="PERMISSIONS.USER_CREATE"
-        class="ml-auto"
         type="primary"
         @click="openCreate"
       >
         新增用户
       </a-button>
-    </div>
+    </template>
 
-    <a-table
-      row-key="id"
-      :columns="columns"
-      :data-source="list"
-      :loading="loading"
-      :pagination="pagination"
-    >
-      <template #bodyCell="{ column, record }: { column: { key: string }; record: BasicUser }">
-        <template v-if="column.key === 'status'">
-          <a-tag :color="STATUS_META[record.status].color">
-            {{ STATUS_META[record.status].label }}
-          </a-tag>
-        </template>
-        <template v-else-if="column.key === 'lastLoginAt'">
-          {{ formatDateTime(record.lastLoginAt) }}
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button
-              v-permission="PERMISSIONS.USER_UPDATE"
-              type="link"
-              size="small"
-              @click="openEdit(record)"
-            >
-              编辑
-            </a-button>
-            <a-button
-              v-if="can(PERMISSIONS.USER_ASSIGN_ROLE) && !isSelf(record)"
-              type="link"
-              size="small"
-              @click="openAssignRoles(record)"
-            >
-              分配角色
-            </a-button>
-            <a-popconfirm
-              v-if="can(PERMISSIONS.USER_FORCE_LOGOUT)"
-              title="确认强制下线该用户？"
-              description="将吊销其全部登录会话"
-              @confirm="forceLogout(record)"
-            >
-              <a-button type="link" size="small" danger>强制下线</a-button>
-            </a-popconfirm>
-            <a-popconfirm
-              v-if="can(PERMISSIONS.USER_DELETE) && !isSelf(record)"
-              title="确认删除该用户？"
-              description="删除后该账号无法登录"
-              @confirm="remove(record)"
-            >
-              <a-button type="link" size="small" danger>删除</a-button>
-            </a-popconfirm>
-          </a-space>
-        </template>
+    <template #bodyCell="{ column, record }: { column: { key: string }; record: BasicUser }">
+      <template v-if="column.key === 'status'">
+        <a-tag :color="STATUS_META[record.status].color">
+          {{ STATUS_META[record.status].label }}
+        </a-tag>
       </template>
-    </a-table>
+      <template v-else-if="column.key === 'lastLoginAt'">
+        {{ formatDateTime(record.lastLoginAt) }}
+      </template>
+      <template v-else-if="column.key === 'action'">
+        <a-space>
+          <a-button
+            v-permission="PERMISSIONS.USER_UPDATE"
+            type="link"
+            size="small"
+            @click="openEdit(record)"
+          >
+            编辑
+          </a-button>
+          <a-button
+            v-if="can(PERMISSIONS.USER_ASSIGN_ROLE) && !isSelf(record)"
+            type="link"
+            size="small"
+            @click="openAssignRoles(record)"
+          >
+            分配角色
+          </a-button>
+          <a-popconfirm
+            v-if="can(PERMISSIONS.USER_FORCE_LOGOUT)"
+            title="确认强制下线该用户？"
+            description="将吊销其全部登录会话"
+            @confirm="forceLogout(record)"
+          >
+            <a-button type="link" size="small" danger>强制下线</a-button>
+          </a-popconfirm>
+          <a-popconfirm
+            v-if="can(PERMISSIONS.USER_DELETE) && !isSelf(record)"
+            title="确认删除该用户？"
+            description="删除后该账号无法登录"
+            @confirm="remove(record)"
+          >
+            <a-button type="link" size="small" danger>删除</a-button>
+          </a-popconfirm>
+        </a-space>
+      </template>
+    </template>
+  </ProTable>
 
-    <!-- 新增 / 编辑 -->
-    <a-modal
-      v-model:open="modalOpen"
-      :title="editing ? `编辑用户 ${editing.username}` : '新增用户'"
-      :confirm-loading="submitting"
-      @ok="submit"
-    >
-      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
-        <a-form-item label="用户名" name="username">
-          <a-input v-model:value="form.username" :disabled="!!editing" />
-        </a-form-item>
-        <a-form-item v-if="!editing" label="密码" name="password">
-          <a-input-password v-model:value="form.password" placeholder="至少 8 位，含字母和数字" />
-        </a-form-item>
-        <a-form-item label="昵称" name="nickname">
-          <a-input v-model:value="form.nickname" />
-        </a-form-item>
-        <a-form-item label="邮箱" name="email">
-          <a-input v-model:value="form.email" />
-        </a-form-item>
-        <a-form-item label="手机号" name="phone">
-          <a-input v-model:value="form.phone" />
-        </a-form-item>
-        <a-form-item label="状态" name="status">
-          <a-radio-group v-model:value="form.status" :options="STATUS_OPTIONS" />
-        </a-form-item>
-        <p v-if="editing" class="text-xs text-gray-400">
-          密码不在此处修改：本人用右上角头像菜单，管理员可强制下线后由用户自行重置
-        </p>
-      </a-form>
-    </a-modal>
+  <!-- 新增 / 编辑 -->
+  <a-modal
+    v-model:open="modalOpen"
+    :title="editing ? `编辑用户 ${editing.username}` : '新增用户'"
+    :confirm-loading="submitting"
+    @ok="submit"
+  >
+    <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
+      <a-form-item label="用户名" name="username">
+        <a-input v-model:value="form.username" :disabled="!!editing" />
+      </a-form-item>
+      <a-form-item v-if="!editing" label="密码" name="password">
+        <a-input-password v-model:value="form.password" placeholder="至少 8 位，含字母和数字" />
+      </a-form-item>
+      <a-form-item label="昵称" name="nickname">
+        <a-input v-model:value="form.nickname" />
+      </a-form-item>
+      <a-form-item label="邮箱" name="email">
+        <a-input v-model:value="form.email" />
+      </a-form-item>
+      <a-form-item label="手机号" name="phone">
+        <a-input v-model:value="form.phone" />
+      </a-form-item>
+      <a-form-item label="状态" name="status">
+        <a-radio-group v-model:value="form.status" :options="STATUS_OPTIONS" />
+      </a-form-item>
+      <p v-if="editing" class="text-xs text-gray-400">
+        密码不在此处修改：本人用右上角头像菜单，管理员可强制下线后由用户自行重置
+      </p>
+    </a-form>
+  </a-modal>
 
-    <!-- 分配角色 -->
-    <a-modal
-      v-model:open="roleModalOpen"
-      :title="`分配角色：${roleTarget?.username ?? ''}`"
-      :confirm-loading="roleSubmitting"
-      @ok="submitRoles"
-    >
-      <a-checkbox-group v-model:value="roleIds" class="flex flex-col gap-2 py-2">
-        <a-checkbox v-for="role in roleOptions" :key="role.id" :value="role.id">
-          {{ role.name }}
-          <span class="text-xs text-gray-400">{{ role.code }}</span>
-          <a-tag v-if="role.isSystem" class="ml-1" color="gold">内置</a-tag>
-        </a-checkbox>
-      </a-checkbox-group>
-    </a-modal>
-  </a-card>
+  <!-- 分配角色 -->
+  <a-modal
+    v-model:open="roleModalOpen"
+    :title="`分配角色：${roleTarget?.username ?? ''}`"
+    :confirm-loading="roleSubmitting"
+    @ok="submitRoles"
+  >
+    <a-checkbox-group v-model:value="roleIds" class="flex flex-col gap-2 py-2">
+      <a-checkbox v-for="role in roleOptions" :key="role.id" :value="role.id">
+        {{ role.name }}
+        <span class="text-xs text-gray-400">{{ role.code }}</span>
+        <a-tag v-if="role.isSystem" class="ml-1" color="gold">内置</a-tag>
+      </a-checkbox>
+    </a-checkbox-group>
+  </a-modal>
 </template>
