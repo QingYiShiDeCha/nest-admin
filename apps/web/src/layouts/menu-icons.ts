@@ -10,7 +10,7 @@
  * 图标组件：图标变成纯 class 后，加图标只需要在这里补一行 +
  * pnpm add 对应的 @iconify-json 集合。
  *
- * 没登记的名字被当成「没有图标」渲染，不会让菜单崩掉：
+ * 图片 URL 原样透传给 AppIcon；没登记的图标名被当成「没有图标」渲染：
  * 图标是装饰，不该因为数据库里写错一个名字就打不开后台。
  */
 export const MENU_ICONS = {
@@ -23,7 +23,9 @@ export const MENU_ICONS = {
   RiIdCardLine: 'i-ri:id-card-line',
 } as const satisfies Readonly<Record<string, string>>;
 
-const LEGACY_MENU_ICON_NAMES: Readonly<Record<string, keyof typeof MENU_ICONS>> = {
+const LEGACY_MENU_ICON_NAMES: Readonly<
+  Record<string, keyof typeof MENU_ICONS>
+> = {
   DashboardOutlined: 'RiDashboardLine',
   SettingOutlined: 'RiSettings3Line',
   UserOutlined: 'RiUser3Line',
@@ -33,9 +35,16 @@ const LEGACY_MENU_ICON_NAMES: Readonly<Record<string, keyof typeof MENU_ICONS>> 
   IdcardOutlined: 'RiIdCardLine',
 };
 
+const IMAGE_ICON_PATTERN =
+  /^(?:https?:\/\/|data:image\/|blob:|\/.*\.(?:png|jpe?g|gif|svg|webp|ico)(?:[?#].*)?$)/i;
+
 export function resolveMenuIcon(name: string | null): string | undefined {
   if (!name) {
     return undefined;
+  }
+
+  if (IMAGE_ICON_PATTERN.test(name)) {
+    return name;
   }
 
   const normalizedName = LEGACY_MENU_ICON_NAMES[name] ?? name;

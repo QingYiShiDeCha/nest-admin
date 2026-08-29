@@ -15,16 +15,18 @@ const sidebarCollapsed = ref(false);
   <a-layout class="h-screen overflow-hidden">
     <AdminSidebar :collapsed="sidebarCollapsed" />
 
-    <a-layout class="min-w-0 min-h-0 overflow-hidden">
+    <a-layout class="min-w-0 min-h-0 overflow-y-auto">
       <AdminHeader
         :sidebar-collapsed="sidebarCollapsed"
         @toggle-sidebar="sidebarCollapsed = !sidebarCollapsed"
       />
 
-      <TabBar class="shrink-0" />
+      <TabBar class="sticky top-13 z-10 shrink-0 mb-3 a-bg-layout" />
 
-      <!-- Content 是后台框架唯一的纵向滚动容器；固定 Header、Tabs 和侧栏不参与滚动。 -->
-      <a-layout-content class="p-6 flex flex-col flex-1 min-h-0 overflow-y-auto">
+      <!-- 右侧 Layout 统一承载纵向滚动，使滚动条从视口顶部开始；Header 和 Tabs 吸顶。 -->
+      <a-layout-content
+        class="px-[15px] md:px-5 pb-6 flex flex-col flex-1 min-h-0"
+      >
         <RouterView v-slot="{ Component }">
           <Transition
             mode="out-in"

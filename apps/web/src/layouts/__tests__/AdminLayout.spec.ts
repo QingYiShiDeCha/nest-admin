@@ -111,9 +111,10 @@ describe('AdminLayout scroll ownership', () => {
     expect(wrapper.find('button[title="展开菜单"]').exists()).toBe(true);
     expect(wrapper.text()).not.toContain('Nest Admin');
     expect(wrapper.find('img[alt="nest-admin"]').exists()).toBe(true);
+    expect(wrapper.get('button[title="展开菜单"]').classes()).toContain('-ml-2');
   });
 
-  it('锁定根布局，并只允许内容区纵向滚动', () => {
+  it('让右侧整栏滚动，并将 Header 与 TabBar 固定在顶部', () => {
     const wrapper = mount(AdminLayout, {
       global: {
         stubs: {
@@ -131,13 +132,36 @@ describe('AdminLayout scroll ownership', () => {
       expect.arrayContaining(['h-screen', 'overflow-hidden']),
     );
     expect(layouts[1]!.classes()).toEqual(
-      expect.arrayContaining(['min-h-0', 'overflow-hidden']),
+      expect.arrayContaining(['min-h-0', 'overflow-y-auto']),
     );
-    expect(wrapper.get('[data-testid="header"]').classes()).toContain('shrink-0');
+    expect(wrapper.get('[data-testid="header"]').classes()).toEqual(
+      expect.arrayContaining([
+        'admin-header',
+        'sticky',
+        'top-0',
+        '!h-13',
+        '!leading-13',
+        'px-[15px]',
+        'md:px-5',
+        'shrink-0',
+      ]),
+    );
     expect(wrapper.find('[data-testid="breadcrumb"]').exists()).toBe(true);
-    expect(wrapper.get('[data-testid="tab-bar"]').classes()).toContain('shrink-0');
+    expect(wrapper.get('[data-testid="tab-bar"]').classes()).toEqual(
+      expect.arrayContaining(['sticky', 'top-13', 'shrink-0', 'mb-3']),
+    );
     expect(wrapper.get('[data-testid="content"]').classes()).toEqual(
-      expect.arrayContaining(['flex-1', 'min-h-0', 'overflow-y-auto']),
+      expect.arrayContaining([
+        'px-[15px]',
+        'md:px-5',
+        'pb-6',
+        'flex-1',
+        'min-h-0',
+      ]),
+    );
+    expect(wrapper.get('[data-testid="content"]').classes()).not.toContain('pt-6');
+    expect(wrapper.get('[data-testid="content"]').classes()).not.toContain(
+      'overflow-y-auto',
     );
   });
 

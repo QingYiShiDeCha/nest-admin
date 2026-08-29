@@ -8,9 +8,10 @@ import { useSettingsStore } from '@/stores/settings';
 vi.mock('antdv-next', () => ({
   Drawer: {
     name: 'ADrawer',
-    props: { open: Boolean, title: String, width: String },
+    props: { open: Boolean, size: String, title: String },
     emits: ['update:open'],
-    template: '<aside v-if="open" data-testid="settings-drawer"><slot /></aside>',
+    template:
+      '<aside v-if="open" data-testid="settings-drawer"><slot /></aside>',
   },
   Segmented: {
     name: 'ASegmented',
@@ -42,13 +43,21 @@ describe('LayoutSettingsDrawer', () => {
     const wrapper = mountDrawer();
     const trigger = wrapper.get('button[title="界面设置"]');
 
-    expect(wrapper.find('[data-testid="settings-drawer"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="settings-drawer"]').exists()).toBe(
+      false,
+    );
     expect(trigger.classes()).toContain('layout-settings-trigger');
+    expect(trigger.classes()).toEqual(
+      expect.arrayContaining(['w-9', 'h-9', 'text-xl']),
+    );
     expect(trigger.get('i').classes()).toContain('layout-settings-icon');
 
     await trigger.trigger('click');
 
     const drawer = wrapper.get('[data-testid="settings-drawer"]');
+    expect(wrapper.getComponent({ name: 'ADrawer' }).props('size')).toBe(
+      '372px',
+    );
     expect(drawer.text()).toContain('主题风格');
     expect(drawer.text()).toContain('菜单布局');
     expect(drawer.text()).toContain('菜单背景');
@@ -77,7 +86,9 @@ describe('LayoutSettingsDrawer', () => {
     const settings = useSettingsStore(pinia);
     await wrapper.get('button[title="界面设置"]').trigger('click');
 
-    const menuBackground = wrapper.findAllComponents({ name: 'ASegmented' })[0]!;
+    const menuBackground = wrapper.findAllComponents({
+      name: 'ASegmented',
+    })[0]!;
     expect(menuBackground.props('value')).toBe('light');
 
     menuBackground.vm.$emit('update:value', 'dark');

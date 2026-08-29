@@ -115,11 +115,33 @@ export const useTabsStore = defineStore(
     return tabs.value[0]?.path;
   }
 
+  function move(sourcePath: string, targetPath: string): void {
+    const sourceIndex = tabs.value.findIndex((tab) => tab.path === sourcePath);
+    const targetIndex = tabs.value.findIndex((tab) => tab.path === targetPath);
+    const source = tabs.value[sourceIndex];
+    const target = tabs.value[targetIndex];
+
+    if (
+      sourceIndex === -1 ||
+      targetIndex === -1 ||
+      sourceIndex === targetIndex ||
+      !source ||
+      !target ||
+      source.affix ||
+      target.affix
+    ) {
+      return;
+    }
+
+    tabs.value.splice(sourceIndex, 1);
+    tabs.value.splice(targetIndex, 0, source);
+  }
+
   function reset(): void {
     tabs.value = [];
   }
 
-  return { tabs, cachedNames, visit, close, closeOthers, closeAll, reset };
+  return { tabs, cachedNames, visit, close, closeOthers, closeAll, move, reset };
   },
   {
     // 只持久化页签数组；恢复后 KeepAlive 从零开始，无实例可复用

@@ -44,7 +44,7 @@ const basicSettings = reactive([
 <template>
   <div class="contents">
     <button
-      class="layout-settings-trigger w-8 h-8 inline-grid place-items-center shrink-0 border-none bg-transparent text-lg a-color-text cursor-pointer"
+      class="layout-settings-trigger w-9 h-9 inline-grid place-items-center shrink-0 border-none rounded-md bg-transparent text-xl a-color-text cursor-pointer transition-colors duration-200 hover:a-bg-fill-secondary"
       type="button"
       title="界面设置"
       @click="open = true"
@@ -52,7 +52,7 @@ const basicSettings = reactive([
       <i class="layout-settings-icon i-ri:settings-line" />
     </button>
 
-    <a-drawer v-model:open="open" title="界面设置" width="372px">
+    <a-drawer v-model:open="open" title="界面设置" size="372px">
       <div class="flex flex-col gap-8">
         <section>
           <h3 class="mb-4 text-center text-sm font-medium a-color-text">

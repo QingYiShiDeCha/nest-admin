@@ -27,7 +27,9 @@ const settings = useSettingsStore();
 const tabs = useTabsStore();
 
 const { token: designToken } = antdvTheme.useToken();
-const headerStyle = computed(() => ({ background: designToken.value.colorBgLayout }));
+const headerStyle = computed(() => ({
+  background: designToken.value.colorBgLayout,
+}));
 
 const userMenuItems = computed<MenuItems>(() => [
   { key: 'profile', label: '个人中心' },
@@ -53,21 +55,17 @@ async function handleUserMenuClick({
 
 <template>
   <a-layout-header
-    class="flex items-center justify-between px-6 shrink-0"
+    class="admin-header sticky top-0 z-20 !h-13 !leading-13 flex items-center justify-between px-[15px] md:px-5 shrink-0"
     :style="headerStyle"
   >
     <div class="flex items-center gap-3 min-w-0">
       <button
-        class="w-8 h-8 flex items-center justify-center shrink-0 border-none bg-transparent text-lg a-color-text cursor-pointer"
+        class="-ml-2 w-9 h-9 flex items-center justify-center shrink-0 border-none rounded-md bg-transparent text-xl a-color-text cursor-pointer transition-colors hover:a-bg-fill-secondary"
         type="button"
         :title="sidebarCollapsed ? '展开菜单' : '收起菜单'"
         @click="$emit('toggleSidebar')"
       >
-        <i
-          v-if="sidebarCollapsed"
-          class="i-ri:menu-unfold-line"
-        />
-        <i v-else class="i-ri:menu-fold-line" />
+        <i class="i-ri:menu-2-line" />
       </button>
 
       <AdminBreadcrumb />
@@ -94,7 +92,7 @@ async function handleUserMenuClick({
           </div>
         </template>
         <button
-          class="w-5.5 h-5.5 rounded-full border-2 a-border-container shadow-[0_0_0_1px_var(--ant-color-border)] cursor-pointer"
+          class="w-6 h-6 rounded-full border-2 a-border-container shadow-[0_0_0_1px_var(--ant-color-border)] cursor-pointer"
           :style="{ background: settings.primaryColor }"
           type="button"
           title="主题色"

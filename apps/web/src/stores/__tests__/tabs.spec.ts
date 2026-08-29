@@ -110,6 +110,33 @@ describe('tabs store', () => {
     expect(tabs.closeAll('/dashboard')).toBeUndefined();
   });
 
+  it('move 重排普通页签，并保持钉住页签的位置', () => {
+    const tabs = useTabsStore();
+    tabs.visit(dashboard());
+    tabs.visit(routeOf('/a'));
+    tabs.visit(user());
+    tabs.visit(role());
+
+    tabs.move('/system/role', '/a');
+
+    expect(tabs.tabs.map((tab) => tab.path)).toEqual([
+      '/dashboard',
+      '/system/role',
+      '/a',
+      '/system/user?id=3',
+    ]);
+
+    tabs.move('/a', '/dashboard');
+    tabs.move('/dashboard', '/system/role');
+
+    expect(tabs.tabs.map((tab) => tab.path)).toEqual([
+      '/dashboard',
+      '/system/role',
+      '/a',
+      '/system/user?id=3',
+    ]);
+  });
+
   it('reset 清空全部（登出/登录态失效用）', () => {
     const tabs = useTabsStore();
     tabs.visit(dashboard());

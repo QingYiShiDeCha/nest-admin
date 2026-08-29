@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import AppIcon from '@/components/core/base/app-icon/index.vue';
 import { useTabsStore, type TabItem } from '@/stores/tabs';
 
 const route = useRoute();
 const router = useRouter();
 const tabs = useTabsStore();
+const draggedPath = ref<string>();
+const dragOverPath = ref<string>();
 
 function isActive(tab: TabItem): boolean {
   return tab.path === route.fullPath;
@@ -23,6 +27,48 @@ function handleClose(tab: TabItem): void {
   if (next) {
     void router.push(next);
   }
+}
+
+function handleDragStart(event: DragEvent, tab: TabItem): void {
+  if (tab.affix) {
+    event.preventDefault();
+    return;
+  }
+
+  draggedPath.value = tab.path;
+  event.dataTransfer?.setData('text/plain', tab.path);
+
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move';
+  }
+}
+
+function handleDragOver(event: DragEvent, tab: TabItem): void {
+  if (!draggedPath.value || tab.affix || draggedPath.value === tab.path) {
+    return;
+  }
+
+  event.preventDefault();
+  dragOverPath.value = tab.path;
+
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move';
+  }
+}
+
+function handleDrop(event: DragEvent, tab: TabItem): void {
+  event.preventDefault();
+
+  if (draggedPath.value && !tab.affix) {
+    tabs.move(draggedPath.value, tab.path);
+  }
+
+  handleDragEnd();
+}
+
+function handleDragEnd(): void {
+  draggedPath.value = undefined;
+  dragOverPath.value = undefined;
 }
 
 const moreItems = [
@@ -43,25 +89,36 @@ function handleMore({ key }: { key: string | number }): void {
 </script>
 
 <template>
-  <div class="flex items-center gap-2 px-6 h-10">
-    <div class="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+  <div class="admin-tabbar flex items-center gap-2 h-10 px-[15px] md:px-5">
+    <div
+      class="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       <button
         v-for="tab in tabs.tabs"
         :key="tab.path"
-        class="inline-flex items-center gap-1.5 px-2.5 py-1 border rounded text-13px leading-20px whitespace-nowrap cursor-pointer shrink-0 transition-colors"
-        :class="
+        class="h-8 inline-flex items-center gap-1.5 px-3 border rounded text-sm whitespace-nowrap shrink-0 transition-[color,border-color,background-color,opacity]"
+        :class="[
           isActive(tab)
             ? 'text-primary border-primary a-bg-primary-bg'
-            : 'a-bg-container a-color-text-secondary a-border-border hover:text-primary hover:border-primary'
-        "
+            : 'a-bg-container a-color-text-secondary a-border-border hover:text-primary hover:border-primary',
+          tab.affix ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
+          draggedPath === tab.path ? 'opacity-50' : '',
+          dragOverPath === tab.path ? '!border-primary' : '',
+        ]"
+        :draggable="!tab.affix"
         type="button"
         @click="open(tab)"
+        @dragstart="handleDragStart($event, tab)"
+        @dragover="handleDragOver($event, tab)"
+        @dragleave="dragOverPath === tab.path && (dragOverPath = undefined)"
+        @drop="handleDrop($event, tab)"
+        @dragend="handleDragEnd"
       >
-        <i v-if="tab.iconClass" :class="tab.iconClass" />
+        <AppIcon v-if="tab.iconClass" :icon="tab.iconClass" class="text-base" />
         <span class="max-w-30 truncate">{{ tab.title }}</span>
         <span
           v-if="!tab.affix"
-          class="inline-grid place-items-center w-4 h-4 rounded-[3px] text-10px hover:a-bg-error hover:text-white"
+          class="inline-grid place-items-center w-4.5 h-4.5 rounded-[3px] text-xs hover:a-bg-error hover:text-white"
           title="关闭"
           @click.stop="handleClose(tab)"
         >
@@ -70,9 +127,12 @@ function handleMore({ key }: { key: string | number }): void {
       </button>
     </div>
 
-    <a-dropdown :trigger="['click']" :menu="{ items: moreItems, onClick: handleMore }">
+    <a-dropdown
+      :trigger="['click']"
+      :menu="{ items: moreItems, onClick: handleMore }"
+    >
       <button
-        class="inline-grid place-items-center w-7 h-7 border a-border-border rounded a-bg-container a-color-text-secondary text-12px cursor-pointer shrink-0 hover:text-primary hover:border-primary"
+        class="inline-grid place-items-center w-8 h-8 border a-border-border rounded a-bg-container a-color-text-secondary text-base cursor-pointer shrink-0 hover:text-primary hover:border-primary"
         type="button"
         title="标签操作"
       >

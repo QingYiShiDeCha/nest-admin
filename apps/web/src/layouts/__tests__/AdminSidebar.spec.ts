@@ -43,21 +43,42 @@ describe('AdminSidebar menu background', () => {
     });
     const menu = wrapper.getComponent({ name: 'AMenu' });
     const title = wrapper.get('span');
+    const logoBar = wrapper.get('.h-16');
+
+    expect(menu.props('theme')).toBe('light');
+    const siderStyle = wrapper.get('[data-testid="sider"]').attributes('style');
+    expect(wrapper.get('[data-testid="sider"]').classes()).toContain(
+      'admin-sidebar',
+    );
+    expect(siderStyle).toContain('background: rgb(255, 255, 255)');
+    expect(logoBar.attributes('style')).toContain(
+      'background: rgb(255, 255, 255)',
+    );
+    expect(logoBar.classes()).toEqual(
+      expect.arrayContaining([
+        'border-r',
+        'border-solid',
+        'a-border-border-secondary',
+      ]),
+    );
+    expect(title.attributes('style')).toContain('color: rgb(56, 56, 83)');
+
+    settings.setThemeMode('dark');
+    await nextTick();
 
     expect(menu.props('theme')).toBe('light');
     expect(wrapper.get('[data-testid="sider"]').attributes('style')).toContain(
-      'background: rgb(255, 255, 255)',
+      'background: rgb(22, 22, 24)',
     );
-    expect(wrapper.get('.h-16').attributes('style')).toContain(
-      'background: rgb(255, 255, 255)',
-    );
-    expect(title.classes()).toContain('a-color-text');
+    expect(title.attributes('style')).toContain('color: rgb(221, 221, 221)');
 
     settings.setMenuBackground('dark');
     await nextTick();
 
     expect(menu.props('theme')).toBe('dark');
-    expect(title.classes()).toContain('text-white');
-    expect(wrapper.get('.h-16').attributes('style')).toBeUndefined();
+    expect(wrapper.get('[data-testid="sider"]').attributes('style')).toContain(
+      'background: rgb(25, 26, 35)',
+    );
+    expect(title.attributes('style')).toContain('color: rgb(217, 218, 219)');
   });
 });
