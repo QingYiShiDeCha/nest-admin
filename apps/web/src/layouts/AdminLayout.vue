@@ -3,9 +3,15 @@ import type { MenuProps } from 'antdv-next';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import logoUrl from '@/assets/logo.svg';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
-import { findAncestorKeys, findByKey, toMenuItems, type MenuItems } from './menu-tree';
+import {
+  findAncestorKeys,
+  findByKey,
+  toMenuItems,
+  type MenuItems,
+} from './menu-tree';
 
 const route = useRoute();
 const router = useRouter();
@@ -70,7 +76,11 @@ const userMenuItems = computed<MenuItems>(() => [
   { key: 'logout', label: '退出登录' },
 ]);
 
-async function handleUserMenuClick({ key }: { key: string | number }): Promise<void> {
+async function handleUserMenuClick({
+  key,
+}: {
+  key: string | number;
+}): Promise<void> {
   if (key === 'profile') {
     await router.push('/profile');
     return;
@@ -90,8 +100,9 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
 <template>
   <a-layout class="min-h-screen">
     <a-layout-sider v-model:collapsed="collapsed" collapsible :width="220">
-      <div class="h-16 flex items-center justify-center text-white font-semibold">
-        {{ collapsed ? 'NA' : 'nest-admin' }}
+      <div class="h-16 flex items-center justify-center gap-1">
+        <img :src="logoUrl" alt="nest-admin" class="h-10 w-10 shrink-0" />
+        <span class="text-white font-extrabold text-2xl">Nest Admin</span>
       </div>
 
       <a-menu
@@ -104,7 +115,10 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
         @click="handleMenuClick"
       />
 
-      <div v-if="!hasMenus && !collapsed" class="px-4 py-3 text-xs text-white/50">
+      <div
+        v-if="!hasMenus && !collapsed"
+        class="px-4 py-3 text-xs text-white/50"
+      >
         还没有配置菜单，可执行 pnpm db:seed 录入默认菜单
       </div>
     </a-layout-sider>
@@ -122,7 +136,9 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
         >
           <a class="text-gray-700" @click.prevent>
             {{ auth.profile?.nickname || auth.username }}
-            <a-tag v-if="auth.isSuperAdmin" color="gold" class="ml-2">超管</a-tag>
+            <a-tag v-if="auth.isSuperAdmin" color="gold" class="ml-2"
+              >超管</a-tag
+            >
           </a>
         </a-dropdown>
       </a-layout-header>

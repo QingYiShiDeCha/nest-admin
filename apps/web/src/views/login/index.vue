@@ -3,6 +3,7 @@ import { reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { ApiError } from '@/api/http';
+import logoUrl from '@/assets/logo.svg';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
 
@@ -44,7 +45,14 @@ async function handleSubmit(): Promise<void> {
 
 <template>
   <div class="min-h-screen flex items-center justify-center bg-gray-100">
-    <a-card class="w-96" title="nest-admin 登录">
+    <a-card class="w-96">
+      <template #title>
+        <div class="flex items-center gap-3">
+          <img :src="logoUrl" alt="nest-admin" class="h-9 w-9 shrink-0" />
+          <span>登录</span>
+        </div>
+      </template>
+
       <a-form layout="vertical" @submit.prevent="handleSubmit">
         <a-form-item label="用户名">
           <a-input

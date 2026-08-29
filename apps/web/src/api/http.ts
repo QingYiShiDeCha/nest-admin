@@ -178,6 +178,26 @@ async function sendWithRetry<T>(
   }
 }
 
+/**
+ * 把筛选对象拼成查询串。空值（undefined/null/空字符串）一律不传——
+ * 后端 status 这类枚举字段收到空字符串会直接 400，而不是当成「不过滤」。
+ */
+export function withQuery(
+  url: string,
+  params: Record<string, unknown>,
+): string {
+  const search = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      search.set(key, String(value));
+    }
+  }
+
+  const qs = search.toString();
+  return qs ? `${url}?${qs}` : url;
+}
+
 export function httpGet<T>(url: string): Promise<T> {
   return sendWithRetry(url, () => alova.Get<T>(url));
 }

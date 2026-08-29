@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">nest-admin logo</title>
+  <desc id="description">A modular letter N enclosed by nested corner frames.</desc>
+  <rect width="512" height="512" rx="104" fill="#111827"/>
+
+  <path
+    d="M112 206V140c0-15.5 12.5-28 28-28h66"
+    fill="none"
+    stroke="#1677FF"
+    stroke-linecap="round"
+    stroke-width="28"
+  />
+  <path
+    d="M400 306v66c0 15.5-12.5 28-28 28h-66"
+    fill="none"
+    stroke="#13C2C2"
+    stroke-linecap="round"
+    stroke-width="28"
+  />
+
+  <path
+    d="M168 340V172l176 168V172"
+    fill="none"
+    stroke="#F8FAFC"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="42"
+  />
+
+  <circle cx="168" cy="172" r="19" fill="#1677FF"/>
+  <circle cx="344" cy="340" r="19" fill="#13C2C2"/>
+</svg>
