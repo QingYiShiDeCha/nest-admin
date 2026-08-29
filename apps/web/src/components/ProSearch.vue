@@ -1,6 +1,8 @@
 <script setup lang="ts" generic="F extends object = Record<string, unknown>">
 import { computed } from 'vue';
 
+import type { FilterField, SearchableTable } from './pro-search.types';
+
 /**
  * 查询区卡片：字段配置驱动，label 左置横排换行，重置/查询右置。
  *
@@ -13,29 +15,9 @@ import { computed } from 'vue';
  * 样式约束：只用 UnoCSS 工具类，不写 <style> 块。
  */
 
-/** useTable 返回值里查询区用到的切片（结构化类型，实例可直接传入） */
-export interface SearchableTable<F> {
-  filters: F;
-  search(): Promise<void>;
-  resetFilters(): void;
-}
-
-export interface FilterField {
-  label: string;
-  /**
-   * input/select 类型对应 table.filters 的键；
-   * custom 类型由页面用 #filter-<key> 插槽提供控件，键名任意
-   */
-  key: string;
-  type?: 'input' | 'select' | 'custom';
-  /** select 类型的选项 */
-  options?: { label: string; value: string | number }[];
-  placeholder?: string;
-}
-
 const props = defineProps<{
   table: SearchableTable<F>;
-  fields: FilterField[];
+  fields: FilterField<F>[];
 }>();
 
 /** filters 是泛型，统一按字符串键值视图读写 */
@@ -46,15 +28,14 @@ function setFilter(key: string, value: unknown): void {
 }
 
 function reset(): void {
-  props.table.resetFilters();
-  void props.table.search();
+  void props.table.reset();
 }
 </script>
 
 <template>
-  <div class="bg-white rounded-lg p-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+  <div class="a-bg-container rounded-lg p-4 flex flex-wrap items-center gap-x-6 gap-y-3">
     <div v-for="field in fields" :key="field.key" class="flex items-center gap-2">
-      <span class="text-sm text-[#4e5969] whitespace-nowrap">{{ field.label }}</span>
+      <span class="text-sm a-color-text-secondary whitespace-nowrap">{{ field.label }}</span>
       <a-input
         v-if="(field.type ?? 'input') === 'input'"
         class="w-52"

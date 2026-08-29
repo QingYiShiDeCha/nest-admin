@@ -1,6 +1,5 @@
 import type { PaginatedResult } from '@nest-admin/shared';
-import { message } from 'antdv-next';
-import type { TablePaginationConfig } from 'antdv-next';
+import type { TableColumnsType, TablePaginationConfig } from 'antdv-next';
 import { computed, reactive, ref, shallowRef } from 'vue';
 
 export interface PageQuery {
@@ -9,11 +8,15 @@ export interface PageQuery {
 }
 
 interface UseTableOptions<T, F extends object> {
+  /** 表格列定义，支持 antdv-next 原生 render（包括 h 函数与 TSX） */
+  columns: TableColumnsType<T>;
   /** 发起分页请求。filters 由 useTable 展开进查询参数 */
   fetcher: (query: PageQuery & F) => Promise<PaginatedResult<T>>;
   /** 筛选条件初值，reactive 包装后暴露 */
   filters?: F;
   defaultPageSize?: number;
+  /** 展示层错误适配器；省略时由调用方根据 reload/search/reset 的返回值处理 */
+  onError?: (message: string, error: unknown) => void;
 }
 
 /**
@@ -29,7 +32,7 @@ interface UseTableOptions<T, F extends object> {
  * 2. 翻页越界自动回拉：在第 3 页删掉最后一条后，当前页会变成空表。
  *    检测到「这页没数据但总数大于 0」时回到最后一页再取一次。
  * 3. 失败不清空旧数据：网络抖一下表格就空白，用户会以为数据没了。
- *    保留旧列表，弹一条错误提示。
+ *    保留旧列表，通过 onError 通知展示层，并返回 false。
  */
 export function useTable<T, F extends object = Record<string, unknown>>(
   options: UseTableOptions<T, F>,
@@ -48,7 +51,7 @@ export function useTable<T, F extends object = Record<string, unknown>>(
   /** 只增不减的请求序号，用于丢弃过期响应 */
   let seq = 0;
 
-  async function run(): Promise<void> {
+  async function reload(): Promise<boolean> {
     const ticket = ++seq;
     loading.value = true;
 
@@ -61,28 +64,32 @@ export function useTable<T, F extends object = Record<string, unknown>>(
 
       // 已有过更新的请求发出，这份响应作废
       if (ticket !== seq) {
-        return;
+        return false;
       }
 
       total.value = result.total;
 
       if (result.list.length === 0 && result.total > 0 && page.value > 1) {
-        // 删除/筛选后当前页超界：回到最后一页重取。
-        // 递归调用会再次递增 seq，本层的 loading 收尾会因 ticket 失效而跳过
-        page.value = Math.max(1, Math.ceil(result.total / pageSize.value));
-        await run();
-        return;
+        const lastPage = Math.max(1, Math.ceil(result.total / pageSize.value));
+
+        // 只在当前页确实越界时回拉。若后端声称本页存在却返回空列表，
+        // 保留这个空结果，避免对同一页无限重复请求。
+        if (lastPage < page.value) {
+          page.value = lastPage;
+          return reload();
+        }
       }
 
       list.value = result.list;
+      return true;
     } catch (error) {
       if (ticket === seq) {
-        // 只吞展示层的错，错误详情通过提示条告诉用户；
-        // 不重新抛出——调用方都是 void 调用，抛了也没人接
         const text =
           error instanceof Error ? error.message : '加载失败，请稍后重试';
-        void message.error(text);
+        options.onError?.(text, error);
       }
+
+      return false;
     } finally {
       if (ticket === seq) {
         loading.value = false;
@@ -91,14 +98,24 @@ export function useTable<T, F extends object = Record<string, unknown>>(
   }
 
   /** 应用新筛选：从第一页开始查 */
-  async function search(): Promise<void> {
+  async function search(): Promise<boolean> {
     page.value = 1;
-    await run();
+    return reload();
   }
 
-  /** 筛选条件回到声明时的初值（ProTable 的重置按钮用） */
-  function resetFilters(): void {
+  /** 筛选条件回到声明时的初值，并从第一页重新查询 */
+  async function reset(): Promise<boolean> {
+    const values = filters as Record<string, unknown>;
+
+    for (const key of Object.keys(values)) {
+      if (!Object.prototype.hasOwnProperty.call(initialFilters, key)) {
+        delete values[key];
+      }
+    }
+
     Object.assign(filters, initialFilters);
+    page.value = 1;
+    return reload();
   }
 
   /** a-table 的 pagination.onChange。翻页/改每页条数后立即重新查询 */
@@ -106,8 +123,11 @@ export function useTable<T, F extends object = Record<string, unknown>>(
     // 每页条数变化时回到第一页：不同页高下 data 的切片完全对不上
     page.value = size === pageSize.value ? current : 1;
     pageSize.value = size;
-    void run();
+    void reload();
   }
+
+  /** 表格序号列只需要偏移量，不暴露内部页码状态 */
+  const rowOffset = computed(() => (page.value - 1) * pageSize.value);
 
   /** 直接绑给 a-table :pagination */
   const pagination = computed<TablePaginationConfig>(() => ({
@@ -120,17 +140,15 @@ export function useTable<T, F extends object = Record<string, unknown>>(
   }));
 
   return {
+    columns: options.columns,
     filters,
-    page,
-    pageSize,
     list,
-    total,
     loading,
     pagination,
-    run,
+    rowOffset,
+    reload,
     search,
-    resetFilters,
-    onPaginationChange,
+    reset,
   };
 }
 
