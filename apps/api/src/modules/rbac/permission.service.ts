@@ -4,7 +4,10 @@ import {
   roles,
   userRoles,
 } from '@nest-admin/database';
-import { SUPER_ADMIN_ROLE_CODE } from '@nest-admin/shared';
+import {
+  SUPER_ADMIN_ROLE_CODE,
+  type PermissionCatalogItem,
+} from '@nest-admin/shared';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 
@@ -17,13 +20,6 @@ export interface UserAuthorization {
   permissions: string[];
   /** 是否持有内置超管角色，持有则跳过权限比对 */
   isSuperAdmin: boolean;
-}
-
-export interface PermissionCatalogItem {
-  id: number;
-  code: string;
-  name: string;
-  module: string | null;
 }
 
 @Injectable()

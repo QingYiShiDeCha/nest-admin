@@ -1,14 +1,7 @@
+import type { PaginatedResult } from '@nest-admin/shared';
 import { message } from 'antdv-next';
 import type { TablePaginationConfig } from 'antdv-next';
 import { computed, reactive, ref, shallowRef } from 'vue';
-
-/** 与后端 PaginatedResult 对齐 */
-export interface PageResult<T> {
-  list: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
 
 export interface PageQuery {
   page: number;
@@ -17,7 +10,7 @@ export interface PageQuery {
 
 interface UseTableOptions<T, F extends object> {
   /** 发起分页请求。filters 由 useTable 展开进查询参数 */
-  fetcher: (query: PageQuery & F) => Promise<PageResult<T>>;
+  fetcher: (query: PageQuery & F) => Promise<PaginatedResult<T>>;
   /** 筛选条件初值，reactive 包装后暴露 */
   filters?: F;
   defaultPageSize?: number;

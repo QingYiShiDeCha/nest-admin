@@ -1,7 +1,7 @@
 import type { MenuProps } from 'antdv-next';
 import { h } from 'vue';
 
-import type { MenuNode } from '@/api/menu';
+import type { MenuNode } from '@nest-admin/shared';
 import { resolveMenuIcon } from './menu-icons';
 
 /** a-menu 的 items 类型。Menu 的 ItemType 没单独导出，只能从 props 上索引 */

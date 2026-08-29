@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 
-import { useAuthStore, type PermissionCode } from '@/stores/auth';
+import type { PermissionCode } from '@nest-admin/shared';
+import { useAuthStore } from '@/stores/auth';
 
 /** 允许传单个码或一组码，一组时满足其一即可 */
 export type PermissionInput =

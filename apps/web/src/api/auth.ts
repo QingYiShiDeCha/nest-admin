@@ -1,8 +1,4 @@
-import type {
-  LoginPayload,
-  LoginResult,
-  UserProfile,
-} from '@/api/types';
+import type { LoginPayload, LoginResult, UserProfile } from '@nest-admin/shared';
 import { httpGet, httpPost } from '@/api/http';
 
 /** 认证相关接口。登录/注册的响应里已带 token，调用方负责 saveTokens */

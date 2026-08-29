@@ -2,7 +2,7 @@ import { PERMISSIONS } from '@nest-admin/shared';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { UserProfile } from '@/api/types';
+import type { UserProfile } from '@nest-admin/shared';
 import { useAuthStore } from '@/stores/auth';
 
 vi.mock('@/api/auth', () => ({

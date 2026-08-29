@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 
-import { apiMyMenus, type MenuNode } from '@/api/menu';
+import type { MenuNode } from '@nest-admin/shared';
+import { apiMyMenus } from '@/api/menu';
 
 export const useMenuStore = defineStore('menu', () => {
   /** 不持久化：菜单授权随时可能被后台改动，每次进应用都重新拉 */

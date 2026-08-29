@@ -1,7 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useTable, type PageResult } from '@/composables/use-table';
+import type { PaginatedResult } from '@nest-admin/shared';
+import { useTable } from '@/composables/use-table';
 
 // use-table 里 import 了 antdv-next 的 message，测试里只给它一个桩，
 // 不必把整包组件库拉进测试环境
@@ -10,7 +11,7 @@ vi.mock('antdv-next', () => ({
   message: { error: (...args: unknown[]) => messageError(...args) },
 }));
 
-const pageOf = <T>(list: T[], total: number): PageResult<T> => ({
+const pageOf = <T>(list: T[], total: number): PaginatedResult<T> => ({
   list,
   total,
   page: 1,
@@ -23,7 +24,7 @@ const pageOf = <T>(list: T[], total: number): PageResult<T> => ({
  * 而额外属性对非字面量实参不做多余属性检查，所以签名是兼容的。
  */
 function makeFetcher<T>(
-  impl: (query: { page: number; pageSize: number }) => Promise<PageResult<T>>,
+  impl: (query: { page: number; pageSize: number }) => Promise<PaginatedResult<T>>,
 ) {
   return vi.fn(impl);
 }
@@ -90,11 +91,11 @@ describe('useTable', () => {
   });
 
   it('慢的旧响应被丢弃，不覆盖新数据', async () => {
-    let resolveFirst!: (v: PageResult<string>) => void;
+    let resolveFirst!: (v: PaginatedResult<string>) => void;
     const fetcher = makeFetcher<string>(() => {
       // 第一次调用：挂起直到手动放行；之后立即返回
       if (fetcher.mock.calls.length === 1) {
-        return new Promise<PageResult<string>>((resolve) => {
+        return new Promise<PaginatedResult<string>>((resolve) => {
           resolveFirst = resolve;
         });
       }
@@ -158,7 +159,7 @@ describe('useTable', () => {
     let rejectFirst!: (e: Error) => void;
     const fetcher = makeFetcher<string>(() => {
       if (fetcher.mock.calls.length === 1) {
-        return new Promise<PageResult<string>>((_resolve, reject) => {
+        return new Promise<PaginatedResult<string>>((_resolve, reject) => {
           rejectFirst = reject;
         });
       }

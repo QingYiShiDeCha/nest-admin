@@ -1,12 +1,9 @@
-import { PERMISSIONS } from '@nest-admin/shared';
+import { PERMISSIONS, type PermissionCatalogItem } from '@nest-admin/shared';
 import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Permissions } from '../../common/decorators/permissions.decorator';
-import {
-  PermissionService,
-  type PermissionCatalogItem,
-} from './permission.service';
+import { PermissionService } from './permission.service';
 
 /**
  * 权限码目录只读。权限码由代码定义、seed 录入，

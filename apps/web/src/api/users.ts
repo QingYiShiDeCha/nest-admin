@@ -1,4 +1,4 @@
-import type { BasicUser, Paginated } from '@/api/types';
+import type { BasicUser, PaginatedResult } from '@nest-admin/shared';
 import { httpDelete, httpGet, httpPatch, httpPost, httpPut, withQuery } from '@/api/http';
 
 export interface UserQuery {
@@ -14,7 +14,7 @@ export interface UserPayload {
 }
 
 export function apiUserPage(query: UserQuery & { page: number; pageSize: number }) {
-  return httpGet<Paginated<BasicUser>>(withQuery('/users', { ...query }));
+  return httpGet<PaginatedResult<BasicUser>>(withQuery('/users', { ...query }));
 }
 
 export function apiUserCreate(payload: UserPayload & {

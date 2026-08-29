@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { MenuNode } from '@/api/menu';
+import type { MenuNode } from '@nest-admin/shared';
 import { findAncestorKeys, findByKey, menuKeyOf, toMenuItems } from '@/layouts/menu-tree';
 
 const node = (overrides: Partial<MenuNode> & Pick<MenuNode, 'id' | 'name'>): MenuNode => ({
@@ -13,6 +13,8 @@ const node = (overrides: Partial<MenuNode> & Pick<MenuNode, 'id' | 'name'>): Men
   visible: true,
   keepAlive: false,
   status: 'active',
+  createdAt: '2026-08-29T00:00:00.000Z',
+  updatedAt: '2026-08-29T00:00:00.000Z',
   children: [],
   ...overrides,
 });

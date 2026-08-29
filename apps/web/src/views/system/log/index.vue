@@ -12,7 +12,7 @@ import {
   apiLogPage,
   type LogQuery,
 } from '@/api/logs';
-import type { OperationLog } from '@/api/types';
+import type { OperationLog } from '@nest-admin/shared';
 import { useTable } from '@/composables/use-table';
 import { OPERATION_STATUS_META } from '@/constants/dicts';
 import { formatDateTime } from '@/utils/format';

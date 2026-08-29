@@ -3,7 +3,7 @@ import { message } from 'antdv-next';
 import type { FormInstance, TableColumnsType } from 'antdv-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 
-import { PERMISSIONS } from '@nest-admin/shared';
+import { PERMISSIONS, type MenuNode } from '@nest-admin/shared';
 
 import {
   apiMenuCreate,
@@ -12,7 +12,6 @@ import {
   apiMenuUpdate,
   type MenuPayload,
 } from '@/api/menu';
-import type { MenuNode } from '@/api/menu';
 import { MENU_ICONS } from '@/layouts/menu-icons';
 import {
   MENU_TYPE_META,

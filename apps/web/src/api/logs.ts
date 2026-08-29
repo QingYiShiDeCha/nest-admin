@@ -1,4 +1,4 @@
-import type { OperationLog, OperationStatus, Paginated } from '@/api/types';
+import type { OperationLog, OperationStatus, PaginatedResult } from '@nest-admin/shared';
 import { httpGet, httpPost, withQuery } from '@/api/http';
 
 export interface LogQuery {
@@ -12,7 +12,7 @@ export interface LogQuery {
 }
 
 export function apiLogPage(query: LogQuery & { page: number; pageSize: number }) {
-  return httpGet<Paginated<OperationLog>>(withQuery('/operation-logs', { ...query }));
+  return httpGet<PaginatedResult<OperationLog>>(withQuery('/operation-logs', { ...query }));
 }
 
 /** 清理结果：日志行数与连带过期的 refreshToken 数 */

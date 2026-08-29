@@ -1,3 +1,4 @@
+import { OPERATION_STATUS, type OperationStatus } from '@nest-admin/shared';
 import {
   index,
   int,
@@ -10,8 +11,9 @@ import {
 
 import { foreignId, primaryId } from './columns';
 
-export const OPERATION_STATUS = ['success', 'failure'] as const;
-export type OperationStatus = (typeof OPERATION_STATUS)[number];
+// 枚举的单一来源在 shared（与 MENU_TYPE/STATUS 一致），
+// 这里转发导出，让既有从 database 引它的代码不受影响
+export { OPERATION_STATUS, type OperationStatus };
 
 /**
  * 操作日志。append-only，没有软删除也没有 created_by/updated_by——

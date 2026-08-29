@@ -1,21 +1,12 @@
-import { httpDelete, httpGet, httpPatch, httpPost } from '@/api/http';
-import type { MenuRecord } from '@/api/types';
+import type { MenuNode, MenuType, Status } from '@nest-admin/shared';
 
-/** 与后端 sys_menu 对齐的节点，children 由后端建好树后返回 */
-export interface MenuNode {
-  id: number;
-  parentId: number | null;
-  name: string;
-  type: 'directory' | 'menu' | 'external';
-  path: string | null;
-  component: string | null;
-  icon: string | null;
-  sort: number;
-  visible: boolean;
-  keepAlive: boolean;
-  status: 'active' | 'disabled';
-  children: MenuNode[];
-}
+import { httpDelete, httpGet, httpPatch, httpPost } from '@/api/http';
+
+/**
+ * 菜单相关的线上类型（MenuNode 等）已上移到 @nest-admin/shared，
+ * 这里只保留请求封装与请求体形状（请求体是前端发起方定义的调用约定，
+ * 后端有对应的 DTO 类做校验）。
+ */
 
 /**
  * 当前用户可见的菜单树。后端已按角色授权过滤、补齐祖先节点，
@@ -35,22 +26,22 @@ export function apiMenuTree(): Promise<MenuNode[]> {
 export interface MenuPayload {
   parentId?: number;
   name: string;
-  type: MenuNode['type'];
+  type: MenuType;
   path?: string;
   component?: string;
   icon?: string;
   sort?: number;
   visible?: boolean;
   keepAlive?: boolean;
-  status?: MenuNode['status'];
+  status?: Status;
 }
 
-export function apiMenuCreate(payload: MenuPayload): Promise<MenuRecord> {
-  return httpPost<MenuRecord>('/menus', payload);
+export function apiMenuCreate(payload: MenuPayload): Promise<MenuNode> {
+  return httpPost<MenuNode>('/menus', payload);
 }
 
-export function apiMenuUpdate(id: number, payload: Partial<MenuPayload>): Promise<MenuRecord> {
-  return httpPatch<MenuRecord>(`/menus/${id}`, payload);
+export function apiMenuUpdate(id: number, payload: Partial<MenuPayload>): Promise<MenuNode> {
+  return httpPatch<MenuNode>(`/menus/${id}`, payload);
 }
 
 /** 有子菜单时后端会拒绝 */

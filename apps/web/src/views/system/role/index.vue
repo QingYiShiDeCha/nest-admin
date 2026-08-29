@@ -5,7 +5,8 @@ import { computed, onMounted, reactive, ref } from 'vue';
 
 import { PERMISSIONS } from '@nest-admin/shared';
 
-import { apiMenuTree, type MenuNode } from '@/api/menu';
+import type { MenuNode, PermissionCatalogItem, Role } from '@nest-admin/shared';
+import { apiMenuTree } from '@/api/menu';
 import {
   apiPermissionCatalog,
   apiRoleCreate,
@@ -17,7 +18,6 @@ import {
   apiRoleUpdate,
   type RoleQuery,
 } from '@/api/roles';
-import type { PermissionCatalogItem, Role } from '@/api/types';
 import { useTable } from '@/composables/use-table';
 import {
   DATA_SCOPE_META,

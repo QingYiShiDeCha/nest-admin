@@ -15,7 +15,7 @@ import {
   apiUserUpdate,
   type UserQuery,
 } from '@/api/users';
-import type { BasicUser, Role } from '@/api/types';
+import type { BasicUser, Role } from '@nest-admin/shared';
 import { apiRolePage } from '@/api/roles';
 import { usePermission } from '@/composables/use-permission';
 import { useTable } from '@/composables/use-table';

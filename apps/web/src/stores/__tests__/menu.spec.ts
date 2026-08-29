@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { MenuNode } from '@/api/menu';
+import type { MenuNode } from '@nest-admin/shared';
 import { useMenuStore } from '@/stores/menu';
 
 vi.mock('@/api/menu', () => ({ apiMyMenus: vi.fn() }));
@@ -20,6 +20,8 @@ const node = (
   icon: null,
   sort: 0,
   visible: true,
+  createdAt: '2026-08-29T00:00:00.000Z',
+  updatedAt: '2026-08-29T00:00:00.000Z',
   keepAlive: false,
   status: 'active',
   children: [],

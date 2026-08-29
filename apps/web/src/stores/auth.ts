@@ -1,13 +1,10 @@
-import { PERMISSIONS } from '@nest-admin/shared';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 
 import { apiLogin, apiLogout, apiProfile } from '@/api/auth';
-import type { LoginPayload, UserProfile } from '@/api/types';
+import type { LoginPayload, PermissionCode, UserProfile } from '@nest-admin/shared';
 import { clearTokens, getTokens, saveTokens } from '@/utils/auth-token';
 
-/** 权限码字面量的类型，直接取自 shared，写错编译期就报错 */
-export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
 
 export const useAuthStore = defineStore(
   'auth',

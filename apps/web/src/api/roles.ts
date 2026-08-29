@@ -1,4 +1,9 @@
-import type { Paginated, PermissionCatalogItem, Role, RoleDetail } from '@/api/types';
+import type {
+  PaginatedResult,
+  PermissionCatalogItem,
+  Role,
+  RoleDetail,
+} from '@nest-admin/shared';
 import { httpDelete, httpGet, httpPatch, httpPost, httpPut, withQuery } from '@/api/http';
 
 export interface RoleQuery {
@@ -16,7 +21,7 @@ export interface RolePayload {
 }
 
 export function apiRolePage(query: RoleQuery & { page: number; pageSize: number }) {
-  return httpGet<Paginated<Role>>(withQuery('/roles', { ...query }));
+  return httpGet<PaginatedResult<Role>>(withQuery('/roles', { ...query }));
 }
 
 export function apiRoleCreate(payload: RolePayload): Promise<Role> {

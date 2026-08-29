@@ -2,7 +2,7 @@ import { PERMISSIONS } from '@nest-admin/shared';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { UserProfile } from '@/api/types';
+import type { UserProfile } from '@nest-admin/shared';
 import { checkPermission, usePermission } from '@/composables/use-permission';
 import { useAuthStore } from '@/stores/auth';
 
