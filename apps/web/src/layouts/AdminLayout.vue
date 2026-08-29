@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { MenuProps } from 'antdv-next';
+import { theme as antdvTheme } from 'antdv-next';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -19,6 +20,13 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const menu = useMenuStore();
+
+/**
+ * 头栏与内容区共用的布局底色（token 而非写死的灰值）：
+ * 参考设计里顶栏和页面背景是同一层颜色，暗色模式下也会一起变。
+ */
+const { token: designToken } = antdvTheme.useToken();
+const headerStyle = computed(() => ({ background: designToken.value.colorBgLayout }));
 
 const collapsed = ref(false);
 
@@ -128,7 +136,7 @@ const settings = useSettingsStore();
     </a-layout-sider>
 
     <a-layout>
-      <a-layout-header class="bg-white flex items-center justify-between px-6">
+      <a-layout-header class="flex items-center justify-between px-6" :style="headerStyle">
         <span class="text-base">{{ route.meta.title ?? '' }}</span>
 
         <div class="flex items-center gap-4">
