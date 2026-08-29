@@ -1,5 +1,7 @@
 import type { DATA_SCOPE, MENU_TYPE, STATUS } from '@nest-admin/shared';
 
+import { SEMANTIC_COLORS } from '@/constants/palette';
+
 export type Status = (typeof STATUS)[number];
 export type MenuType = (typeof MENU_TYPE)[number];
 export type DataScope = (typeof DATA_SCOPE)[number];
@@ -10,9 +12,10 @@ interface Option<T> {
 }
 
 /** 状态 → 展示文案与标签色，用户/角色/菜单三处共用 */
+// Tag 的 color 用状态预设而不是具体色值，让它们跟随全局语义色 token
 export const STATUS_META: Record<Status, { label: string; color: string }> = {
-  active: { label: '启用', color: 'green' },
-  disabled: { label: '禁用', color: 'red' },
+  active: { label: '启用', color: 'success' },
+  disabled: { label: '禁用', color: 'error' },
 };
 
 export const STATUS_OPTIONS: Option<Status>[] = [
@@ -48,6 +51,8 @@ export const OPERATION_STATUS_META: Record<
   'success' | 'failure',
   { label: string; color: string }
 > = {
-  success: { label: '成功', color: 'green' },
-  failure: { label: '失败', color: 'red' },
+  // 失败用调色板里的「错误」软红：antd 只有一条 error 通道（给了危险色），
+  // 日志失败态是展示不是破坏性操作，用软红区分开
+  success: { label: '成功', color: 'success' },
+  failure: { label: '失败', color: SEMANTIC_COLORS.error },
 };

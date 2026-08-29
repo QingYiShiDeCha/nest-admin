@@ -4,8 +4,10 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import logoUrl from '@/assets/logo.svg';
+import { BRAND_COLORS } from '@/constants/palette';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
+import { useSettingsStore } from '@/stores/settings';
 import {
   findAncestorKeys,
   findByKey,
@@ -95,6 +97,8 @@ async function handleUserMenuClick({
 const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
   openKeys.value = keys as string[];
 };
+
+const settings = useSettingsStore();
 </script>
 
 <template>
@@ -127,20 +131,44 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
       <a-layout-header class="bg-white flex items-center justify-between px-6">
         <span class="text-base">{{ route.meta.title ?? '' }}</span>
 
-        <!-- 显式用点击触发：antdv 默认是 hover，而悬浮菜单在移动端无法触达，
-             键盘用户也很难操作，退出登录这类操作不该藏在 hover 里。
-             trigger 的类型是数组，写成字符串虽然能跑（String 也有 includes）但类型不对 -->
-        <a-dropdown
-          :trigger="['click']"
-          :menu="{ items: userMenuItems, onClick: handleUserMenuClick }"
-        >
-          <a class="text-gray-700" @click.prevent>
-            {{ auth.profile?.nickname || auth.username }}
-            <a-tag v-if="auth.isSuperAdmin" color="gold" class="ml-2"
-              >超管</a-tag
-            >
-          </a>
-        </a-dropdown>
+        <div class="flex items-center gap-4">
+          <!-- 主色切换：点色板弹出色卡，选择即时生效并持久化 -->
+          <a-popover trigger="click" placement="bottomRight">
+            <template #content>
+              <div class="theme-swatches">
+                <button
+                  v-for="color in BRAND_COLORS"
+                  :key="color.value"
+                  class="theme-swatch"
+                  :class="{ active: settings.primaryColor === color.value }"
+                  :style="{ background: color.value }"
+                  :title="color.name"
+                  type="button"
+                  @click="settings.setPrimaryColor(color.value)"
+                />
+              </div>
+            </template>
+            <button
+              class="theme-trigger"
+              :style="{ background: settings.primaryColor }"
+              type="button"
+              title="主题色"
+            />
+          </a-popover>
+
+          <!-- 显式用点击触发：antdv 默认是 hover，而悬浮菜单在移动端无法触达，
+               键盘用户也很难操作，退出登录这类操作不该藏在 hover 里。
+               trigger 的类型是数组，写成字符串虽然能跑（String 也有 includes）但类型不对 -->
+          <a-dropdown
+            :trigger="['click']"
+            :menu="{ items: userMenuItems, onClick: handleUserMenuClick }"
+          >
+            <a class="text-gray-700" @click.prevent>
+              {{ auth.profile?.nickname || auth.username }}
+              <a-tag v-if="auth.isSuperAdmin" color="gold" class="ml-2">超管</a-tag>
+            </a>
+          </a-dropdown>
+        </div>
       </a-layout-header>
 
       <a-layout-content class="p-6">
@@ -149,3 +177,34 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
     </a-layout>
   </a-layout>
 </template>
+
+<style scoped>
+/* 主色切换的色卡。选中态用外圈描边，不依赖图标组件 */
+.theme-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, 28px);
+  gap: 10px;
+}
+
+.theme-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+}
+
+.theme-swatch.active {
+  outline: 2px solid #1d2129;
+  outline-offset: 2px;
+}
+
+.theme-trigger {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #e5e6eb;
+  cursor: pointer;
+}
+</style>

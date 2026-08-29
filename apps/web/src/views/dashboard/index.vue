@@ -7,6 +7,9 @@ import {
   ThunderboltOutlined,
   UserOutlined,
 } from '@antdv-next/icons';
+import { SEMANTIC_COLORS } from '@/constants/palette';
+import { useSettingsStore } from '@/stores/settings';
+import { computed } from 'vue';
 
 /**
  * 看板布局复刻：网格结构、卡片视觉与参考设计一致。
@@ -15,6 +18,20 @@ import {
  * ——布局定型后接统计接口时，把对应区块换成 echarts 即可，
  * 网格与卡片样式不用动。
  */
+
+const settings = useSettingsStore();
+
+/**
+ * 图表消费的主题色，来源与 App.vue 的 token 相同（palette 单一来源）。
+ * computed 而不是普通对象：主色是可切换的，绑定 :style 时要保持响应式。
+ */
+const themeVars = computed(() => ({
+  '--dash-blue': settings.primaryColor,
+  '--dash-green': SEMANTIC_COLORS.success,
+  '--dash-cyan': SEMANTIC_COLORS.info,
+  '--dash-orange': SEMANTIC_COLORS.warning,
+  '--dash-danger': SEMANTIC_COLORS.danger,
+}));
 
 /** 顶部四张统计卡 */
 const statCards = [
@@ -82,7 +99,7 @@ const heatRows = heatLabels.map((_, row) =>
 </script>
 
 <template>
-  <div class="dash">
+  <div class="dash" :style="themeVars">
     <!-- 左主体 + 右通栏 -->
     <div class="dash-board">
       <div class="dash-main">
@@ -254,7 +271,7 @@ const heatRows = heatLabels.map((_, row) =>
                   v-for="(v, c) in row"
                   :key="c"
                   class="heat-cell"
-                  :style="{ background: `rgba(16, 185, 129, ${0.15 + v * 0.85})` }"
+                  :style="{ background: `color-mix(in srgb, var(--dash-green) ${Math.round((0.15 + v * 0.85) * 100)}%, #fff)` }"
                 />
               </div>
             </div>
@@ -268,9 +285,7 @@ const heatRows = heatLabels.map((_, row) =>
 <style scoped>
 /* 布局用到的主题色，接 echarts 时保持同一组取值 */
 .dash {
-  --dash-blue: #4080ff;
-  --dash-green: #10b981;
-  --dash-orange: #f59e0b;
+  /* --dash-blue/green/cyan/orange/danger 由模板 :style 注入 */
   --dash-radius: 8px;
 }
 
@@ -326,16 +341,17 @@ const heatRows = heatLabels.map((_, row) =>
   flex-shrink: 0;
 }
 
-.tint-blue { background: #ecf2ff; color: var(--dash-blue); }
-.tint-cyan { background: #e6f7fb; color: #13c2c2; }
-.tint-green { background: #e7f8f1; color: var(--dash-green); }
-.tint-orange { background: #fff3e0; color: var(--dash-orange); }
+/* 浅色底用 color-mix 从语义色自动生成，跟随主题不必逐个调 */
+.tint-blue { background: color-mix(in srgb, var(--dash-blue) 12%, #fff); color: var(--dash-blue); }
+.tint-cyan { background: color-mix(in srgb, var(--dash-cyan) 12%, #fff); color: var(--dash-cyan); }
+.tint-green { background: color-mix(in srgb, var(--dash-green) 12%, #fff); color: var(--dash-green); }
+.tint-orange { background: color-mix(in srgb, var(--dash-orange) 12%, #fff); color: var(--dash-orange); }
 
 .stat-label { font-size: 13px; color: #86909c; }
 .stat-value { font-size: 24px; font-weight: 600; line-height: 1.4; white-space: nowrap; }
 .stat-trend { font-size: 12px; }
 .stat-trend.up { color: var(--dash-green); }
-.stat-trend.down { color: #f53f3f; }
+.stat-trend.down { color: var(--dash-danger); }
 
 .card-link { font-size: 13px; }
 
@@ -425,7 +441,7 @@ const heatRows = heatLabels.map((_, row) =>
 .flag { margin-right: 6px; }
 .code { color: #86909c; margin-right: 6px; font-size: 12px; }
 .trend-up { color: var(--dash-green); margin-right: 6px; font-size: 12px; }
-.trend-down { color: #f53f3f; margin-right: 6px; font-size: 12px; }
+.trend-down { color: var(--dash-danger); margin-right: 6px; font-size: 12px; }
 .owner-avatar { background: #ecf2ff; color: var(--dash-blue); margin-right: 8px; vertical-align: middle; }
 .owner-name { vertical-align: middle; margin-right: 8px; }
 .owner-dept { color: #86909c; font-size: 12px; vertical-align: middle; }
