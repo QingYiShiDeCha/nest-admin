@@ -151,6 +151,8 @@ describe('ProTable', () => {
         '[&_.ant-spin]:overflow-hidden',
         '[&_.ant-pagination]:shrink-0',
         '[&_.ant-table-body]:!overflow-y-auto',
+        '[&_.ant-empty-normal_.ant-empty-image]:!h-16',
+        '[&_.ant-empty-description]:text-base',
       ]),
     );
     expect(wrapper.classes()).not.toContain(

@@ -251,12 +251,12 @@ defineOptions({ name: 'PostPage' });
         <a-form-item label="岗位编码" name="code">
           <a-input
             v-model:value="form.code"
-            maxlength="64"
+            :maxlength="64"
             placeholder="如 product_manager"
           />
         </a-form-item>
         <a-form-item label="岗位名称" name="name">
-          <a-input v-model:value="form.name" maxlength="64" />
+          <a-input v-model:value="form.name" :maxlength="64" />
         </a-form-item>
         <a-form-item label="排序" name="sort">
           <a-input-number
@@ -273,7 +273,11 @@ defineOptions({ name: 'PostPage' });
           />
         </a-form-item>
         <a-form-item class="md:col-span-2" label="备注" name="remark">
-          <a-textarea v-model:value="form.remark" :rows="3" maxlength="255" />
+          <a-textarea
+            v-model:value="form.remark"
+            :rows="3"
+            :maxlength="255"
+          />
         </a-form-item>
       </a-form>
     </a-modal>

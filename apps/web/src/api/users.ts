@@ -1,6 +1,7 @@
 import type {
   BasicUser,
   PaginatedResult,
+  UpdateOwnProfilePayload,
   UserListItem,
 } from '@nest-admin/shared';
 import {
@@ -52,6 +53,12 @@ export function apiUserUpdate(
 
 export function apiUpdateOwnAvatar(avatar: string | null): Promise<BasicUser> {
   return httpPatch<BasicUser>('/users/me/avatar', { avatar });
+}
+
+export function apiUpdateOwnProfile(
+  payload: UpdateOwnProfilePayload,
+): Promise<BasicUser> {
+  return httpPatch<BasicUser>('/users/me/profile', payload);
 }
 
 export function apiUserRemove(id: number): Promise<void> {

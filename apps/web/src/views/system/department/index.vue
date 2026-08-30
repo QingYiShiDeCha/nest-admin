@@ -404,12 +404,12 @@ defineOptions({ name: 'DepartmentPage' });
           />
         </a-form-item>
         <a-form-item label="部门名称" name="name">
-          <a-input v-model:value="form.name" maxlength="64" />
+          <a-input v-model:value="form.name" :maxlength="64" />
         </a-form-item>
         <a-form-item label="部门编码" name="code">
           <a-input
             v-model:value="form.code"
-            maxlength="64"
+            :maxlength="64"
             placeholder="如 rd_center"
           />
         </a-form-item>
@@ -420,10 +420,10 @@ defineOptions({ name: 'DepartmentPage' });
           />
         </a-form-item>
         <a-form-item label="联系电话" name="phone">
-          <a-input v-model:value="form.phone" maxlength="20" />
+          <a-input v-model:value="form.phone" :maxlength="20" />
         </a-form-item>
         <a-form-item label="联系邮箱" name="email">
-          <a-input v-model:value="form.email" maxlength="128" />
+          <a-input v-model:value="form.email" :maxlength="128" />
         </a-form-item>
         <a-form-item label="排序" name="sort">
           <a-input-number
@@ -451,7 +451,7 @@ defineOptions({ name: 'DepartmentPage' });
           <a-textarea
             v-model:value="form.moveReason"
             :rows="3"
-            maxlength="255"
+            :maxlength="255"
             show-count
             placeholder="请说明本次组织调整原因"
           />

@@ -149,6 +149,7 @@ const stretchChain =
   '[&_.ant-table-container]:flex-1 [&_.ant-table-container]:min-h-0 [&_.ant-table-container]:flex [&_.ant-table-container]:flex-col ' +
   '[&_.ant-table-header]:shrink-0 ' +
   '[&_.ant-table-body]:flex-1 [&_.ant-table-body]:min-h-0 [&_.ant-table-body]:!max-h-none [&_.ant-table-body]:!overflow-y-auto ' +
+  '[&_.ant-empty-normal_.ant-empty-image]:!h-16 [&_.ant-empty-description]:text-base ' +
   '[&_.ant-pagination]:shrink-0';
 </script>
 
