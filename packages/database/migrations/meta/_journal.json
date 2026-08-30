@@ -36,6 +36,34 @@
       "when": 1788005461001,
       "tag": "0004_remix_menu_icons",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1788070414748,
+      "tag": "0005_dry_black_cat",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1788074602311,
+      "tag": "0006_talented_golden_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1788075884503,
+      "tag": "0007_wooden_toad",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1788076844705,
+      "tag": "0008_neat_kree",
+      "breakpoints": true
     }
   ]
 }

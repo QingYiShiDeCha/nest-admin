@@ -6,7 +6,16 @@ import {
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 import { createDatabaseClient } from '../src/client';
-import { menus, permissions, roles, userRoles, users } from '../src/schema';
+import {
+  departments,
+  menus,
+  permissions,
+  posts,
+  roles,
+  userPosts,
+  userRoles,
+  users,
+} from '../src/schema';
 import type { DrizzleDB } from '../src/types';
 import { resolveDatabaseOptions } from './env';
 
@@ -22,32 +31,42 @@ const SUPER_ADMIN_ROLE = {
   remark: '内置角色，拥有全部权限，不参与权限校验',
 };
 
+const DEFAULT_DEPARTMENT = {
+  code: 'headquarters',
+  name: '总公司',
+};
+
+const DEFAULT_POST = {
+  code: 'system_admin',
+  name: '系统管理员',
+};
+
 interface MenuSeed {
   name: string;
-  type: 'directory' | 'menu';
-  /** 与前端静态路由的 path 一致。目录没有 path */
+  type: 'directory' | 'external' | 'menu';
+  /** 前端路由 path。目录没有 path */
   path?: string;
+  /** 相对 apps/web/src/views 的组件路径；留空时前端按 path 推导 */
+  component?: string;
   /** 前端 menu-icons.ts 注册表里的键名，未登记的名字前端会当成无图标 */
   icon?: string;
   sort: number;
   /** false = 路由可达但不进侧边栏 */
   visible?: boolean;
+  keepAlive?: boolean;
   children?: readonly MenuSeed[];
 }
 
-/**
- * 默认菜单树，与 router/routes.ts 的静态路由一一对应。
- *
- * component 一律留空：前端用静态路由注册页面，菜单只负责渲染侧边栏和
- * 决定可达性。数据库里存组件路径的话，写错一个字是运行时白屏且没有提示。
- */
+/** 默认菜单树。业务页面由前端根据这里的 path/component 动态注册。 */
 const MENU_TREE: readonly MenuSeed[] = [
   {
     name: '首页',
     type: 'menu',
     path: '/dashboard',
+    component: 'dashboard/index',
     icon: 'RiDashboardLine',
     sort: 0,
+    keepAlive: true,
   },
   {
     name: '系统管理',
@@ -59,38 +78,73 @@ const MENU_TREE: readonly MenuSeed[] = [
         name: '用户管理',
         type: 'menu',
         path: '/system/user',
+        component: 'system/user/index',
         icon: 'RiUser3Line',
         sort: 0,
+        keepAlive: true,
+      },
+      {
+        name: '组织架构',
+        type: 'menu',
+        path: '/system/department',
+        component: 'system/department/index',
+        icon: 'RiOrganizationChart',
+        sort: 5,
+        keepAlive: true,
+      },
+      {
+        name: '岗位管理',
+        type: 'menu',
+        path: '/system/post',
+        component: 'system/post/index',
+        icon: 'RiBriefcase4Line',
+        sort: 10,
+        keepAlive: true,
       },
       {
         name: '角色管理',
         type: 'menu',
         path: '/system/role',
+        component: 'system/role/index',
         icon: 'RiTeamLine',
-        sort: 10,
+        sort: 20,
+        keepAlive: true,
       },
       {
         name: '菜单管理',
         type: 'menu',
         path: '/system/menu',
+        component: 'system/menu/index',
         icon: 'RiMenu2Line',
-        sort: 20,
+        sort: 30,
+        keepAlive: true,
       },
       {
         name: '操作日志',
         type: 'menu',
         path: '/system/log',
+        component: 'system/log/index',
         icon: 'RiFileList3Line',
-        sort: 30,
+        sort: 40,
+        keepAlive: true,
       },
       {
         name: '在线用户',
         type: 'menu',
         path: '/system/online-user',
+        component: 'system/online-user/index',
         icon: 'RiGlobalLine',
-        sort: 40,
+        sort: 50,
+        keepAlive: true,
       },
     ],
+  },
+  {
+    name: '接口文档',
+    type: 'external',
+    path: 'http://localhost:3000/api/docs',
+    icon: 'RiCodeBoxLine',
+    sort: 20,
   },
   {
     // visible: false 的示例：路由可达但不出现在侧边栏，
@@ -98,8 +152,9 @@ const MENU_TREE: readonly MenuSeed[] = [
     name: '个人中心',
     type: 'menu',
     path: '/profile',
+    component: 'profile/index',
     icon: 'RiIdCardLine',
-    sort: 20,
+    sort: 30,
     visible: false,
   },
 ];
@@ -163,6 +218,84 @@ async function ensureSuperAdminRole(db: DrizzleDB): Promise<number> {
   console.log(`已创建内置角色 ${SUPER_ADMIN_ROLE.code}（数据权限：全部）`);
 
   return result.insertId;
+}
+
+async function ensureDefaultDepartment(db: DrizzleDB): Promise<number> {
+  const [existing] = await db
+    .select({ id: departments.id, deletedAt: departments.deletedAt })
+    .from(departments)
+    .where(eq(departments.code, DEFAULT_DEPARTMENT.code))
+    .limit(1);
+
+  if (existing) {
+    if (existing.deletedAt) {
+      throw new Error(
+        `默认部门编码 ${DEFAULT_DEPARTMENT.code} 被已删除部门占用，请先恢复或更换编码`,
+      );
+    }
+    return existing.id;
+  }
+
+  const [result] = await db.insert(departments).values({
+    ...DEFAULT_DEPARTMENT,
+    sort: 0,
+    status: 'active',
+  });
+  console.log(`已创建默认部门 ${DEFAULT_DEPARTMENT.name}`);
+  return result.insertId;
+}
+
+async function ensureUserDepartment(
+  db: DrizzleDB,
+  userId: number,
+  deptId: number,
+): Promise<void> {
+  await db
+    .update(users)
+    .set({ deptId })
+    .where(and(eq(users.id, userId), isNull(users.deptId)));
+}
+
+async function ensureDefaultPost(db: DrizzleDB): Promise<number> {
+  const [existing] = await db
+    .select({ id: posts.id, deletedAt: posts.deletedAt })
+    .from(posts)
+    .where(eq(posts.code, DEFAULT_POST.code))
+    .limit(1);
+
+  if (existing) {
+    if (existing.deletedAt) {
+      throw new Error(
+        `默认岗位编码 ${DEFAULT_POST.code} 被已删除岗位占用，请先恢复或更换编码`,
+      );
+    }
+    return existing.id;
+  }
+
+  const [result] = await db.insert(posts).values({
+    ...DEFAULT_POST,
+    sort: 0,
+    status: 'active',
+  });
+  console.log(`已创建默认岗位 ${DEFAULT_POST.name}`);
+  return result.insertId;
+}
+
+async function ensureUserPost(
+  db: DrizzleDB,
+  userId: number,
+  postId: number,
+): Promise<void> {
+  const [existing] = await db
+    .select({ userId: userPosts.userId })
+    .from(userPosts)
+    .where(and(eq(userPosts.userId, userId), eq(userPosts.postId, postId)))
+    .limit(1);
+
+  if (!existing) {
+    await db.insert(userPosts).values({ userId, postId });
+    console.log(`已将岗位 ${postId} 分配给用户 ${userId}`);
+  }
 }
 
 async function ensureUserRole(
@@ -249,7 +382,7 @@ async function ensureMenuTree(
         );
 
     const [existing] = await db
-      .select({ id: menus.id })
+      .select({ id: menus.id, component: menus.component })
       .from(menus)
       .where(and(isNull(menus.deletedAt), matcher))
       .limit(1);
@@ -258,15 +391,29 @@ async function ensureMenuTree(
 
     if (existing) {
       id = existing.id;
+
+      if (seed.component && !existing.component) {
+        await db
+          .update(menus)
+          .set({
+            component: seed.component,
+            ...(seed.keepAlive === undefined
+              ? {}
+              : { keepAlive: seed.keepAlive }),
+          })
+          .where(eq(menus.id, id));
+      }
     } else {
       const [result] = await db.insert(menus).values({
         parentId,
         name: seed.name,
         type: seed.type,
         path: seed.path ?? null,
+        component: seed.component ?? null,
         icon: seed.icon ?? null,
         sort: seed.sort,
         visible: seed.visible ?? true,
+        keepAlive: seed.keepAlive ?? false,
         status: 'active',
       });
 
@@ -295,6 +442,10 @@ async function seed(): Promise<void> {
 
   try {
     const userId = await ensureAdminUser(db);
+    const deptId = await ensureDefaultDepartment(db);
+    await ensureUserDepartment(db, userId, deptId);
+    const postId = await ensureDefaultPost(db);
+    await ensureUserPost(db, userId, postId);
     const roleId = await ensureSuperAdminRole(db);
     await ensureUserRole(db, userId, roleId);
     await ensurePermissions(db);

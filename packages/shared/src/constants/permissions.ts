@@ -15,10 +15,26 @@ export const PERMISSIONS = {
   USER_DELETE: 'system:user:delete',
   /** 给用户分配角色，与改用户资料分开，因为它实际是在授权 */
   USER_ASSIGN_ROLE: 'system:user:assign-role',
+  /** 给用户分配岗位，与角色授权分开。 */
+  USER_ASSIGN_POST: 'system:user:assign-post',
   /** 查看用户的在线设备。与下线拆开：看是只读，踢是写 */
   USER_SESSION_LIST: 'system:user:session:list',
   /** 强制用户下线：吊销其全部或指定 refreshToken */
   USER_FORCE_LOGOUT: 'system:user:force-logout',
+
+  DEPT_LIST: 'system:dept:list',
+  DEPT_READ: 'system:dept:read',
+  DEPT_CREATE: 'system:dept:create',
+  DEPT_UPDATE: 'system:dept:update',
+  DEPT_DELETE: 'system:dept:delete',
+  /** 查看部门迁移轨迹，与部门资料查看权限分开。 */
+  DEPT_TRANSFER_LIST: 'system:dept:transfer:list',
+
+  POST_LIST: 'system:post:list',
+  POST_READ: 'system:post:read',
+  POST_CREATE: 'system:post:create',
+  POST_UPDATE: 'system:post:update',
+  POST_DELETE: 'system:post:delete',
 
   ROLE_LIST: 'system:role:list',
   ROLE_READ: 'system:role:read',
@@ -64,6 +80,11 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
     module: 'system',
   },
   {
+    code: PERMISSIONS.USER_ASSIGN_POST,
+    name: '给用户分配岗位',
+    module: 'system',
+  },
+  {
     code: PERMISSIONS.USER_SESSION_LIST,
     name: '查看用户在线设备',
     module: 'system',
@@ -73,6 +94,21 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
     name: '强制用户下线',
     module: 'system',
   },
+  { code: PERMISSIONS.DEPT_LIST, name: '查询部门树', module: 'system' },
+  { code: PERMISSIONS.DEPT_READ, name: '查看部门详情', module: 'system' },
+  { code: PERMISSIONS.DEPT_CREATE, name: '新增部门', module: 'system' },
+  { code: PERMISSIONS.DEPT_UPDATE, name: '更新部门', module: 'system' },
+  { code: PERMISSIONS.DEPT_DELETE, name: '删除部门', module: 'system' },
+  {
+    code: PERMISSIONS.DEPT_TRANSFER_LIST,
+    name: '查看部门迁移记录',
+    module: 'system',
+  },
+  { code: PERMISSIONS.POST_LIST, name: '查询岗位列表', module: 'system' },
+  { code: PERMISSIONS.POST_READ, name: '查看岗位详情', module: 'system' },
+  { code: PERMISSIONS.POST_CREATE, name: '新增岗位', module: 'system' },
+  { code: PERMISSIONS.POST_UPDATE, name: '更新岗位', module: 'system' },
+  { code: PERMISSIONS.POST_DELETE, name: '删除岗位', module: 'system' },
   { code: PERMISSIONS.ROLE_LIST, name: '查询角色列表', module: 'system' },
   { code: PERMISSIONS.ROLE_READ, name: '查看角色详情', module: 'system' },
   { code: PERMISSIONS.ROLE_CREATE, name: '新增角色', module: 'system' },

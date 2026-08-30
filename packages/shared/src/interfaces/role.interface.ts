@@ -23,6 +23,7 @@ export interface Role {
 export interface RoleDetail extends Role {
   permissionIds: number[];
   menuIds: number[];
+  departmentIds: number[];
 }
 
 /** 权限码目录项，角色授权界面按 module 分组展示 */

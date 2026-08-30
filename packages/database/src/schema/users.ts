@@ -1,5 +1,6 @@
 import { STATUS } from '@nest-admin/shared';
 import {
+  type AnyMySqlColumn,
   index,
   mysqlEnum,
   mysqlTable,
@@ -9,11 +10,17 @@ import {
 } from 'drizzle-orm/mysql-core';
 
 import { auditColumns, primaryId } from './columns';
+import { departments } from './departments';
+import { foreignId } from './columns';
 
 export const users = mysqlTable(
   'sys_user',
   {
     id: primaryId(),
+    deptId: foreignId('dept_id').references(
+      (): AnyMySqlColumn => departments.id,
+      { onDelete: 'restrict' },
+    ),
     username: varchar('username', { length: 32 }).notNull(),
     /** bcrypt 哈希，任何对外返回都必须剔除该字段 */
     password: varchar('password', { length: 100 }).notNull(),
@@ -28,6 +35,7 @@ export const users = mysqlTable(
   (table) => [
     uniqueIndex('uk_sys_user_username').on(table.username),
     index('idx_sys_user_status').on(table.status),
+    index('idx_sys_user_dept_id').on(table.deptId),
   ],
 );
 

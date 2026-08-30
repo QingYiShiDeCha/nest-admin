@@ -13,6 +13,7 @@
 /** 登录/注册返回的用户体（不含角色权限） */
 export interface BasicUser {
   id: number;
+  deptId: number | null;
   username: string;
   nickname: string | null;
   email: string | null;
@@ -22,6 +23,11 @@ export interface BasicUser {
   lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** 用户管理列表在基础用户信息上补充已分配岗位名称。 */
+export interface UserListItem extends BasicUser {
+  postNames: string[];
 }
 
 /** /auth/profile 的返回：用户 + 授权信息 */
