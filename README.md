@@ -1,12 +1,12 @@
 # nest-admin
 
-基于 NestJS 11、Vue 3、Drizzle ORM 和 MySQL 8 的全栈后台管理系统，采用 pnpm monorepo 组织。项目已经覆盖认证与会话安全、RBAC、用户/角色/菜单管理、操作日志、在线用户、文件上传、主题切换和通用表格/图表组件，可直接作为管理后台的开发基础。
+基于 NestJS 11、Vue 3、Drizzle ORM 和 MySQL 8 的全栈后台管理系统，采用 pnpm monorepo 组织。项目已经覆盖认证与会话安全、RBAC、用户/角色/菜单/组织架构/岗位管理、部门数据权限、操作日志、在线用户、文件上传、主题切换和通用表格/图表组件，可直接作为管理后台的开发基础。
 
 ## 已实现功能
 
 - **认证与会话**：access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效。
-- **RBAC**：用户、角色、权限码、菜单树和按钮级权限控制，内置超管防自锁规则。
-- **系统管理**：用户、角色、菜单、操作日志、在线用户等页面，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
+- **RBAC**：用户、角色、权限码、菜单树、部门数据范围和按钮级权限控制，内置超管防自锁规则。
+- **系统管理**：用户、组织架构、岗位、角色、菜单、操作日志、在线用户等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
 - **界面基础设施**：浅色/深色/跟随系统主题、可切换主色和菜单风格、KeepAlive 页签、内容区独立刷新、Remix Icon 图标体系。
 - **数据展示**：封装折线图、柱状图、饼图/环形图和热力图，统一处理主题、自适应尺寸、空状态和动画。
 - **文件与头像**：本地或 S3 兼容存储，个人中心支持上传头像，图片地址统一适配 API 前缀。
@@ -115,7 +115,7 @@ pnpm dev
 | `pnpm db:migrate`                 | 把未执行的迁移应用到数据库                                                          |
 | `pnpm db:push`                    | 不生成迁移文件直接同步 schema，**仅限本地试验**                                     |
 | `pnpm db:studio`                  | 打开 Drizzle Studio 可视化查看数据                                                  |
-| `pnpm db:seed`                    | 幂等地创建初始管理员、权限码目录和默认菜单树                                        |
+| `pnpm db:seed`                    | 幂等地创建初始管理员、根部门、默认岗位、权限码目录和默认菜单树                      |
 
 要只操作某个包，用 `pnpm --filter @nest-admin/api <script>`。
 
@@ -171,11 +171,17 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 **超管短路**。持有 `super_admin` 角色的用户在 `PermissionGuard` 里直接放行，不参与权限码比对。这不是图省事——没有这条兜底，一旦权限数据配错或被清空，管理员会连「修复权限」的接口都调不了，只能去数据库手工插数据。所以超管的 `permissions` 字段返回空数组，前端见到 `isSuperAdmin: true` 应视为拥有全部权限。
 
-**授权接口是全量替换语义**。`PUT /roles/:id/permissions` 传入的集合就是最终结果，未包含的视为撤销，空数组清空全部。比增量的 add/remove 少一半接口，也不会因为前端漏发某一项而产生「以为撤销了其实没撤销」的偏差。替换在事务里完成（先删后插），已实测插入失败时删除会回滚。
+**授权与分配接口是全量替换语义**。`PUT /roles/:id/permissions` 和 `PUT /users/:id/posts` 传入的集合就是最终结果，未包含的视为撤销，空数组清空全部。比增量的 add/remove 少一半接口，也不会因为前端漏发某一项而产生「以为撤销了其实没撤销」的偏差。替换在事务里完成（先删后插），已实测插入失败时删除会回滚。
+
+**部门与数据范围**。`sys_dept` 是自关联组织树，一个用户最多直属一个部门。角色的 `data_scope` 支持全部、本部门、本部门及下级、仅本人和自定义部门；自定义集合保存在 `sys_role_dept`。同一用户拥有多个角色时取范围并集，超级管理员始终查看全部。部门有子部门或直属用户时拒绝删除，停用部门不可再作为父部门或分配给用户。
+
+**部门迁移可追溯**。变更 `parent_id` 时必须提交迁移原因；部门更新与 `sys_dept_transfer_log` 历史写入在同一事务完成，并用原父级作为更新条件防止并发迁移生成错误记录。历史表保存部门、原父级、新父级和操作人的名称快照，因此后续改名或删除不会改变既有审计语义。
+
+**岗位与用户关系**。`sys_post` 保存岗位主数据，`sys_user_post` 支持一个用户拥有多个岗位。停用岗位不能新增分配，但已有关系可保留或解除；岗位仍有有效用户时拒绝删除。用户岗位接口同样受当前管理员的数据范围约束，不能通过猜测用户 ID 越权分配。
 
 **几条防自锁规则**。内置角色（`is_system`）不可删除、不可停用、不可改角色码——停用超管角色会把所有管理员一起锁在系统外；改角色码会让守卫里的超管短路判断失效。另外不允许修改自己的角色，否则误摘超管后只能去数据库手工恢复。改名称和备注不受限制。
 
-**菜单树的几条规则**。节点分三类：`directory` 只做分组、不对应页面也不能有 `component`；`menu` 必须有 `path` 和 `component`；`external` 的 `path` 必须是完整 URL。只有目录能当父节点。改 `parentId` 时会拒绝指向自己或自己的后代，避免子树脱离主干成环。删除和「目录改成其他类型」在还有子节点时都会被拒绝——级联删一棵子树不可逆，让调用方显式逐个确认更安全。
+**菜单树的几条规则**。节点分三类：`directory` 只做分组、不对应页面也不能有 `component`；`menu` 必须有 `path`，前端根据当前用户菜单动态注册路由，`component` 可填写相对 `apps/web/src/views` 的组件路径，也可留空并按 `path` 自动匹配对应目录下的 `index.vue`；`external` 的 `path` 必须是完整 URL。只有目录能当父节点。改 `parentId` 时会拒绝指向自己或自己的后代，避免子树脱离主干成环。删除和「目录改成其他类型」在还有子节点时都会被拒绝——级联删一棵子树不可逆，让调用方显式逐个确认更安全。
 
 `GET /menus/mine` 是前端渲染侧边栏的入口，不需要菜单管理权限。超管拿到全部启用菜单，其余按角色授权返回，并且**会自动补齐授权节点的祖先**：只授子菜单而没授父目录时，子节点会因为找不到父亲而在建树时被丢掉，整块入口就消失了。反过来，停用一个目录会连带隐藏它下面的所有入口。`visible: false` 的节点仍会返回，它表示「不在侧边栏显示但路由可访问」（详情页那类），由前端决定怎么处理。
 
@@ -233,29 +239,36 @@ RBAC 采用**菜单与权限分离**：`sys_menu` 只回答「看得见什么」
 
 ```
 sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >── sys_permission
-                                   │
-                                   └──< sys_role_menu >── sys_menu (自引用树)
+    │                              ├──< sys_role_menu >── sys_menu (自引用树)
+    ├── sys_dept (自引用树)        └──< sys_role_dept >── sys_dept
+    │       └──< sys_dept_transfer_log
+    └──< sys_user_post >── sys_post
 ```
 
 | 表                    | 作用                            | 关键约束                                                         |
 | --------------------- | ------------------------------- | ---------------------------------------------------------------- |
-| `sys_user`            | 用户                            | `username` 唯一                                                  |
+| `sys_user`            | 用户                            | `username` 唯一；`dept_id` 指向直属部门                          |
+| `sys_dept`            | 部门组织树                      | `code` 唯一；`parent_id` 组成层级                                |
+| `sys_dept_transfer_log` | 部门迁移历史                  | append-only；保存迁移前后父级、原因与操作人名称快照              |
+| `sys_post`            | 岗位主数据                      | `code` 唯一；停用后不可新增用户分配                              |
 | `sys_role`            | 角色                            | `code` 唯一；`data_scope` 数据权限范围；`is_system` 内置角色保护 |
 | `sys_permission`      | 权限码，如 `system:user:delete` | `code` 唯一；`module` 用于分配界面分组                           |
 | `sys_menu`            | 前端路由菜单树                  | `parent_id` 自引用，`type` 为 directory / menu / external        |
 | `sys_user_role`       | 用户授角色                      | 联合主键                                                         |
+| `sys_user_post`       | 用户分配岗位                    | 联合主键                                                         |
 | `sys_role_permission` | 角色授权限                      | 联合主键                                                         |
 | `sys_role_menu`       | 角色授菜单                      | 联合主键                                                         |
+| `sys_role_dept`       | 角色自定义部门范围              | 联合主键                                                         |
 | `sys_refresh_token`   | 登录设备会话                    | `jti` 唯一；记录过期、吊销、轮换链、IP 与 User-Agent             |
 | `sys_operation_log`   | 操作审计日志                    | append-only；保存脱敏参数、结果、耗时与客户端信息                |
 
 几条贯穿全表的约定：
 
-**软删除**。业务主表都有 `deleted_at`，非空即已删除。所有业务查询必须叠加 `isNull(deletedAt)`——`UserService` 里的 `alive()` 辅助函数就是干这个的，新写查询时照抄。三张关联表不软删除：解绑就是真删行，授权关系只有"有"和"没有"两种状态。
+**软删除**。业务主表都有 `deleted_at`，非空即已删除。所有业务查询必须叠加 `isNull(deletedAt)`——`UserService` 里的 `alive()` 辅助函数就是干这个的，新写查询时照抄。关联表不软删除：解绑就是真删行，关系只有"有"和"没有"两种状态。
 
-**唯一码删除后不可复用**。`sys_role.code`、`sys_permission.code`、`sys_user.username` 的唯一索引覆盖已软删除的行。这是有意为之：权限码会被前端和守卫元数据引用，让新角色复用一个被删除的旧码，等于把历史授权语义悄悄还给了它。相应地，`UserService.create` 的重名预检查查的是全量而非仅未删除的行，否则会先告诉调用方"可用"再在插入时撞 `ER_DUP_ENTRY`。
+**唯一码删除后不可复用**。`sys_role.code`、`sys_post.code`、`sys_permission.code`、`sys_user.username` 的唯一索引覆盖已软删除的行。这是有意为之：权限码和业务编码会被授权关系、菜单或历史数据引用，复用旧码会把历史语义悄悄交给新记录。相应地，创建前的重名预检查查的是全量而非仅未删除的行，否则会先告诉调用方"可用"再在插入时撞 `ER_DUP_ENTRY`。
 
-**关联表带外键且 `ON DELETE CASCADE`**。主表虽走软删除、级联极少触发，但一旦真的物理清理数据，不会留下悬空的授权行。
+**关联表带外键且 `ON DELETE CASCADE`**。主表虽走软删除、级联极少触发，但一旦真的物理清理数据，不会留下悬空的授权行。用户所属部门使用 `ON DELETE RESTRICT`，物理清理前也必须先处理归属关系。
 
 **审计字段自动填充**。`created_by` / `updated_by` 由 `RequestContext` 统一写入，service 里只要 `...this.ctx.auditOnCreate()` 或 `...this.ctx.auditOnUpdate()`，不需要把 `operatorId` 从 controller 一路当参数传下来。
 
@@ -276,7 +289,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | DELETE | `/api/auth/sessions/:id`              | 仅需登录                   | 下线自己的指定设备                                  |
 | POST   | `/api/auth/sessions/revoke-others`    | 仅需登录                   | 下线除当前设备外的全部会话                          |
 | GET    | `/api/auth/profile`                   | 需要                       | 当前登录用户信息，含角色码与权限码                  |
-| GET    | `/api/users`                          | `system:user:list`         | 分页查询，支持 `keyword` / `status`                 |
+| GET    | `/api/users`                          | `system:user:list`         | 按数据范围分页，支持用户、状态和部门筛选            |
 | POST   | `/api/users`                          | `system:user:create`       | 新增用户                                            |
 | GET    | `/api/users/:id`                      | `system:user:read`         | 用户详情                                            |
 | PATCH  | `/api/users/:id`                      | `system:user:update`       | 更新用户（不含用户名和密码）                        |
@@ -289,9 +302,16 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | PUT    | `/api/users/me/password`              | 仅需登录                   | 修改自己的密码，需校验旧密码                        |
 | GET    | `/api/users/:id/roles`                | `system:user:assign-role`  | 用户已分配的角色 id，供分配界面回显                 |
 | PUT    | `/api/users/:id/roles`                | `system:user:assign-role`  | 全量替换用户的角色                                  |
+| GET    | `/api/users/:id/posts`                | `system:user:assign-post`  | 用户已分配的岗位 id                                 |
+| PUT    | `/api/users/:id/posts`                | `system:user:assign-post`  | 全量替换用户岗位                                    |
+| GET    | `/api/posts`                          | `system:post:list`         | 分页查询岗位及用户数                                |
+| POST   | `/api/posts`                          | `system:post:create`       | 新增岗位                                            |
+| GET    | `/api/posts/:id`                      | `system:post:read`         | 查询岗位详情                                        |
+| PATCH  | `/api/posts/:id`                      | `system:post:update`       | 更新岗位                                            |
+| DELETE | `/api/posts/:id`                      | `system:post:delete`       | 删除未分配用户的岗位                                |
 | GET    | `/api/roles`                          | `system:role:list`         | 分页查询角色                                        |
 | POST   | `/api/roles`                          | `system:role:create`       | 新增角色                                            |
-| GET    | `/api/roles/:id`                      | `system:role:read`         | 角色详情，含 `permissionIds` / `menuIds`            |
+| GET    | `/api/roles/:id`                      | `system:role:read`         | 角色详情，含权限、菜单和自定义部门 id               |
 | PATCH  | `/api/roles/:id`                      | `system:role:update`       | 更新角色                                            |
 | DELETE | `/api/roles/:id`                      | `system:role:delete`       | 删除角色（软删除）                                  |
 | PUT    | `/api/roles/:id/permissions`          | `system:role:assign`       | 全量替换角色的权限码                                |
@@ -308,13 +328,19 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | GET    | `/api/menus/:id`                      | `system:menu:read`         | 菜单详情                                            |
 | PATCH  | `/api/menus/:id`                      | `system:menu:update`       | 更新菜单                                            |
 | DELETE | `/api/menus/:id`                      | `system:menu:delete`       | 删除菜单（软删除），有子菜单时拒绝                  |
+| GET    | `/api/departments`                    | `system:dept:list`         | 查询部门树，搜索时保留祖先节点                      |
+| POST   | `/api/departments`                    | `system:dept:create`       | 新增部门                                            |
+| GET    | `/api/departments/:id`                | `system:dept:read`         | 查询部门详情                                        |
+| GET    | `/api/departments/:id/transfers`      | `system:dept:transfer:list` | 分页查询部门迁移历史                               |
+| PATCH  | `/api/departments/:id`                | `system:dept:update`       | 更新或移动部门；移动时迁移原因必填                  |
+| DELETE | `/api/departments/:id`                | `system:dept:delete`       | 删除空部门，有下级或直属用户时拒绝                  |
 
 ## 尚未包含
 
 按当前范围刻意留白的部分，后续要做时的落点：
 
 - **日志归档到冷存储**。目前超期日志是直接物理删除。若有合规要求需要长期留存，应在 `LogCleanupService` 删除前先导出到对象存储或归档表。
-- **部门表与数据权限**。`sys_role.data_scope` 已经落库但还没有任何地方消费它，需要先有 `sys_dept` 才能把「本部门」「本部门及以下」这些范围翻译成查询条件。
+- **通用数据权限适配**。部门数据范围当前已用于用户列表；后续业务模块需要在各自查询入口复用 `DataScopeService`，按资源所有者或部门字段追加条件。
 - **Redis 业务缓存**。限流与清理任务分布式锁已经使用 Redis，用户和权限数据尚未做缓存。
 - **实时在线状态**。在线用户当前按有效登录会话判断，不包含 WebSocket 心跳、最后活跃时间或 IP 地理位置；浏览器关闭但会话未过期时仍会显示在线。
 - **鉴权查询缓存**。`JwtStrategy` 每个受保护请求都会校验会话、用户和授权，好处是退出、禁用与权限变更立即生效；量大时需要引入带主动失效机制的缓存。
