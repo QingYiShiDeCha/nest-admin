@@ -6,20 +6,27 @@ import type {
   LoginResult,
   MenuNode,
   MenuRecord,
+  Notice,
+  NoticeDetail,
+  NoticeListItem,
+  NoticeMessage,
   OnlineUserSession,
   OperationLog,
   Post,
   PostListItem,
   Role,
   RoleDetail,
+  SystemConfig,
   UserProfile,
   UserListItem,
 } from '@nest-admin/shared';
 import type {
   MenuRow,
+  NoticeRow,
   OperationLogRow,
   PostRow,
   RoleRow,
+  SystemConfigRow,
   SafeUser,
   DepartmentTransferRow,
 } from '@nest-admin/database';
@@ -29,6 +36,11 @@ import type { OnlineUserSessionRow } from './modules/auth/refresh-token.service'
 import type { MenuTreeNode } from './modules/rbac/menu.service';
 import type { RoleDetail as BackendRoleDetail } from './modules/rbac/role.service';
 import type { PostListRecord } from './modules/rbac/post.service';
+import type {
+  NoticeDetailRecord,
+  NoticeListRecord,
+} from './modules/notice/notice.service';
+import type { NoticeMessageRecord } from './modules/notice/message.service';
 import type {
   DepartmentRecord,
   DepartmentTreeNode,
@@ -119,6 +131,25 @@ type OnlineUserSessionContract = Assert<
   Serialized<OnlineUserSessionRow> extends OnlineUserSession ? true : false
 >;
 
+// ---- 通知公告 ----
+type NoticeContract = Assert<
+  Serialized<NoticeRow> extends Notice ? true : false
+>;
+type NoticeListContract = Assert<
+  Serialized<NoticeListRecord> extends NoticeListItem ? true : false
+>;
+type NoticeDetailContract = Assert<
+  Serialized<NoticeDetailRecord> extends NoticeDetail ? true : false
+>;
+type NoticeMessageContract = Assert<
+  Serialized<NoticeMessageRecord> extends NoticeMessage ? true : false
+>;
+
+// ---- 系统参数 ----
+type SystemConfigContract = Assert<
+  Serialized<SystemConfigRow> extends SystemConfig ? true : false
+>;
+
 // 引用一遍，防止被认为未使用而被工具清理；同时让 IDE 悬停可查
 export type WireContractChecks = [
   BasicUserContract,
@@ -136,4 +167,9 @@ export type WireContractChecks = [
   MenuNodeContract,
   OperationLogContract,
   OnlineUserSessionContract,
+  NoticeContract,
+  NoticeListContract,
+  NoticeDetailContract,
+  NoticeMessageContract,
+  SystemConfigContract,
 ];

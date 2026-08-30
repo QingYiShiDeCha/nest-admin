@@ -21,7 +21,9 @@ import { FileModule } from './modules/file/file.module';
 import { PermissionGuard } from './modules/rbac/guards/permission.guard';
 import { OperationLogInterceptor } from './modules/operation-log/operation-log.interceptor';
 import { OperationLogModule } from './modules/operation-log/operation-log.module';
+import { NoticeModule } from './modules/notice/notice.module';
 import { RbacModule } from './modules/rbac/rbac.module';
+import { SystemConfigModule } from './modules/system-config/system-config.module';
 import { UserModule } from './modules/user/user.module';
 import { REDIS_CLIENT, type RedisClient } from './redis/redis.constants';
 import { RedisModule } from './redis/redis.module';
@@ -63,7 +65,9 @@ import { RedisModule } from './redis/redis.module';
     RefreshTokenModule,
     FileModule,
     OperationLogModule,
+    NoticeModule,
     RbacModule,
+    SystemConfigModule,
     AuthModule,
     UserModule,
   ],

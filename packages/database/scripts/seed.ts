@@ -12,6 +12,7 @@ import {
   permissions,
   posts,
   roles,
+  systemConfigs,
   userPosts,
   userRoles,
   users,
@@ -40,6 +41,23 @@ const DEFAULT_POST = {
   code: 'system_admin',
   name: '系统管理员',
 };
+
+const DEFAULT_SYSTEM_CONFIGS = [
+  {
+    name: '系统名称',
+    key: 'system.name',
+    value: 'Nest Admin',
+    valueType: 'string',
+    remark: '系统展示名称',
+  },
+  {
+    name: '默认分页条数',
+    key: 'system.pagination.default_page_size',
+    value: '10',
+    valueType: 'number',
+    remark: '列表组件默认分页条数',
+  },
+] as const;
 
 interface MenuSeed {
   name: string;
@@ -129,12 +147,30 @@ const MENU_TREE: readonly MenuSeed[] = [
         keepAlive: true,
       },
       {
+        name: '通知公告',
+        type: 'menu',
+        path: '/system/notice',
+        component: 'system/notice/index',
+        icon: 'RiNotification3Line',
+        sort: 45,
+        keepAlive: true,
+      },
+      {
         name: '在线用户',
         type: 'menu',
         path: '/system/online-user',
         component: 'system/online-user/index',
         icon: 'RiGlobalLine',
         sort: 50,
+        keepAlive: true,
+      },
+      {
+        name: '参数配置',
+        type: 'menu',
+        path: '/system/config',
+        component: 'system/config/index',
+        icon: 'RiListSettingsLine',
+        sort: 55,
         keepAlive: true,
       },
     ],
@@ -298,6 +334,28 @@ async function ensureUserPost(
   }
 }
 
+async function ensureDefaultSystemConfigs(db: DrizzleDB): Promise<void> {
+  for (const config of DEFAULT_SYSTEM_CONFIGS) {
+    const [existing] = await db
+      .select({ id: systemConfigs.id, deletedAt: systemConfigs.deletedAt })
+      .from(systemConfigs)
+      .where(eq(systemConfigs.key, config.key))
+      .limit(1);
+
+    if (existing?.deletedAt) {
+      throw new Error(`内置参数键 ${config.key} 被已删除参数占用`);
+    }
+    if (existing) continue;
+
+    await db.insert(systemConfigs).values({
+      ...config,
+      builtIn: true,
+      status: 'active',
+    });
+    console.log(`已创建内置参数 ${config.key}`);
+  }
+}
+
 async function ensureUserRole(
   db: DrizzleDB,
   userId: number,
@@ -449,6 +507,7 @@ async function seed(): Promise<void> {
     const roleId = await ensureSuperAdminRole(db);
     await ensureUserRole(db, userId, roleId);
     await ensurePermissions(db);
+    await ensureDefaultSystemConfigs(db);
 
     const createdMenus = await ensureMenuTree(db, MENU_TREE);
     console.log(

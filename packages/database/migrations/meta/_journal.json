@@ -64,6 +64,20 @@
       "when": 1788076844705,
       "tag": "0008_neat_kree",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1788081070670,
+      "tag": "0009_broken_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1788089772243,
+      "tag": "0010_steady_tinkerer",
+      "breakpoints": true
     }
   ]
 }

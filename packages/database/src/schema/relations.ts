@@ -8,6 +8,9 @@ import {
   userRoles,
 } from './grants';
 import { menus } from './menus';
+import { noticeRecipients } from './notice-recipients';
+import { noticeTargets } from './notice-targets';
+import { notices } from './notices';
 import { permissions } from './permissions';
 import { posts } from './posts';
 import { roles } from './roles';
@@ -31,7 +34,34 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   }),
   userPosts: many(userPosts),
   userRoles: many(userRoles),
+  noticeRecipients: many(noticeRecipients),
 }));
+
+export const noticesRelations = relations(notices, ({ many }) => ({
+  targets: many(noticeTargets),
+  recipients: many(noticeRecipients),
+}));
+
+export const noticeTargetsRelations = relations(noticeTargets, ({ one }) => ({
+  notice: one(notices, {
+    fields: [noticeTargets.noticeId],
+    references: [notices.id],
+  }),
+}));
+
+export const noticeRecipientsRelations = relations(
+  noticeRecipients,
+  ({ one }) => ({
+    notice: one(notices, {
+      fields: [noticeRecipients.noticeId],
+      references: [notices.id],
+    }),
+    user: one(users, {
+      fields: [noticeRecipients.userId],
+      references: [users.id],
+    }),
+  }),
+);
 
 export const postsRelations = relations(posts, ({ many }) => ({
   userPosts: many(userPosts),

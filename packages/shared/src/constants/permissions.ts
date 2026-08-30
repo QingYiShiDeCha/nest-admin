@@ -55,6 +55,20 @@ export const PERMISSIONS = {
   /** 手动触发日志清理 */
   LOG_CLEAN: 'system:log:clean',
 
+  NOTICE_LIST: 'system:notice:list',
+  NOTICE_READ: 'system:notice:read',
+  NOTICE_CREATE: 'system:notice:create',
+  NOTICE_UPDATE: 'system:notice:update',
+  NOTICE_DELETE: 'system:notice:delete',
+  NOTICE_PUBLISH: 'system:notice:publish',
+  NOTICE_WITHDRAW: 'system:notice:withdraw',
+
+  CONFIG_LIST: 'system:config:list',
+  CONFIG_READ: 'system:config:read',
+  CONFIG_CREATE: 'system:config:create',
+  CONFIG_UPDATE: 'system:config:update',
+  CONFIG_DELETE: 'system:config:delete',
+
   /** 权限码目录只读，供角色授权界面拉取可选项 */
   PERMISSION_LIST: 'system:permission:list',
 } as const;
@@ -127,6 +141,18 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   { code: PERMISSIONS.LOG_LIST, name: '查询操作日志', module: 'system' },
   { code: PERMISSIONS.LOG_READ, name: '查看日志详情', module: 'system' },
   { code: PERMISSIONS.LOG_CLEAN, name: '手动清理日志', module: 'system' },
+  { code: PERMISSIONS.NOTICE_LIST, name: '查询通知公告', module: 'system' },
+  { code: PERMISSIONS.NOTICE_READ, name: '查看通知公告', module: 'system' },
+  { code: PERMISSIONS.NOTICE_CREATE, name: '新增通知公告', module: 'system' },
+  { code: PERMISSIONS.NOTICE_UPDATE, name: '更新通知公告', module: 'system' },
+  { code: PERMISSIONS.NOTICE_DELETE, name: '删除通知公告', module: 'system' },
+  { code: PERMISSIONS.NOTICE_PUBLISH, name: '发布通知公告', module: 'system' },
+  { code: PERMISSIONS.NOTICE_WITHDRAW, name: '撤回通知公告', module: 'system' },
+  { code: PERMISSIONS.CONFIG_LIST, name: '查询系统参数', module: 'system' },
+  { code: PERMISSIONS.CONFIG_READ, name: '查看系统参数', module: 'system' },
+  { code: PERMISSIONS.CONFIG_CREATE, name: '新增系统参数', module: 'system' },
+  { code: PERMISSIONS.CONFIG_UPDATE, name: '更新系统参数', module: 'system' },
+  { code: PERMISSIONS.CONFIG_DELETE, name: '删除系统参数', module: 'system' },
   {
     code: PERMISSIONS.PERMISSION_LIST,
     name: '查询权限码目录',
