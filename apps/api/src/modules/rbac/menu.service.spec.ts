@@ -49,6 +49,9 @@ describe('MenuService', () => {
           }),
         }),
       }),
+      update: () => ({
+        set: () => ({ where: () => Promise.resolve(undefined) }),
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -87,10 +90,20 @@ describe('MenuService', () => {
       ).rejects.toThrow(new BadRequestException('菜单必须填写 path'));
     });
 
-    it('菜单必须有 component', async () => {
+    it('静态路由模式下菜单可以不填写 component', async () => {
+      rows = [
+        menu(17, '组织架构', 1, {
+          path: '/system/department',
+          component: null,
+        }),
+      ];
+
       await expect(
-        create({ name: 'x', type: 'menu', path: '/x' }),
-      ).rejects.toThrow(new BadRequestException('菜单必须填写 component'));
+        service.update(17, { name: '组织架构' }),
+      ).resolves.toMatchObject({
+        id: 17,
+        component: null,
+      });
     });
 
     it('外链的 path 必须是完整 URL', async () => {

@@ -7,6 +7,8 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayUnique,
+  IsArray,
   IsEnum,
   IsInt,
   IsOptional,
@@ -49,13 +51,24 @@ export class CreateRoleDto {
   status?: Status;
 
   @ApiPropertyOptional({
-    description: '数据权限范围，部门表尚未落地，当前仅存储不生效',
+    description: '数据权限范围',
     enum: DATA_SCOPE,
     default: 'self',
   })
   @IsEnum(DATA_SCOPE)
   @IsOptional()
   dataScope?: DataScope;
+
+  @ApiPropertyOptional({
+    description: '自定义数据范围的部门 id 集合，仅 dataScope=custom 时使用',
+    type: [Number],
+  })
+  @IsArray()
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @IsOptional()
+  departmentIds?: number[];
 
   @ApiPropertyOptional({ description: '备注' })
   @IsString()

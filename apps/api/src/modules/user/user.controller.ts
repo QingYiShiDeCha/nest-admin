@@ -25,6 +25,8 @@ import { QueryUserDto } from './dto/query-user.dto';
 import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserService } from './user.service';
+import type { UserListItemRecord } from './user.service';
+import type { AuthUser } from '../auth/interfaces/auth-user.interface';
 
 @ApiTags('用户管理')
 @ApiBearerAuth()
@@ -41,10 +43,17 @@ export class UserController {
   }
 
   @Get()
-  @Permissions(PERMISSIONS.USER_LIST)
+  @Permissions(
+    PERMISSIONS.USER_LIST,
+    PERMISSIONS.DEPT_CREATE,
+    PERMISSIONS.DEPT_UPDATE,
+  )
   @ApiOperation({ summary: '分页查询用户' })
-  findPage(@Query() query: QueryUserDto): Promise<PaginatedResult<SafeUser>> {
-    return this.userService.findPage(query);
+  findPage(
+    @Query() query: QueryUserDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<PaginatedResult<UserListItemRecord>> {
+    return this.userService.findPage(query, user);
   }
 
   // 改自己的密码不需要用户管理权限，任何登录用户都可以

@@ -1,25 +1,39 @@
 import type {
   BasicUser,
+  Department,
+  DepartmentNode,
+  DepartmentTransfer,
   LoginResult,
   MenuNode,
   MenuRecord,
   OnlineUserSession,
   OperationLog,
+  Post,
+  PostListItem,
   Role,
   RoleDetail,
   UserProfile,
+  UserListItem,
 } from '@nest-admin/shared';
 import type {
   MenuRow,
   OperationLogRow,
+  PostRow,
   RoleRow,
   SafeUser,
+  DepartmentTransferRow,
 } from '@nest-admin/database';
 import type { AuthUser } from './modules/auth/interfaces/auth-user.interface';
 import type { AuthResult } from './modules/auth/interfaces/jwt-payload.interface';
 import type { OnlineUserSessionRow } from './modules/auth/refresh-token.service';
 import type { MenuTreeNode } from './modules/rbac/menu.service';
 import type { RoleDetail as BackendRoleDetail } from './modules/rbac/role.service';
+import type { PostListRecord } from './modules/rbac/post.service';
+import type {
+  DepartmentRecord,
+  DepartmentTreeNode,
+} from './modules/rbac/department.service';
+import type { UserListItemRecord } from './modules/user/user.service';
 
 /**
  * 线上契约与数据库行类型的编译期绑定。
@@ -60,6 +74,26 @@ type UserProfileContract = Assert<
 type LoginResultContract = Assert<
   Serialized<AuthResult> extends LoginResult ? true : false
 >;
+type UserListItemContract = Assert<
+  Serialized<UserListItemRecord> extends UserListItem ? true : false
+>;
+
+// ---- 部门 ----
+type DepartmentContract = Assert<
+  Serialized<DepartmentRecord> extends Department ? true : false
+>;
+type DepartmentNodeContract = Assert<
+  Serialized<DepartmentTreeNode> extends DepartmentNode ? true : false
+>;
+type DepartmentTransferContract = Assert<
+  Serialized<DepartmentTransferRow> extends DepartmentTransfer ? true : false
+>;
+
+// ---- 岗位 ----
+type PostContract = Assert<Serialized<PostRow> extends Post ? true : false>;
+type PostListContract = Assert<
+  Serialized<PostListRecord> extends PostListItem ? true : false
+>;
 
 // ---- 角色 ----
 type RoleContract = Assert<Serialized<RoleRow> extends Role ? true : false>;
@@ -90,6 +124,12 @@ export type WireContractChecks = [
   BasicUserContract,
   UserProfileContract,
   LoginResultContract,
+  UserListItemContract,
+  DepartmentContract,
+  DepartmentNodeContract,
+  DepartmentTransferContract,
+  PostContract,
+  PostListContract,
   RoleContract,
   RoleDetailContract,
   MenuRecordContract,

@@ -35,7 +35,7 @@ export class CreateMenuDto {
 
   @ApiProperty({
     description:
-      'directory 只做分组不对应页面；menu 需要 path 与 component；external 需要 path 为完整 URL',
+      'directory 只做分组不对应页面；menu 需要 path；external 需要 path 为完整 URL',
     enum: MENU_TYPE,
     default: 'menu',
   })
@@ -49,7 +49,10 @@ export class CreateMenuDto {
   @IsOptional()
   path?: string;
 
-  @ApiPropertyOptional({ description: '前端组件路径，仅 menu 类型需要' })
+  @ApiPropertyOptional({
+    description:
+      '相对前端 views 的组件路径；可不填，前端会根据路由 path 自动匹配',
+  })
   @IsString()
   @MaxLength(255)
   @IsOptional()

@@ -1,6 +1,8 @@
 import {
+  departments,
   menus,
   permissions,
+  roleDepartments,
   roleMenus,
   rolePermissions,
   roles,
@@ -43,6 +45,7 @@ import type { UpdateRoleDto } from './dto/update-role.dto';
 export interface RoleDetail extends RoleRow {
   permissionIds: number[];
   menuIds: number[];
+  departmentIds: number[];
 }
 
 /** 统一叠加「未软删除」，所有面向业务的角色查询都必须走它 */
@@ -86,7 +89,7 @@ export class RoleService {
   async findDetail(id: number): Promise<RoleDetail> {
     const role = await this.findRoleOrFail(id);
 
-    const [permissionRows, menuRows] = await Promise.all([
+    const [permissionRows, menuRows, departmentRows] = await Promise.all([
       this.db
         .select({ id: rolePermissions.permissionId })
         .from(rolePermissions)
@@ -95,23 +98,49 @@ export class RoleService {
         .select({ id: roleMenus.menuId })
         .from(roleMenus)
         .where(eq(roleMenus.roleId, id)),
+      this.db
+        .select({ id: roleDepartments.deptId })
+        .from(roleDepartments)
+        .where(eq(roleDepartments.roleId, id)),
     ]);
 
     return {
       ...role,
       permissionIds: permissionRows.map((row) => row.id),
       menuIds: menuRows.map((row) => row.id),
+      departmentIds: departmentRows.map((row) => row.id),
     };
   }
 
   async create(dto: CreateRoleDto): Promise<RoleRow> {
-    await this.assertCodeAvailable(dto.code);
+    const { departmentIds = [], ...roleValues } = dto;
+    await Promise.all([
+      this.assertCodeAvailable(dto.code),
+      this.assertDepartmentSelection(
+        roleValues.dataScope ?? 'self',
+        departmentIds,
+      ),
+    ]);
 
-    const [result] = await this.db
-      .insert(roles)
-      .values({ ...dto, ...this.ctx.auditOnCreate() });
+    const roleId = await this.db.transaction(async (tx) => {
+      const [result] = await tx
+        .insert(roles)
+        .values({ ...roleValues, ...this.ctx.auditOnCreate() });
 
-    return this.findRoleOrFail(result.insertId);
+      if (departmentIds.length > 0) {
+        await tx.insert(roleDepartments).values(
+          departmentIds.map((deptId) => ({
+            roleId: result.insertId,
+            deptId,
+            createdBy: this.ctx.userId,
+          })),
+        );
+      }
+
+      return result.insertId;
+    });
+
+    return this.findRoleOrFail(roleId);
   }
 
   async update(id: number, dto: UpdateRoleDto): Promise<RoleRow> {
@@ -120,32 +149,64 @@ export class RoleService {
     }
 
     const role = await this.findRoleOrFail(id);
+    const { departmentIds, ...roleValues } = dto;
 
     if (role.isSystem) {
       // 内置角色的标识和启用状态锁死：改了 code 会让超管短路判断失效，
       // 禁用它会把所有超管一起锁在系统外
-      if (dto.code !== undefined && dto.code !== role.code) {
+      if (roleValues.code !== undefined && roleValues.code !== role.code) {
         throw new ForbiddenException('内置角色的角色码不允许修改');
       }
-      if (dto.status !== undefined && dto.status !== role.status) {
+      if (
+        roleValues.status !== undefined &&
+        roleValues.status !== role.status
+      ) {
         throw new ForbiddenException('内置角色不允许停用');
       }
     }
 
-    if (dto.code !== undefined && dto.code !== role.code) {
-      await this.assertCodeAvailable(dto.code);
+    if (roleValues.code !== undefined && roleValues.code !== role.code) {
+      await this.assertCodeAvailable(roleValues.code);
     }
 
-    await this.db
-      .update(roles)
-      .set({ ...dto, ...this.ctx.auditOnUpdate() })
-      .where(aliveRole(eq(roles.id, id)));
+    const nextScope = roleValues.dataScope ?? role.dataScope;
+    if (departmentIds !== undefined) {
+      await this.assertDepartmentSelection(nextScope, departmentIds);
+    }
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(roles)
+        .set({ ...roleValues, ...this.ctx.auditOnUpdate() })
+        .where(aliveRole(eq(roles.id, id)));
+
+      if (
+        departmentIds !== undefined ||
+        (roleValues.dataScope !== undefined && nextScope !== 'custom')
+      ) {
+        await tx.delete(roleDepartments).where(eq(roleDepartments.roleId, id));
+
+        if (
+          nextScope === 'custom' &&
+          departmentIds &&
+          departmentIds.length > 0
+        ) {
+          await tx.insert(roleDepartments).values(
+            departmentIds.map((deptId) => ({
+              roleId: id,
+              deptId,
+              createdBy: this.ctx.userId,
+            })),
+          );
+        }
+      }
+    });
 
     return this.findRoleOrFail(id);
   }
 
   /**
-   * 软删除角色。授权关系（sys_user_role / sys_role_permission / sys_role_menu）
+   * 软删除角色。授权关系（用户、权限、菜单、自定义部门）
    * 刻意保留不删：PermissionService 查授权时会过滤掉已删除的角色，
    * 所以权限即刻失效；保留关系是为了将来支持恢复。
    */
@@ -313,6 +374,36 @@ export class RoleService {
 
       throw new BadRequestException(
         `以下${label} id 不存在或已删除：${missing.join(', ')}`,
+      );
+    }
+  }
+
+  private async assertDepartmentSelection(
+    dataScope: RoleRow['dataScope'],
+    departmentIds: number[],
+  ): Promise<void> {
+    if (dataScope !== 'custom' && departmentIds.length > 0) {
+      throw new BadRequestException('只有自定义数据范围可以配置部门');
+    }
+    if (departmentIds.length === 0) return;
+
+    const uniqueIds = [...new Set(departmentIds)];
+    const found = await this.db
+      .select({ id: departments.id })
+      .from(departments)
+      .where(
+        and(
+          inArray(departments.id, uniqueIds),
+          eq(departments.status, 'active'),
+          isNull(departments.deletedAt),
+        ),
+      );
+
+    if (found.length !== uniqueIds.length) {
+      const foundIds = new Set(found.map((row) => row.id));
+      const invalid = uniqueIds.filter((id) => !foundIds.has(id));
+      throw new BadRequestException(
+        `以下部门 id 不存在、已停用或已删除：${invalid.join(', ')}`,
       );
     }
   }

@@ -28,6 +28,7 @@ const CONFIG: Record<string, string> = {
 
 const USER: SafeUser = {
   id: 1,
+  deptId: null,
   username: 'admin',
   nickname: '超级管理员',
   email: null,

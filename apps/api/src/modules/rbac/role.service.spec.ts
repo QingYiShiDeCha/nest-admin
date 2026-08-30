@@ -101,6 +101,9 @@ describe('RoleService 的保护性规则', () => {
       set: () => ({ where: () => Promise.resolve(undefined) }),
     });
     (db as unknown as { update: unknown }).update = update;
+    (db as unknown as { transaction: unknown }).transaction = async (
+      callback: (tx: { update: typeof update }) => Promise<void>,
+    ) => callback({ update });
 
     await expect(service.update(2, { remark: 'ok' })).resolves.toBeDefined();
     expect(update).toHaveBeenCalled();

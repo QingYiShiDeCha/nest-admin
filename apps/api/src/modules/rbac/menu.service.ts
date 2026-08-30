@@ -202,10 +202,6 @@ export class MenuService {
       );
     }
 
-    if (type === 'menu' && !shape.component) {
-      throw new BadRequestException('菜单必须填写 component');
-    }
-
     if (type === 'external' && !/^https?:\/\//.test(shape.path)) {
       throw new BadRequestException(
         '外链的 path 必须以 http:// 或 https:// 开头',

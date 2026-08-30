@@ -1,4 +1,10 @@
-import { users, type SafeUser } from '@nest-admin/database';
+import {
+  departments,
+  posts,
+  userPosts,
+  users,
+  type SafeUser,
+} from '@nest-admin/database';
 import type { PaginatedResult } from '@nest-admin/shared';
 import {
   BadRequestException,
@@ -10,10 +16,27 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { compare, hash } from 'bcryptjs';
-import { and, count, desc, eq, isNull, like, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  like,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 
 import { RequestContext } from '../../common/context/request-context.service';
 import { RefreshTokenService } from '../auth/refresh-token.service';
+import {
+  DataScopeService,
+  type DataScopeSubject,
+} from '../rbac/data-scope.service';
+import { DepartmentService } from '../rbac/department.service';
 import type { Env } from '../../config/env.validation';
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
 import type { ChangePasswordDto } from './dto/change-password.dto';
@@ -24,6 +47,7 @@ import type { UpdateUserDto } from './dto/update-user.dto';
 /** 复用的投影，保证 password 永远不会跟着查询结果溜出去 */
 const safeColumns = {
   id: users.id,
+  deptId: users.deptId,
   username: users.username,
   nickname: users.nickname,
   email: users.email,
@@ -36,6 +60,10 @@ const safeColumns = {
   createdAt: users.createdAt,
   updatedAt: users.updatedAt,
 } as const;
+
+export interface UserListItemRecord extends SafeUser {
+  postNames: string[];
+}
 
 /**
  * 拼接查询条件时统一叠加「未软删除」。
@@ -52,9 +80,15 @@ export class UserService {
     private readonly config: ConfigService<Env, true>,
     private readonly ctx: RequestContext,
     private readonly refreshTokens: RefreshTokenService,
+    private readonly departments: DepartmentService,
+    private readonly dataScopes: DataScopeService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<SafeUser> {
+    if (dto.deptId !== undefined && dto.deptId !== null) {
+      await this.departments.assertDepartmentsUsable([dto.deptId]);
+    }
+
     // 唯一索引覆盖已软删除的行，所以这里查全量而不是只查未删除的，
     // 否则会先告诉调用方「可用」，再在插入时撞上 ER_DUP_ENTRY
     const [existing] = await this.db
@@ -80,10 +114,27 @@ export class UserService {
     return this.findById(result.insertId);
   }
 
-  async findPage(query: QueryUserDto): Promise<PaginatedResult<SafeUser>> {
+  async findPage(
+    query: QueryUserDto,
+    subject: DataScopeSubject,
+  ): Promise<PaginatedResult<UserListItemRecord>> {
+    const [scopeCondition, departmentIds] = await Promise.all([
+      this.dataScopes.buildUserCondition(subject),
+      query.deptId
+        ? this.departments.findDescendantIds(query.deptId)
+        : Promise.resolve(undefined),
+    ]);
+
     const where = alive(
-      query.keyword ? like(users.username, `%${query.keyword}%`) : undefined,
+      query.keyword
+        ? or(
+            like(users.username, `%${query.keyword}%`),
+            like(users.nickname, `%${query.keyword}%`),
+          )
+        : undefined,
       query.status ? eq(users.status, query.status) : undefined,
+      departmentIds ? inArray(users.deptId, departmentIds) : undefined,
+      scopeCondition,
     );
 
     const [list, [{ total }]] = await Promise.all([
@@ -97,7 +148,40 @@ export class UserService {
       this.db.select({ total: count() }).from(users).where(where),
     ]);
 
-    return { list, total, page: query.page, pageSize: query.pageSize };
+    const postRows =
+      list.length === 0
+        ? []
+        : await this.db
+            .select({ userId: userPosts.userId, postName: posts.name })
+            .from(userPosts)
+            .innerJoin(posts, eq(posts.id, userPosts.postId))
+            .where(
+              and(
+                inArray(
+                  userPosts.userId,
+                  list.map((user) => user.id),
+                ),
+                isNull(posts.deletedAt),
+              ),
+            )
+            .orderBy(asc(posts.sort), asc(posts.id));
+
+    const postNamesByUser = new Map<number, string[]>();
+    for (const row of postRows) {
+      const names = postNamesByUser.get(row.userId) ?? [];
+      names.push(row.postName);
+      postNamesByUser.set(row.userId, names);
+    }
+
+    return {
+      list: list.map((user) => ({
+        ...user,
+        postNames: postNamesByUser.get(user.id) ?? [],
+      })),
+      total,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
   }
 
   async findById(id: number): Promise<SafeUser> {
@@ -135,8 +219,29 @@ export class UserService {
       throw new BadRequestException('没有需要更新的字段');
     }
 
+    if (dto.deptId !== undefined && dto.deptId !== null) {
+      await this.departments.assertDepartmentsUsable([dto.deptId]);
+    }
+
     // 先确认存在，否则 MySQL 的 update 影响 0 行时无法区分「不存在」和「值没变」
     await this.findById(id);
+
+    if (dto.status === 'disabled') {
+      await this.db.transaction(async (tx) => {
+        await tx
+          .update(departments)
+          .set({ leaderId: null, ...this.ctx.auditOnUpdate() })
+          .where(
+            and(eq(departments.leaderId, id), isNull(departments.deletedAt)),
+          );
+        await tx
+          .update(users)
+          .set({ ...dto, ...this.ctx.auditOnUpdate() })
+          .where(alive(eq(users.id, id)));
+      });
+      return this.findById(id);
+    }
+
     await this.db
       .update(users)
       .set({ ...dto, ...this.ctx.auditOnUpdate() })
@@ -195,10 +300,19 @@ export class UserService {
   async remove(id: number): Promise<void> {
     await this.findById(id);
 
-    await this.db
-      .update(users)
-      .set({ deletedAt: sql`CURRENT_TIMESTAMP`, ...this.ctx.auditOnUpdate() })
-      .where(alive(eq(users.id, id)));
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(departments)
+        .set({ leaderId: null, ...this.ctx.auditOnUpdate() })
+        .where(
+          and(eq(departments.leaderId, id), isNull(departments.deletedAt)),
+        );
+
+      await tx
+        .update(users)
+        .set({ deletedAt: sql`CURRENT_TIMESTAMP`, ...this.ctx.auditOnUpdate() })
+        .where(alive(eq(users.id, id)));
+    });
 
     // 人都删了，残留的会话没有存在意义
     await this.refreshTokens.revokeAllForUser(id);

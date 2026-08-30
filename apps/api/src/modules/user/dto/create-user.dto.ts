@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsInt,
   IsEmail,
   IsEnum,
   IsMobilePhone,
@@ -8,11 +9,20 @@ import {
   Length,
   Matches,
   MaxLength,
+  Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 import { STATUS, type Status } from '@nest-admin/shared';
 
 export class CreateUserDto {
+  @ApiPropertyOptional({ description: '所属部门 id' })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  deptId?: number | null;
+
   @ApiProperty({ description: '登录账号', example: 'admin' })
   @IsString()
   @Length(3, 32, { message: '用户名长度需在 3-32 之间' })
