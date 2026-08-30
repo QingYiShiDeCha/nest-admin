@@ -3,9 +3,11 @@ import { theme as antdvTheme } from 'antdv-next';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
+import AppIcon from '@/components/core/base/app-icon/index.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
 import { useTabsStore } from '@/stores/tabs';
+import { resolveImageUrl } from '@/utils/image-url';
 import AdminBreadcrumb from './AdminBreadcrumb.vue';
 import LayoutSettingsDrawer from './LayoutSettingsDrawer.vue';
 import type { MenuItems } from '../menu-tree';
@@ -15,6 +17,7 @@ defineProps<{
 }>();
 
 defineEmits<{
+  refreshContent: [];
   toggleSidebar: [];
 }>();
 
@@ -22,6 +25,7 @@ const router = useRouter();
 const auth = useAuthStore();
 const menu = useMenuStore();
 const tabs = useTabsStore();
+const avatarSrc = computed(() => resolveImageUrl(auth.profile?.avatar));
 
 const { token: designToken } = antdvTheme.useToken();
 const headerStyle = computed(() => ({
@@ -64,7 +68,16 @@ async function handleUserMenuClick({
       >
         <i class="i-ri:menu-2-line" />
       </button>
-      
+
+      <button
+        class="header-refresh-trigger w-9 h-9 flex items-center justify-center shrink-0 border-none rounded-md bg-transparent text-xl a-color-text cursor-pointer transition-colors hover:a-bg-fill-secondary"
+        type="button"
+        title="刷新"
+        @click="$emit('refreshContent')"
+      >
+        <i class="header-refresh-icon i-ri:refresh-line" />
+      </button>
+
       <AdminBreadcrumb />
     </div>
 
@@ -72,13 +85,19 @@ async function handleUserMenuClick({
       <LayoutSettingsDrawer />
 
       <a-dropdown
-        :trigger="['click']"
         :menu="{ items: userMenuItems, onClick: handleUserMenuClick }"
       >
-        <a class="a-color-text" @click.prevent>
-          {{ auth.profile?.nickname || auth.username }}
-          <a-tag v-if="auth.isSuperAdmin" color="gold" class="ml-2">超管</a-tag>
-        </a>
+        <button
+          type="button"
+          class="border-none bg-transparent p-0 leading-none cursor-pointer"
+          aria-label="打开用户菜单"
+        >
+          <a-avatar :size="32" :src="avatarSrc" alt="用户头像">
+            <template #icon>
+              <AppIcon icon="i-ri:user-3-line" alt="默认用户头像" />
+            </template>
+          </a-avatar>
+        </button>
       </a-dropdown>
     </div>
   </a-layout-header>

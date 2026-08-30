@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { RouterView } from 'vue-router';
+import { computed, nextTick, reactive, ref } from 'vue';
+import { RouterView, useRoute } from 'vue-router';
 
 import { useTabsStore } from '@/stores/tabs';
 import AdminHeader from './components/AdminHeader.vue';
@@ -8,7 +8,27 @@ import AdminSidebar from './components/AdminSidebar.vue';
 import TabBar from './components/TabBar.vue';
 
 const tabs = useTabsStore();
+const route = useRoute();
 const sidebarCollapsed = ref(false);
+const refreshingCacheName = ref<string>();
+const refreshVersions = reactive(new Map<string, number>());
+
+const cachedNames = computed(() =>
+  tabs.cachedNames.filter((name) => name !== refreshingCacheName.value),
+);
+const contentKey = computed(
+  () => `${route.fullPath}:${refreshVersions.get(route.fullPath) ?? 0}`,
+);
+
+async function refreshContent(): Promise<void> {
+  const path = route.fullPath;
+
+  refreshingCacheName.value = route.meta.cacheName;
+  await nextTick();
+
+  refreshVersions.set(path, (refreshVersions.get(path) ?? 0) + 1);
+  refreshingCacheName.value = undefined;
+}
 </script>
 
 <template>
@@ -18,6 +38,7 @@ const sidebarCollapsed = ref(false);
     <a-layout class="min-w-0 min-h-0 overflow-y-auto">
       <AdminHeader
         :sidebar-collapsed="sidebarCollapsed"
+        @refresh-content="refreshContent"
         @toggle-sidebar="sidebarCollapsed = !sidebarCollapsed"
       />
 
@@ -39,8 +60,8 @@ const sidebarCollapsed = ref(false);
           >
             <!-- include 用页签的组件名：关掉页签 = 移出缓存 = 状态丢弃，
                  页签里开着的页面在切换间保持实例 -->
-            <KeepAlive :include="tabs.cachedNames">
-              <component :is="Component" />
+            <KeepAlive :include="cachedNames">
+              <component :is="Component" :key="contentKey" />
             </KeepAlive>
           </Transition>
         </RouterView>

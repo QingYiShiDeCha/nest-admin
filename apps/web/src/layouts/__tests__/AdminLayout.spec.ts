@@ -1,13 +1,16 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
+import { defineComponent, h } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 
 import AdminLayout from '@/layouts/AdminLayout.vue';
 
 const mocks = vi.hoisted(() => ({
+  go: vi.fn(),
+  pageMounts: 0,
   push: vi.fn(),
   route: {
     fullPath: '/dashboard',
-    meta: { title: '首页' },
+    meta: { cacheName: 'DashboardPage', title: '首页' },
     path: '/dashboard',
   },
 }));
@@ -18,7 +21,7 @@ vi.mock('vue-router', () => ({
     template: '<div data-testid="router-view" />',
   },
   useRoute: () => mocks.route,
-  useRouter: () => ({ push: mocks.push }),
+  useRouter: () => ({ go: mocks.go, push: mocks.push }),
 }));
 
 vi.mock('antdv-next', () => {
@@ -30,6 +33,7 @@ vi.mock('antdv-next', () => {
 
   return {
     Breadcrumb: stub('ABreadcrumb', 'breadcrumb'),
+    Avatar: stub('AAvatar', 'avatar'),
     Dropdown: stub('ADropdown', 'dropdown'),
     Drawer: stub('ADrawer', 'drawer'),
     Layout: stub('ALayout', 'layout'),
@@ -52,7 +56,9 @@ vi.mock('antdv-next', () => {
     Tag: stub('ATag', 'tag'),
     theme: {
       useToken: () => ({
-        token: { value: { colorBgContainer: '#ffffff', colorBgLayout: '#f5f5f5' } },
+        token: {
+          value: { colorBgContainer: '#ffffff', colorBgLayout: '#f5f5f5' },
+        },
       }),
     },
   };
@@ -92,7 +98,7 @@ vi.mock('@/stores/settings', () => ({
 }));
 
 vi.mock('@/stores/tabs', () => ({
-  useTabsStore: () => ({ cachedNames: [], reset: vi.fn() }),
+  useTabsStore: () => ({ cachedNames: ['DashboardPage'], reset: vi.fn() }),
 }));
 
 describe('AdminLayout scroll ownership', () => {
@@ -103,7 +109,9 @@ describe('AdminLayout scroll ownership', () => {
     expect(sider.props('collapsed')).toBe(false);
     expect(sider.props('trigger')).toBeNull();
     expect(wrapper.text()).toContain('Nest Admin');
-    expect(wrapper.get('[data-testid="menu"]').attributes('theme')).toBe('light');
+    expect(wrapper.get('[data-testid="menu"]').attributes('theme')).toBe(
+      'light',
+    );
 
     await wrapper.get('button[title="收起菜单"]').trigger('click');
 
@@ -111,7 +119,47 @@ describe('AdminLayout scroll ownership', () => {
     expect(wrapper.find('button[title="展开菜单"]').exists()).toBe(true);
     expect(wrapper.text()).not.toContain('Nest Admin');
     expect(wrapper.find('img[alt="nest-admin"]').exists()).toBe(true);
-    expect(wrapper.get('button[title="展开菜单"]').classes()).toContain('-ml-2');
+    expect(wrapper.get('button[title="展开菜单"]').classes()).toContain(
+      '-ml-2',
+    );
+  });
+
+  it('刷新按钮只重新挂载内容区域', async () => {
+    mocks.pageMounts = 0;
+    const PageComponent = defineComponent({
+      name: 'DashboardPage',
+      setup: () => {
+        mocks.pageMounts += 1;
+        return () => h('div', { 'data-testid': 'page' }, '页面内容');
+      },
+    });
+    const wrapper = mount(AdminLayout, {
+      global: {
+        stubs: {
+          RouterView: {
+            setup: () => ({ PageComponent }),
+            template: '<slot :Component="PageComponent" />',
+          },
+        },
+      },
+    });
+    const refreshButton = wrapper.get('button[title="刷新"]');
+    const siderElement = wrapper.get('[data-testid="sider"]').element;
+    const headerElement = wrapper.get('[data-testid="header"]').element;
+    const pageElement = wrapper.get('[data-testid="page"]').element;
+
+    expect(refreshButton.classes()).toContain('header-refresh-trigger');
+    expect(refreshButton.find('i').classes()).toContain('i-ri:refresh-line');
+    expect(refreshButton.find('i').classes()).toContain('header-refresh-icon');
+    expect(mocks.pageMounts).toBe(1);
+    await refreshButton.trigger('click');
+    await flushPromises();
+
+    expect(mocks.go).not.toHaveBeenCalled();
+    expect(mocks.pageMounts).toBe(2);
+    expect(wrapper.get('[data-testid="page"]').element).not.toBe(pageElement);
+    expect(wrapper.get('[data-testid="sider"]').element).toBe(siderElement);
+    expect(wrapper.get('[data-testid="header"]').element).toBe(headerElement);
   });
 
   it('让右侧整栏滚动，并将 Header 与 TabBar 固定在顶部', () => {
@@ -159,7 +207,9 @@ describe('AdminLayout scroll ownership', () => {
         'min-h-0',
       ]),
     );
-    expect(wrapper.get('[data-testid="content"]').classes()).not.toContain('pt-6');
+    expect(wrapper.get('[data-testid="content"]').classes()).not.toContain(
+      'pt-6',
+    );
     expect(wrapper.get('[data-testid="content"]').classes()).not.toContain(
       'overflow-y-auto',
     );

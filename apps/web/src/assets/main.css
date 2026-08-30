@@ -121,6 +121,10 @@ body {
   animation: rotate180 0.5s;
 }
 
+.header-refresh-trigger:hover .header-refresh-icon {
+  animation: rotate180 0.5s;
+}
+
 @keyframes rotate180 {
   0% {
     transform: rotate(0);
