@@ -173,6 +173,17 @@ export class UserService {
     await this.refreshTokens.revokeAllForUser(id);
   }
 
+  async updateAvatar(id: number, avatar: string | null): Promise<SafeUser> {
+    await this.findById(id);
+
+    await this.db
+      .update(users)
+      .set({ avatar, ...this.ctx.auditOnUpdate() })
+      .where(alive(eq(users.id, id)));
+
+    return this.findById(id);
+  }
+
   /** 管理员强制某用户下线，返回被吊销的会话数 */
   async forceLogout(id: number): Promise<{ revokedSessions: number }> {
     await this.findById(id);

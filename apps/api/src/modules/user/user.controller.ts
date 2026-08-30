@@ -22,6 +22,7 @@ import { Permissions } from '../../common/decorators/permissions.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { QueryUserDto } from './dto/query-user.dto';
+import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserService } from './user.service';
 
@@ -56,6 +57,16 @@ export class UserController {
     @Body() dto: ChangePasswordDto,
   ): Promise<void> {
     return this.userService.changePassword(userId, dto);
+  }
+
+  @Patch('me/avatar')
+  @OperationLog({ module: '个人中心', action: '修改头像' })
+  @ApiOperation({ summary: '修改当前登录用户的头像' })
+  updateOwnAvatar(
+    @CurrentUser('id') userId: number,
+    @Body() dto: UpdateAvatarDto,
+  ): Promise<SafeUser> {
+    return this.userService.updateAvatar(userId, dto.avatar);
   }
 
   @Post(':id/force-logout')

@@ -1,5 +1,12 @@
 import type { BasicUser, PaginatedResult } from '@nest-admin/shared';
-import { httpDelete, httpGet, httpPatch, httpPost, httpPut, withQuery } from '@/api/http';
+import {
+  httpDelete,
+  httpGet,
+  httpPatch,
+  httpPost,
+  httpPut,
+  withQuery,
+} from '@/api/http';
 
 export interface UserQuery {
   keyword?: string;
@@ -13,19 +20,30 @@ export interface UserPayload {
   status?: 'active' | 'disabled';
 }
 
-export function apiUserPage(query: UserQuery & { page: number; pageSize: number }) {
+export function apiUserPage(
+  query: UserQuery & { page: number; pageSize: number },
+) {
   return httpGet<PaginatedResult<BasicUser>>(withQuery('/users', { ...query }));
 }
 
-export function apiUserCreate(payload: UserPayload & {
-  username: string;
-  password: string;
-}): Promise<BasicUser> {
+export function apiUserCreate(
+  payload: UserPayload & {
+    username: string;
+    password: string;
+  },
+): Promise<BasicUser> {
   return httpPost<BasicUser>('/users', payload);
 }
 
-export function apiUserUpdate(id: number, payload: UserPayload): Promise<BasicUser> {
+export function apiUserUpdate(
+  id: number,
+  payload: UserPayload,
+): Promise<BasicUser> {
   return httpPatch<BasicUser>(`/users/${id}`, payload);
+}
+
+export function apiUpdateOwnAvatar(avatar: string | null): Promise<BasicUser> {
+  return httpPatch<BasicUser>('/users/me/avatar', { avatar });
 }
 
 export function apiUserRemove(id: number): Promise<void> {
@@ -43,6 +61,8 @@ export function apiUserSetRoles(id: number, ids: number[]): Promise<void> {
 }
 
 /** 强制下线：吊销该用户全部 refreshToken */
-export function apiUserForceLogout(id: number): Promise<{ revokedSessions: number }> {
+export function apiUserForceLogout(
+  id: number,
+): Promise<{ revokedSessions: number }> {
   return httpPost<{ revokedSessions: number }>(`/users/${id}/force-logout`);
 }

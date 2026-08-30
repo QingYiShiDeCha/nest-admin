@@ -42,7 +42,26 @@ export function resolveLocalUploadDirectory(config: AppConfig): string {
 
 export function normalizeLocalUrlPrefix(config: AppConfig): string {
   const configured = config.get('UPLOAD_LOCAL_URL_PREFIX', { infer: true });
-  const normalized = `/${configured}`.replace(/\/+/g, '/').replace(/\/$/, '');
+  const normalized = normalizePathPrefix(configured);
 
   return normalized || '/uploads';
+}
+
+export function buildLocalUploadPrefixes(
+  apiPrefix: string,
+  uploadPrefix: string,
+): string[] {
+  const normalizedApiPrefix = normalizePathPrefix(apiPrefix);
+  const normalizedUploadPrefix =
+    normalizePathPrefix(uploadPrefix) || '/uploads';
+  const prefixes = [
+    normalizedUploadPrefix,
+    `${normalizedApiPrefix}${normalizedUploadPrefix}`,
+  ];
+
+  return [...new Set(prefixes)].map((prefix) => `${prefix}/`);
+}
+
+function normalizePathPrefix(value: string): string {
+  return `/${value}`.replace(/\/+/g, '/').replace(/\/$/, '');
 }

@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import {
+  isImageUrl as checkImageUrl,
+  resolveImageUrl,
+} from '@/utils/image-url';
+
 defineOptions({ name: 'AppIcon', inheritAttrs: false });
 
 const props = withDefaults(
@@ -14,41 +19,8 @@ const props = withDefaults(
   },
 );
 
-const remoteImagePattern = /^(?:https?:\/\/|data:image\/|blob:)/i;
-const relativeImagePattern =
-  /^\/.*\.(?:png|jpe?g|gif|svg|webp|ico)(?:[?#].*)?$/i;
-
-const isImageUrl = computed(() => {
-  const icon = props.icon?.trim();
-  return (
-    !!icon && (remoteImagePattern.test(icon) || relativeImagePattern.test(icon))
-  );
-});
-
-const processedIcon = computed(() => {
-  const icon = props.icon?.trim();
-
-  if (!icon || !isImageUrl.value || remoteImagePattern.test(icon)) {
-    return icon;
-  }
-
-  const apiBase = (import.meta.env.VITE_API_BASE || '/api')
-    .trim()
-    .replace(/\/$/, '');
-
-  if (!apiBase || apiBase === '/') {
-    return icon;
-  }
-
-  if (
-    apiBase.startsWith('/') &&
-    (icon === apiBase || icon.startsWith(`${apiBase}/`))
-  ) {
-    return icon;
-  }
-
-  return `${apiBase}${icon}`;
-});
+const isImageUrl = computed(() => checkImageUrl(props.icon));
+const processedIcon = computed(() => resolveImageUrl(props.icon));
 </script>
 
 <template>

@@ -9,6 +9,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import type { Env } from './config/env.validation';
 import { setupSwagger } from './config/swagger.setup';
 import {
+  buildLocalUploadPrefixes,
   normalizeLocalUrlPrefix,
   resolveLocalUploadDirectory,
 } from './modules/file/file-storage.factory';
@@ -31,9 +32,15 @@ async function bootstrap(): Promise<void> {
   }
 
   if (config.get('UPLOAD_DRIVER', { infer: true }) === 'local') {
-    app.useStaticAssets(resolveLocalUploadDirectory(config), {
-      prefix: `${normalizeLocalUrlPrefix(config)}/`,
-    });
+    const uploadDirectory = resolveLocalUploadDirectory(config);
+    const uploadPrefixes = buildLocalUploadPrefixes(
+      prefix,
+      normalizeLocalUrlPrefix(config),
+    );
+
+    for (const uploadPrefix of uploadPrefixes) {
+      app.useStaticAssets(uploadDirectory, { prefix: uploadPrefix });
+    }
   }
 
   app.setGlobalPrefix(prefix);
