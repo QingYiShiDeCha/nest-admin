@@ -9,6 +9,10 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
 import App from './App.vue';
 import router from './router';
 import { vPermission } from './directives/permission';
+import { resetDynamicRoutes } from './router/dynamic-routes';
+import { useAuthStore } from './stores/auth';
+import { useMenuStore } from './stores/menu';
+import { useTabsStore } from './stores/tabs';
 import { onUnauthorized } from './utils/auth-events';
 
 const app = createApp(App);
@@ -27,10 +31,17 @@ app.directive('permission', vPermission);
 // http 层救不回登录态时会发这个事件。放在这里订阅而不是让 http 直接
 // import router，避免一个纯请求模块反向依赖路由
 onUnauthorized(() => {
+  const redirect = router.currentRoute.value.fullPath;
+
+  useAuthStore(pinia).reset();
+  useMenuStore(pinia).reset();
+  useTabsStore(pinia).reset();
+  resetDynamicRoutes();
+
   if (router.currentRoute.value.name !== 'login') {
     void router.push({
       name: 'login',
-      query: { redirect: router.currentRoute.value.fullPath },
+      query: { redirect },
     });
   }
 });

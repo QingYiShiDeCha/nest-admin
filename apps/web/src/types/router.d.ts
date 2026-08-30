@@ -12,7 +12,7 @@ import type { PermissionCode } from '@nest-admin/shared';
  * 字段语义：
  * - public：无需登录（登录页、错误页），也不产生页签
  * - permission：进入页面所需权限码，守卫统一消费；用 PermissionCode
- *   字面量类型约束，routes.ts 里写错码编译期就报错
+ *   字面量类型约束，前端固定路由写错码会在编译期报错
  * - affix：页签钉住（首页），不可关闭、不受「关闭全部」影响
  * - keepAlive + cacheName：该页参与 KeepAlive 缓存，cacheName 是组件
  *   defineOptions 的名字（KeepAlive 按组件名匹配）

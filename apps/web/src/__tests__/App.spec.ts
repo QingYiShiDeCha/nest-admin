@@ -12,6 +12,10 @@ const themeAlgorithms = vi.hoisted(() => ({
 }));
 
 vi.mock('antdv-next', () => ({
+  App: {
+    name: 'AApp',
+    template: '<div><slot /></div>',
+  },
   ConfigProvider: {
     name: 'AConfigProvider',
     props: { locale: Object, theme: Object },
@@ -40,6 +44,8 @@ describe('App theme provider', () => {
     const wrapper = mount(App, { global: { plugins: [pinia] } });
     const provider = wrapper.getComponent({ name: 'AConfigProvider' });
 
+    expect(wrapper.findComponent({ name: 'AApp' }).exists()).toBe(true);
+
     expect(provider.props('theme')).toMatchObject({
       algorithm: themeAlgorithms.light,
       cssVar: { key: 'css-var-nest-admin' },
@@ -61,6 +67,9 @@ describe('App theme provider', () => {
         controlItemBgActive: '#F2F4F5',
       },
       components: {
+        Message: {
+          contentBg: '#FFFFFF',
+        },
         Tag: {
           defaultBg: '#F9FAFB',
           defaultColor: '#4D5875',
@@ -115,6 +124,9 @@ describe('App theme provider', () => {
         controlItemBgActive: '#2E2E38',
       },
       components: {
+        Message: {
+          contentBg: '#161618',
+        },
         Tag: {
           defaultBg: '#17171C',
           defaultColor: '#C7C7D1',

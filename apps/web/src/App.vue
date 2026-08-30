@@ -107,6 +107,12 @@ const themeConfig = computed<ThemeConfig>(() => ({
         }),
   },
   components: {
+    Message: {
+      contentBg:
+        resolvedTheme.value === 'light'
+          ? LIGHT_THEME_COLORS.background.container
+          : DARK_THEME_COLORS.background.container,
+    },
     Tag: {
       defaultBg:
         resolvedTheme.value === 'light'
@@ -168,8 +174,10 @@ onBeforeUnmount(() => document.documentElement.classList.remove(CSS_VAR_KEY));
 
 <template>
   <a-config-provider :theme="themeConfig" :locale="zh_CN">
-    <div :class="CSS_VAR_KEY" class="h-full a-bg-layout a-color-text">
-      <RouterView />
-    </div>
+    <a-app class="h-full">
+      <div :class="CSS_VAR_KEY" class="h-full a-bg-layout a-color-text">
+        <RouterView />
+      </div>
+    </a-app>
   </a-config-provider>
 </template>
