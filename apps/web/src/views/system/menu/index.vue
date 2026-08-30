@@ -13,10 +13,11 @@ import {
   type MenuPayload,
 } from '@/api/menu';
 import AppTag from '@/components/core/base/app-tag/index.vue';
+import IconPicker from '@/components/core/selectors/icon-picker/index.vue';
 import ProTable from '@/components/core/tables/pro-table/index.vue';
 import { usePermission } from '@/composables/use-permission';
 import { useTable } from '@/composables/use-table';
-import { MENU_ICONS } from '@/layouts/menu-icons';
+import { MENU_ICON_OPTIONS } from '@/layouts/menu-icons';
 import {
   MENU_TYPE_META,
   MENU_TYPE_OPTIONS,
@@ -154,6 +155,10 @@ function collectDirectoryKeys(nodes: MenuNode[], acc: number[] = []): number[] {
   }
 
   return acc;
+}
+
+function canExpandMenuRow(record: MenuNode): boolean {
+  return record.children.length > 0;
 }
 
 // ---- 新增 / 编辑 ----
@@ -301,8 +306,6 @@ async function remove(record: MenuNode): Promise<void> {
   await table.reload();
 }
 
-const iconKeys = Object.keys(MENU_ICONS);
-
 defineOptions({ name: 'MenuPage' });
 </script>
 
@@ -314,6 +317,7 @@ defineOptions({ name: 'MenuPage' });
       row-key="id"
       :pagination="false"
       :show-index="false"
+      :row-expandable="canExpandMenuRow"
     >
       <template #toolbar>
         <div class="flex items-center gap-3 min-w-0 flex-1">
@@ -396,14 +400,7 @@ defineOptions({ name: 'MenuPage' });
           />
         </a-form-item>
         <a-form-item label="图标" name="icon">
-          <a-select
-            v-model:value="form.icon"
-            class="w-full"
-            allow-clear
-            show-search
-            placeholder="选择或留空"
-            :options="iconKeys.map((k) => ({ label: k, value: k }))"
-          />
+          <IconPicker v-model="form.icon" :options="MENU_ICON_OPTIONS" />
         </a-form-item>
         <a-form-item label="排序" name="sort">
           <a-input-number

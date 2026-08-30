@@ -25,7 +25,7 @@ export default defineConfig({
   /**
    * 菜单图标的 class 是运行时从数据库的 sys_menu.icon 拼出来的，
    * 扫描器在源码里看不到，必须 safelist 让它们始终生成。
-   * 清单直接取自注册表，与页面下拉选项同源。
+   * 清单直接取自注册表，与菜单图标选择器同源。
    */
   safelist: Object.values(MENU_ICONS),
 });
