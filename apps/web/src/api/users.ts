@@ -1,4 +1,8 @@
-import type { BasicUser, PaginatedResult } from '@nest-admin/shared';
+import type {
+  BasicUser,
+  PaginatedResult,
+  UserListItem,
+} from '@nest-admin/shared';
 import {
   httpDelete,
   httpGet,
@@ -9,11 +13,13 @@ import {
 } from '@/api/http';
 
 export interface UserQuery {
+  deptId?: number;
   keyword?: string;
   status?: 'active' | 'disabled' | '';
 }
 
 export interface UserPayload {
+  deptId?: number | null;
   nickname?: string;
   email?: string;
   phone?: string;
@@ -23,7 +29,9 @@ export interface UserPayload {
 export function apiUserPage(
   query: UserQuery & { page: number; pageSize: number },
 ) {
-  return httpGet<PaginatedResult<BasicUser>>(withQuery('/users', { ...query }));
+  return httpGet<PaginatedResult<UserListItem>>(
+    withQuery('/users', { ...query }),
+  );
 }
 
 export function apiUserCreate(
@@ -58,6 +66,14 @@ export function apiUserRoleIds(id: number): Promise<number[]> {
 /** 全量替换用户的角色 */
 export function apiUserSetRoles(id: number, ids: number[]): Promise<void> {
   return httpPut(`/users/${id}/roles`, { ids });
+}
+
+export function apiUserPostIds(id: number): Promise<number[]> {
+  return httpGet<number[]>(`/users/${id}/posts`);
+}
+
+export function apiUserSetPosts(id: number, ids: number[]): Promise<void> {
+  return httpPut(`/users/${id}/posts`, { ids });
 }
 
 /** 强制下线：吊销该用户全部 refreshToken */

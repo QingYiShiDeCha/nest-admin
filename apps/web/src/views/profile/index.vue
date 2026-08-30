@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { message } from 'antdv-next';
+import { App } from 'antdv-next';
 import type { FormInstance } from 'antdv-next';
 import { computed, reactive, ref } from 'vue';
 
@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth';
 import { formatDateTime } from '@/utils/format';
 import { resolveImageUrl } from '@/utils/image-url';
 
+const { message } = App.useApp();
 const auth = useAuthStore();
 const avatarSrc = computed(() => resolveImageUrl(auth.profile?.avatar));
 

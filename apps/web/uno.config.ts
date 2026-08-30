@@ -4,6 +4,10 @@ import { defineConfig, presetIcons, presetWind4 } from 'unocss';
 import { MENU_ICONS } from './src/layouts/menu-icons';
 
 export default defineConfig({
+  content: {
+    // .ts 默认不进入 UnoCSS 扫描管线；显式监听后，开发时新增菜单图标可立即 HMR。
+    filesystem: ['src/layouts/menu-icons.ts'],
+  },
   presets: [
     presetWind4(),
     presetIcons({

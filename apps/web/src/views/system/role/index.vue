@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { Button, Popconfirm, Space, Tag, message } from 'antdv-next';
+import { App, Button, Popconfirm, Space, Tag } from 'antdv-next';
 import type { FormInstance } from 'antdv-next';
 import { computed, h, reactive, ref } from 'vue';
 
 import { PERMISSIONS } from '@nest-admin/shared';
 
-import type { MenuNode, PermissionCatalogItem, Role } from '@nest-admin/shared';
+import type {
+  DepartmentNode,
+  MenuNode,
+  PermissionCatalogItem,
+  Role,
+} from '@nest-admin/shared';
+import { apiDepartmentTree } from '@/api/departments';
 import { apiMenuTree } from '@/api/menu';
 import {
   apiPermissionCatalog,
@@ -29,6 +35,8 @@ import {
   STATUS_META,
   STATUS_OPTIONS,
 } from '@/constants/dicts';
+
+const { message } = App.useApp();
 import { formatDateTime } from '@/utils/format';
 
 const { can } = usePermission();
@@ -40,12 +48,16 @@ const table = useTable<Role, RoleQuery>({
       dataIndex: 'code',
       key: 'code',
       render: (_value, record) =>
-        h(Space, { size: 4 }, {
-          default: () => [
-            record.code,
-            record.isSystem ? h(Tag, { color: 'gold' }, () => '内置') : null,
-          ],
-        }),
+        h(
+          Space,
+          { size: 4 },
+          {
+            default: () => [
+              record.code,
+              record.isSystem ? h(Tag, { color: 'gold' }, () => '内置') : null,
+            ],
+          },
+        ),
     },
     { title: '名称', dataIndex: 'name' },
     {
@@ -60,8 +72,10 @@ const table = useTable<Role, RoleQuery>({
       key: 'status',
       width: 90,
       render: (_value, record) =>
-        h(Tag, { color: STATUS_META[record.status].color }, () =>
-          STATUS_META[record.status].label,
+        h(
+          Tag,
+          { color: STATUS_META[record.status].color },
+          () => STATUS_META[record.status].label,
         ),
     },
     { title: '备注', dataIndex: 'remark', ellipsis: true },
@@ -81,14 +95,22 @@ const table = useTable<Role, RoleQuery>({
             can(PERMISSIONS.ROLE_UPDATE)
               ? h(
                   Button,
-                  { type: 'link', size: 'small', onClick: () => openEdit(record) },
+                  {
+                    type: 'link',
+                    size: 'small',
+                    onClick: () => openEdit(record),
+                  },
                   () => '编辑',
                 )
               : null,
             can(PERMISSIONS.ROLE_ASSIGN)
               ? h(
                   Button,
-                  { type: 'link', size: 'small', onClick: () => openGrant(record) },
+                  {
+                    type: 'link',
+                    size: 'small',
+                    onClick: () => openGrant(record),
+                  },
                   () => '授权',
                 )
               : null,
@@ -136,8 +158,37 @@ const form = reactive({
   sort: 0,
   status: 'active' as 'active' | 'disabled',
   dataScope: 'self' as Role['dataScope'],
+  departmentIds: [] as number[],
   remark: '',
 });
+
+const departmentTree = ref<DepartmentNode[]>([]);
+const departmentTreeData = computed(() =>
+  toDepartmentTreeData(departmentTree.value),
+);
+
+function toDepartmentTreeData(nodes: DepartmentNode[]): {
+  value: number;
+  label: string;
+  disabled: boolean;
+  children?: unknown[];
+}[] {
+  return nodes.map((node) => ({
+    value: node.id,
+    label: node.name + (node.status === 'disabled' ? '（已停用）' : ''),
+    disabled: node.status === 'disabled',
+    children:
+      node.children.length > 0
+        ? toDepartmentTreeData(node.children)
+        : undefined,
+  }));
+}
+
+async function ensureDepartmentTree(): Promise<void> {
+  if (departmentTree.value.length === 0) {
+    departmentTree.value = await apiDepartmentTree();
+  }
+}
 
 const rules = {
   code: [
@@ -158,12 +209,14 @@ function openCreate(): void {
     sort: 0,
     status: 'active',
     dataScope: 'self',
+    departmentIds: [],
     remark: '',
   });
   modalOpen.value = true;
+  void ensureDepartmentTree();
 }
 
-function openEdit(record: Role): void {
+async function openEdit(record: Role): Promise<void> {
   editing.value = record;
   Object.assign(form, {
     code: record.code,
@@ -171,9 +224,16 @@ function openEdit(record: Role): void {
     sort: record.sort,
     status: record.status,
     dataScope: record.dataScope,
+    departmentIds: [],
     remark: record.remark ?? '',
   });
   modalOpen.value = true;
+
+  const [detail] = await Promise.all([
+    apiRoleDetail(record.id),
+    ensureDepartmentTree(),
+  ]);
+  form.departmentIds = [...detail.departmentIds];
 }
 
 async function submit(): Promise<void> {
@@ -188,11 +248,16 @@ async function submit(): Promise<void> {
         sort: form.sort,
         status: editing.value.isSystem ? undefined : form.status,
         dataScope: form.dataScope,
+        departmentIds: form.dataScope === 'custom' ? form.departmentIds : [],
         remark: form.remark || undefined,
       });
       void message.success('已保存');
     } else {
-      await apiRoleCreate({ ...form, remark: form.remark || undefined });
+      await apiRoleCreate({
+        ...form,
+        departmentIds: form.dataScope === 'custom' ? form.departmentIds : [],
+        remark: form.remark || undefined,
+      });
       void message.success('已创建');
     }
 
@@ -290,7 +355,9 @@ async function openGrant(record: Role): Promise<void> {
       catalog.value.length > 0
         ? Promise.resolve(catalog.value)
         : apiPermissionCatalog(),
-      menuTree.value.length > 0 ? Promise.resolve(menuTree.value) : apiMenuTree(),
+      menuTree.value.length > 0
+        ? Promise.resolve(menuTree.value)
+        : apiMenuTree(),
     ]);
 
     catalog.value = catalogData;
@@ -315,7 +382,10 @@ async function openGrant(record: Role): Promise<void> {
 }
 
 /** 收集树里所有「有孩子」的节点 id */
-function collectParentIds(nodes: MenuNode[], acc = new Set<number>()): Set<number> {
+function collectParentIds(
+  nodes: MenuNode[],
+  acc = new Set<number>(),
+): Set<number> {
   for (const node of nodes) {
     if (node.children.length > 0) {
       acc.add(node.id);
@@ -352,7 +422,9 @@ async function submitGrant(): Promise<void> {
 
   grantSubmitting.value = true;
   try {
-    const menuIds = [...new Set([...menuCheckedKeys.value, ...menuHalfCheckedKeys.value])];
+    const menuIds = [
+      ...new Set([...menuCheckedKeys.value, ...menuHalfCheckedKeys.value]),
+    ];
 
     await Promise.all([
       apiRoleSetPermissions(grantTarget.value.id, permissionIds.value),
@@ -372,30 +444,35 @@ defineOptions({ name: 'RolePage' });
 
 <template>
   <div class="flex flex-col flex-1 min-h-0 gap-4">
-  <ProSearch :table="table" :fields="filterFields" />
+    <ProSearch :table="table" :fields="filterFields" />
 
-  <ProTable :table="table" row-key="id">
-    <template #toolbar>
-      <a-button
-        v-permission="PERMISSIONS.ROLE_CREATE"
-        type="primary"
-        @click="openCreate"
-      >
-        新增角色
-      </a-button>
-    </template>
+    <ProTable :table="table" row-key="id">
+      <template #toolbar>
+        <a-button
+          v-permission="PERMISSIONS.ROLE_CREATE"
+          type="primary"
+          @click="openCreate"
+        >
+          新增角色
+        </a-button>
+      </template>
+    </ProTable>
 
-  </ProTable>
-
-<!-- 新增 / 编辑 -->
+    <!-- 新增 / 编辑 -->
     <a-modal
       v-model:open="modalOpen"
       :title="editing ? `编辑角色：${editing.name}` : '新增角色'"
       :confirm-loading="submitting"
-      width="600px"
+      width="820px"
       @ok="submit"
     >
-      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
+      <a-form
+        ref="formRef"
+        class="grid grid-cols-1 gap-x-5 md:grid-cols-2"
+        :model="form"
+        :rules="rules"
+        layout="vertical"
+      >
         <a-form-item label="角色码" name="code">
           <a-input
             v-model:value="form.code"
@@ -407,12 +484,34 @@ defineOptions({ name: 'RolePage' });
           <a-input v-model:value="form.name" />
         </a-form-item>
         <a-form-item label="排序" name="sort">
-          <a-input-number v-model:value="form.sort" :min="0" :max="9999" class="w-full" />
+          <a-input-number
+            v-model:value="form.sort"
+            :min="0"
+            :max="9999"
+            class="w-full"
+          />
         </a-form-item>
         <a-form-item label="数据权限范围" name="dataScope">
-          <a-select v-model:value="form.dataScope" :options="DATA_SCOPE_OPTIONS" />
-          <!-- 部门体系尚未落地，如实告知而不是假装这个选项生效 -->
-          <p class="mb-0 text-xs a-color-text-tertiary">部门体系尚未实现，当前仅存储不生效</p>
+          <a-select
+            v-model:value="form.dataScope"
+            :options="DATA_SCOPE_OPTIONS"
+          />
+        </a-form-item>
+        <a-form-item
+          v-if="form.dataScope === 'custom'"
+          class="md:col-span-2"
+          label="自定义部门"
+          name="departmentIds"
+        >
+          <a-tree-select
+            v-model:value="form.departmentIds"
+            class="w-full"
+            :tree-data="departmentTreeData"
+            tree-checkable
+            tree-default-expand-all
+            allow-clear
+            placeholder="请选择可查看的部门"
+          />
         </a-form-item>
         <a-form-item label="状态" name="status">
           <a-radio-group
@@ -421,7 +520,7 @@ defineOptions({ name: 'RolePage' });
             :disabled="editing?.isSystem"
           />
         </a-form-item>
-        <a-form-item label="备注" name="remark">
+        <a-form-item class="md:col-span-2" label="备注" name="remark">
           <a-input v-model:value="form.remark" />
         </a-form-item>
       </a-form>
@@ -444,10 +543,19 @@ defineOptions({ name: 'RolePage' });
               :key="group.module"
               :header="`${group.module}（${group.items.length}）`"
             >
-              <a-checkbox-group v-model:value="permissionIds" class="flex flex-col gap-1">
-                <a-checkbox v-for="item in group.items" :key="item.id" :value="item.id">
+              <a-checkbox-group
+                v-model:value="permissionIds"
+                class="flex flex-col gap-1"
+              >
+                <a-checkbox
+                  v-for="item in group.items"
+                  :key="item.id"
+                  :value="item.id"
+                >
                   {{ item.name }}
-                  <span class="text-xs a-color-text-tertiary">{{ item.code }}</span>
+                  <span class="text-xs a-color-text-tertiary">{{
+                    item.code
+                  }}</span>
                 </a-checkbox>
               </a-checkbox-group>
             </a-collapse-panel>

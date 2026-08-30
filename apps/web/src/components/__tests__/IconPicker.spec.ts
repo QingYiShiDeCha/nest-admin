@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { icons as remixIcons } from '@iconify-json/ri';
 
 import { filterIconOptions } from '@/components/core/selectors/icon-picker/utils';
 import { MENU_ICONS, MENU_ICON_OPTIONS } from '@/layouts/menu-icons';
@@ -11,6 +12,14 @@ describe('IconPicker', () => {
     expect(new Set(Object.values(MENU_ICONS)).size).toBe(
       MENU_ICON_OPTIONS.length,
     );
+
+    for (const option of MENU_ICON_OPTIONS) {
+      const iconName = option.icon.replace(/^i-ri:/, '');
+
+      expect(remixIcons.icons, `${option.value} 对应的图标不存在`).toHaveProperty(
+        iconName,
+      );
+    }
   });
 
   it('支持按中文名称、组件名和 Remix class 搜索', () => {

@@ -13,6 +13,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AAlert: typeof import('antdv-next')['Alert']
+    AApp: typeof import('antdv-next')['App']
     AAvatar: typeof import('antdv-next')['Avatar']
     ABreadcrumb: typeof import('antdv-next')['Breadcrumb']
     AButton: typeof import('antdv-next')['Button']
@@ -24,6 +25,7 @@ declare module 'vue' {
     AConfigProvider: typeof import('antdv-next')['ConfigProvider']
     ADescriptions: typeof import('antdv-next')['Descriptions']
     ADescriptionsItem: typeof import('antdv-next')['DescriptionsItem']
+    ADivider: typeof import('antdv-next')['Divider']
     ADrawer: typeof import('antdv-next')['Drawer']
     ADropdown: typeof import('antdv-next')['Dropdown']
     AEmpty: typeof import('antdv-next')['Empty']
@@ -38,6 +40,7 @@ declare module 'vue' {
     ALayoutSider: typeof import('antdv-next')['LayoutSider']
     AMenu: typeof import('antdv-next')['Menu']
     AModal: typeof import('antdv-next')['Modal']
+    APagination: typeof import('antdv-next')['Pagination']
     APopover: typeof import('antdv-next')['Popover']
     AppIcon: typeof import('./src/components/core/base/app-icon/index.vue')['default']
     AppTag: typeof import('./src/components/core/base/app-tag/index.vue')['default']
@@ -48,9 +51,11 @@ declare module 'vue' {
     ASelect: typeof import('antdv-next')['Select']
     ASkeleton: typeof import('antdv-next')['Skeleton']
     ASpace: typeof import('antdv-next')['Space']
+    ASpin: typeof import('antdv-next')['Spin']
     ASwitch: typeof import('antdv-next')['Switch']
     ATable: typeof import('antdv-next')['Table']
     ATag: typeof import('antdv-next')['Tag']
+    ATextarea: typeof import('antdv-next')['TextArea']
     ATooltip: typeof import('antdv-next')['Tooltip']
     ATree: typeof import('antdv-next')['Tree']
     ATreeSelect: typeof import('antdv-next')['TreeSelect']
@@ -64,12 +69,14 @@ declare module 'vue' {
     ProTable: typeof import('./src/components/core/tables/pro-table/index.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    UserSelect: typeof import('./src/components/core/selectors/user-select/index.vue')['default']
   }
 }
 
 // For TSX support
 declare global {
   const AAlert: typeof import('antdv-next')['Alert']
+  const AApp: typeof import('antdv-next')['App']
   const AAvatar: typeof import('antdv-next')['Avatar']
   const ABreadcrumb: typeof import('antdv-next')['Breadcrumb']
   const AButton: typeof import('antdv-next')['Button']
@@ -81,6 +88,7 @@ declare global {
   const AConfigProvider: typeof import('antdv-next')['ConfigProvider']
   const ADescriptions: typeof import('antdv-next')['Descriptions']
   const ADescriptionsItem: typeof import('antdv-next')['DescriptionsItem']
+  const ADivider: typeof import('antdv-next')['Divider']
   const ADrawer: typeof import('antdv-next')['Drawer']
   const ADropdown: typeof import('antdv-next')['Dropdown']
   const AEmpty: typeof import('antdv-next')['Empty']
@@ -95,6 +103,7 @@ declare global {
   const ALayoutSider: typeof import('antdv-next')['LayoutSider']
   const AMenu: typeof import('antdv-next')['Menu']
   const AModal: typeof import('antdv-next')['Modal']
+  const APagination: typeof import('antdv-next')['Pagination']
   const APopover: typeof import('antdv-next')['Popover']
   const AppIcon: typeof import('./src/components/core/base/app-icon/index.vue')['default']
   const AppTag: typeof import('./src/components/core/base/app-tag/index.vue')['default']
@@ -105,9 +114,11 @@ declare global {
   const ASelect: typeof import('antdv-next')['Select']
   const ASkeleton: typeof import('antdv-next')['Skeleton']
   const ASpace: typeof import('antdv-next')['Space']
+  const ASpin: typeof import('antdv-next')['Spin']
   const ASwitch: typeof import('antdv-next')['Switch']
   const ATable: typeof import('antdv-next')['Table']
   const ATag: typeof import('antdv-next')['Tag']
+  const ATextarea: typeof import('antdv-next')['TextArea']
   const ATooltip: typeof import('antdv-next')['Tooltip']
   const ATree: typeof import('antdv-next')['Tree']
   const ATreeSelect: typeof import('antdv-next')['TreeSelect']
@@ -121,4 +132,5 @@ declare global {
   const ProTable: typeof import('./src/components/core/tables/pro-table/index.vue')['default']
   const RouterLink: typeof import('vue-router')['RouterLink']
   const RouterView: typeof import('vue-router')['RouterView']
+  const UserSelect: typeof import('./src/components/core/selectors/user-select/index.vue')['default']
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Avatar, Button, Popconfirm, Tooltip, message } from 'antdv-next';
+import { App, Avatar, Button, Popconfirm, Tooltip } from 'antdv-next';
 import { h } from 'vue';
 
 import { PERMISSIONS, type OnlineUserSession } from '@nest-admin/shared';
@@ -19,6 +19,7 @@ import { useTable } from '@/composables/use-table';
 import { formatDateTime } from '@/utils/format';
 import { resolveImageUrl } from '@/utils/image-url';
 
+const { message } = App.useApp();
 const { can } = usePermission();
 
 function describeClient(userAgent: string | null): string {

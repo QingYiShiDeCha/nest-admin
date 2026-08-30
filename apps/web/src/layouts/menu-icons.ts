@@ -60,6 +60,12 @@ export const MENU_ICON_OPTIONS = [
     keywords: 'team users',
   },
   {
+    value: 'RiOrganizationChart',
+    icon: 'i-ri:organization-chart',
+    label: '组织架构',
+    keywords: 'organization department hierarchy',
+  },
+  {
     value: 'RiAdminLine',
     icon: 'i-ri:admin-line',
     label: '管理员',
@@ -118,6 +124,12 @@ export const MENU_ICON_OPTIONS = [
     icon: 'i-ri:profile-line',
     label: '档案',
     keywords: 'profile resume',
+  },
+  {
+    value: 'RiBriefcase4Line',
+    icon: 'i-ri:briefcase-4-line',
+    label: '岗位',
+    keywords: 'briefcase post position job',
   },
   {
     value: 'RiLockLine',

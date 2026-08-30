@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, Popconfirm, Space, Tooltip, message } from 'antdv-next';
+import { App, Button, Popconfirm, Space, Tooltip } from 'antdv-next';
 import type { FormInstance, TableColumnsType } from 'antdv-next';
 import { computed, h, reactive, ref, watch } from 'vue';
 
@@ -25,6 +25,7 @@ import {
   STATUS_OPTIONS,
 } from '@/constants/dicts';
 
+const { message } = App.useApp();
 const { can } = usePermission();
 
 const columns: TableColumnsType<MenuNode> = [
@@ -295,6 +296,9 @@ async function submit(): Promise<void> {
 
     modalOpen.value = false;
     await table.reload();
+  } catch (error) {
+    const text = error instanceof Error ? error.message : '菜单保存失败';
+    void message.error(text);
   } finally {
     submitting.value = false;
   }
@@ -330,7 +334,7 @@ defineOptions({ name: 'MenuPage' });
             新增菜单
           </a-button>
           <span class="min-w-0 truncate text-sm a-color-text-tertiary">
-            侧边栏由这里的菜单驱动；path 需与前端静态路由一致才会出现在侧边栏
+            侧边栏与页面路由均由这里的菜单驱动
           </span>
         </div>
       </template>
@@ -396,7 +400,7 @@ defineOptions({ name: 'MenuPage' });
         >
           <a-input
             v-model:value="form.component"
-            placeholder="仅存档参考，页面注册在前端路由表里"
+            placeholder="可选，留空时按路由路径自动匹配"
           />
         </a-form-item>
         <a-form-item label="图标" name="icon">

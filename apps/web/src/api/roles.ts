@@ -4,7 +4,14 @@ import type {
   Role,
   RoleDetail,
 } from '@nest-admin/shared';
-import { httpDelete, httpGet, httpPatch, httpPost, httpPut, withQuery } from '@/api/http';
+import {
+  httpDelete,
+  httpGet,
+  httpPatch,
+  httpPost,
+  httpPut,
+  withQuery,
+} from '@/api/http';
 
 export interface RoleQuery {
   keyword?: string;
@@ -17,10 +24,13 @@ export interface RolePayload {
   sort?: number;
   status?: 'active' | 'disabled';
   dataScope?: Role['dataScope'];
+  departmentIds?: number[];
   remark?: string;
 }
 
-export function apiRolePage(query: RoleQuery & { page: number; pageSize: number }) {
+export function apiRolePage(
+  query: RoleQuery & { page: number; pageSize: number },
+) {
   return httpGet<PaginatedResult<Role>>(withQuery('/roles', { ...query }));
 }
 
@@ -28,7 +38,10 @@ export function apiRoleCreate(payload: RolePayload): Promise<Role> {
   return httpPost<Role>('/roles', payload);
 }
 
-export function apiRoleUpdate(id: number, payload: Partial<RolePayload>): Promise<Role> {
+export function apiRoleUpdate(
+  id: number,
+  payload: Partial<RolePayload>,
+): Promise<Role> {
   return httpPatch<Role>(`/roles/${id}`, payload);
 }
 
@@ -42,7 +55,10 @@ export function apiRoleDetail(id: number): Promise<RoleDetail> {
 }
 
 /** 全量替换角色的权限码，空数组即清空 */
-export function apiRoleSetPermissions(id: number, ids: number[]): Promise<void> {
+export function apiRoleSetPermissions(
+  id: number,
+  ids: number[],
+): Promise<void> {
   return httpPut(`/roles/${id}/permissions`, { ids });
 }
 

@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
 import { useTabsStore } from '@/stores/tabs';
 import { resolveImageUrl } from '@/utils/image-url';
+import { resetDynamicRoutes } from '@/router/dynamic-routes';
 import AdminBreadcrumb from './AdminBreadcrumb.vue';
 import LayoutSettingsDrawer from './LayoutSettingsDrawer.vue';
 import type { MenuItems } from '../menu-tree';
@@ -50,6 +51,7 @@ async function handleUserMenuClick({
   await auth.logout();
   menu.reset();
   tabs.reset();
+  resetDynamicRoutes();
   await router.push({ name: 'login' });
 }
 </script>

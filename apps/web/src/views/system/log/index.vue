@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, Tag, message } from 'antdv-next';
+import { App, Button, Tag } from 'antdv-next';
 import dayjs from 'dayjs';
 import { h, ref, watch } from 'vue';
 
@@ -18,6 +18,8 @@ import ProTable from '@/components/core/tables/pro-table/index.vue';
 import { useTable } from '@/composables/use-table';
 import { OPERATION_STATUS_META } from '@/constants/dicts';
 import { formatDateTime } from '@/utils/format';
+
+const { message } = App.useApp();
 
 const table = useTable<OperationLog, LogQuery>({
   columns: [
