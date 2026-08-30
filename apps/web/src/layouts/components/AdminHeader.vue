@@ -3,10 +3,8 @@ import { theme as antdvTheme } from 'antdv-next';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { BRAND_COLORS } from '@/constants/palette';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
-import { useSettingsStore } from '@/stores/settings';
 import { useTabsStore } from '@/stores/tabs';
 import AdminBreadcrumb from './AdminBreadcrumb.vue';
 import LayoutSettingsDrawer from './LayoutSettingsDrawer.vue';
@@ -23,7 +21,6 @@ defineEmits<{
 const router = useRouter();
 const auth = useAuthStore();
 const menu = useMenuStore();
-const settings = useSettingsStore();
 const tabs = useTabsStore();
 
 const { token: designToken } = antdvTheme.useToken();
@@ -67,38 +64,11 @@ async function handleUserMenuClick({
       >
         <i class="i-ri:menu-2-line" />
       </button>
-
+      
       <AdminBreadcrumb />
     </div>
 
     <div class="flex items-center gap-4">
-      <a-popover trigger="click" placement="bottomRight">
-        <template #content>
-          <div class="grid grid-cols-4 gap-2.5">
-            <button
-              v-for="color in BRAND_COLORS"
-              :key="color.value"
-              class="w-7 h-7 rounded-md border-none cursor-pointer"
-              :class="
-                settings.primaryColor === color.value
-                  ? 'ring-2 ring-primary ring-offset-2 [--un-ring-offset-color:var(--ant-color-bg-container)]'
-                  : []
-              "
-              :style="{ background: color.value }"
-              :title="color.name"
-              type="button"
-              @click="settings.setPrimaryColor(color.value)"
-            />
-          </div>
-        </template>
-        <button
-          class="w-6 h-6 rounded-full border-2 a-border-container shadow-[0_0_0_1px_var(--ant-color-border)] cursor-pointer"
-          :style="{ background: settings.primaryColor }"
-          type="button"
-          title="主题色"
-        />
-      </a-popover>
-
       <LayoutSettingsDrawer />
 
       <a-dropdown

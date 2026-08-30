@@ -1,31 +1,40 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue';
 
+import themeDarkPreview from '@/assets/images/settings/theme_styles/dark.png';
+import themeLightPreview from '@/assets/images/settings/theme_styles/light.png';
+import themeSystemPreview from '@/assets/images/settings/theme_styles/system.png';
+import { BRAND_COLORS } from '@/constants/palette';
 import { useSettingsStore } from '@/stores/settings';
 
 const open = ref(false);
 const settings = useSettingsStore();
-const menuLayout = ref('vertical');
-const direction = ref('ltr');
-
-const menuLayouts = [
-  { key: 'double', label: '双列', icon: 'i-ri:layout-column-line' },
-  { key: 'vertical', label: '垂直', icon: 'i-ri:layout-left-line' },
-  { key: 'horizontal', label: '水平', icon: 'i-ri:layout-top-line' },
-  { key: 'mixed', label: '混合', icon: 'i-ri:layout-masonry-line' },
-  { key: 'floating', label: '悬浮', icon: 'i-ri:layout-grid-line' },
-  { key: 'sidebar', label: '侧边栏', icon: 'i-ri:layout-left-2-line' },
-] as const;
 
 const menuBackgroundOptions = [
   { label: '浅色', value: 'light' },
   { label: '深色', value: 'dark' },
 ];
 
-const directionOptions = [
-  { label: 'LTR', value: 'ltr' },
-  { label: 'RTL', value: 'rtl' },
-];
+const themeStyles = [
+  {
+    key: 'light',
+    label: '浅色',
+    title: '浅色主题',
+    image: themeLightPreview,
+  },
+  {
+    key: 'dark',
+    label: '深色',
+    title: '深色主题',
+    image: themeDarkPreview,
+  },
+  {
+    key: 'system',
+    label: '系统',
+    title: '跟随系统主题',
+    image: themeSystemPreview,
+  },
+] as const;
 
 function handleMenuBackgroundChange(value: string | number): void {
   if (value === 'light' || value === 'dark') {
@@ -60,95 +69,54 @@ const basicSettings = reactive([
           </h3>
           <div class="grid grid-cols-3 gap-3">
             <button
+              v-for="style in themeStyles"
+              :key="style.key"
               class="min-w-0 border rounded-md bg-transparent p-1.5 cursor-pointer"
               :class="
-                settings.themeMode === 'light'
+                settings.themeMode === style.key
                   ? 'border-primary text-primary a-bg-primary-bg'
                   : 'a-border-border a-color-text-secondary a-bg-container hover:border-primary'
               "
               type="button"
-              title="浅色主题"
-              :aria-pressed="settings.themeMode === 'light'"
-              @click="settings.setThemeMode('light')"
+              :title="style.title"
+              :aria-pressed="settings.themeMode === style.key"
+              @click="settings.setThemeMode(style.key)"
             >
-              <span class="h-14 flex overflow-hidden rounded bg-gray-100">
-                <span class="w-1/4 bg-white border-r border-gray-200" />
-                <span class="flex-1 p-1.5">
-                  <span class="block h-1.5 rounded bg-white" />
-                  <span class="mt-1.5 block h-8 rounded bg-white" />
-                </span>
-              </span>
-              <span class="mt-1.5 block text-xs">浅色</span>
-            </button>
-
-            <button
-              class="min-w-0 border rounded-md bg-transparent p-1.5 cursor-pointer"
-              :class="
-                settings.themeMode === 'dark'
-                  ? 'border-primary text-primary a-bg-primary-bg'
-                  : 'a-border-border a-color-text-secondary a-bg-container hover:border-primary'
-              "
-              type="button"
-              title="深色主题"
-              :aria-pressed="settings.themeMode === 'dark'"
-              @click="settings.setThemeMode('dark')"
-            >
-              <span class="h-14 flex overflow-hidden rounded bg-gray-800">
-                <span class="w-1/4 bg-gray-950 border-r border-gray-700" />
-                <span class="flex-1 p-1.5">
-                  <span class="block h-1.5 rounded bg-gray-700" />
-                  <span class="mt-1.5 block h-8 rounded bg-gray-700" />
-                </span>
-              </span>
-              <span class="mt-1.5 block text-xs">深色</span>
-            </button>
-
-            <button
-              class="min-w-0 border rounded-md bg-transparent p-1.5 cursor-pointer"
-              :class="
-                settings.themeMode === 'system'
-                  ? 'border-primary text-primary a-bg-primary-bg'
-                  : 'a-border-border a-color-text-secondary a-bg-container hover:border-primary'
-              "
-              type="button"
-              title="跟随系统主题"
-              :aria-pressed="settings.themeMode === 'system'"
-              @click="settings.setThemeMode('system')"
-            >
-              <span class="h-14 flex overflow-hidden rounded">
-                <span class="w-1/2 bg-white border-r border-gray-200" />
-                <span class="w-1/2 bg-gray-900" />
-              </span>
-              <span class="mt-1.5 block text-xs">系统</span>
+              <img
+                :src="style.image"
+                :alt="style.title"
+                class="block aspect-[11/8] w-full rounded object-cover"
+              />
+              <span class="mt-1.5 block text-xs">{{ style.label }}</span>
             </button>
           </div>
         </section>
 
         <section>
           <h3 class="mb-4 text-center text-sm font-medium a-color-text">
-            菜单布局
+            主题色
           </h3>
-          <div class="grid grid-cols-3 gap-x-3 gap-y-4">
+          <div class="flex flex-wrap justify-center gap-4 px-2">
             <button
-              v-for="layout in menuLayouts"
-              :key="layout.key"
-              class="min-w-0 border rounded-md bg-transparent p-2 cursor-pointer"
+              v-for="color in BRAND_COLORS"
+              :key="color.value"
+              class="h-8 w-8 rounded-full border-2 border-solid cursor-pointer transition-transform duration-200 hover:scale-110"
               :class="
-                menuLayout === layout.key
-                  ? 'border-primary text-primary a-bg-primary-bg'
-                  : 'a-border-border a-color-text-secondary a-bg-container hover:border-primary'
+                settings.primaryColor === color.value
+                  ? 'border-primary ring-2 ring-primary ring-offset-2'
+                  : 'a-border-border'
               "
               type="button"
-              :title="`${layout.label}菜单`"
-              :aria-pressed="menuLayout === layout.key"
-              @click="menuLayout = layout.key"
+              :title="`${color.name}主题色`"
+              :aria-label="`${color.name}主题色`"
+              :aria-pressed="settings.primaryColor === color.value"
+              :style="{ backgroundColor: color.value }"
+              @click="settings.setPrimaryColor(color.value)"
             >
-              <span
-                class="h-10 grid place-items-center rounded a-bg-fill-tertiary text-2xl"
-              >
-                <i :class="layout.icon" />
-              </span>
-              <span class="mt-1.5 block text-xs">{{ layout.label }}</span>
+              <i
+                v-if="settings.primaryColor === color.value"
+                class="i-ri:check-line text-sm text-white drop-shadow"
+              />
             </button>
           </div>
         </section>
@@ -163,18 +131,6 @@ const basicSettings = reactive([
             block
             :options="menuBackgroundOptions"
             @update:value="handleMenuBackgroundChange"
-          />
-        </section>
-
-        <section>
-          <h3 class="mb-4 text-center text-sm font-medium a-color-text">
-            布局方向
-          </h3>
-          <a-segmented
-            v-model:value="direction"
-            class="w-full"
-            block
-            :options="directionOptions"
           />
         </section>
 

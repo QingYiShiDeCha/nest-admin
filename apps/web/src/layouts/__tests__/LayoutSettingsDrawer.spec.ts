@@ -59,9 +59,10 @@ describe('LayoutSettingsDrawer', () => {
       '372px',
     );
     expect(drawer.text()).toContain('主题风格');
-    expect(drawer.text()).toContain('菜单布局');
+    expect(drawer.text()).toContain('主题色');
     expect(drawer.text()).toContain('菜单背景');
-    expect(drawer.text()).toContain('布局方向');
+    expect(drawer.text()).not.toContain('菜单布局');
+    expect(drawer.text()).not.toContain('布局方向');
     expect(drawer.text()).toContain('基础配置');
     expect(wrapper.findAll('[data-testid="switch"]')).toHaveLength(4);
   });
@@ -96,5 +97,19 @@ describe('LayoutSettingsDrawer', () => {
 
     expect(settings.menuBackground).toBe('dark');
     expect(menuBackground.props('value')).toBe('dark');
+  });
+
+  it('从抽屉切换主题色', async () => {
+    const wrapper = mountDrawer();
+    const settings = useSettingsStore(pinia);
+    await wrapper.get('button[title="界面设置"]').trigger('click');
+
+    const greenTheme = wrapper.get('button[title="绿色主题色"]');
+    expect(greenTheme.attributes('aria-pressed')).toBe('false');
+
+    await greenTheme.trigger('click');
+
+    expect(greenTheme.attributes('aria-pressed')).toBe('true');
+    expect(settings.primaryColor).toBe('#60C041');
   });
 });
