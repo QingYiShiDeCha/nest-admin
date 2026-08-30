@@ -1,12 +1,13 @@
 # nest-admin
 
-基于 NestJS 11、Vue 3、Drizzle ORM 和 MySQL 8 的全栈后台管理系统，采用 pnpm monorepo 组织。项目已经覆盖认证与会话安全、RBAC、用户/角色/菜单/组织架构/岗位管理、部门数据权限、操作日志、在线用户、文件上传、主题切换和通用表格/图表组件，可直接作为管理后台的开发基础。
+基于 NestJS 11、Vue 3、Drizzle ORM 和 MySQL 8 的全栈后台管理系统，采用 pnpm monorepo 组织。项目已经覆盖认证与会话安全、RBAC、用户/角色/菜单/组织架构/岗位管理、部门数据权限、通知公告、操作日志、在线用户、文件上传、主题切换和通用表格/图表组件，可直接作为管理后台的开发基础。
 
 ## 已实现功能
 
 - **认证与会话**：access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效。
-- **RBAC**：用户、角色、权限码、菜单树、部门数据范围和按钮级权限控制，内置超管防自锁规则。
-- **系统管理**：用户、组织架构、岗位、角色、菜单、操作日志、在线用户等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
+- **RBAC**：用户、角色、权限码、菜单树、部门数据范围和按钮级权限控制，支持 Redis 授权/数据范围缓存及主动失效，内置超管防自锁规则。
+- **系统管理**：用户、组织架构、岗位、角色、菜单、参数配置、通知公告、操作日志、在线用户等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
+- **通知与消息**：公告草稿、发布、撤回和阅读统计，支持全员、部门、角色、指定用户发送；Header 展示未读角标和最近消息，SSE + Redis Pub/Sub 实时同步多实例事件，断线自动回退轮询。
 - **界面基础设施**：浅色/深色/跟随系统主题、可切换主色和菜单风格、KeepAlive 页签、内容区独立刷新、Remix Icon 图标体系。
 - **数据展示**：封装折线图、柱状图、饼图/环形图和热力图，统一处理主题、自适应尺寸、空状态和动画。
 - **文件与头像**：本地或 S3 兼容存储，个人中心支持上传头像，图片地址统一适配 API 前缀。
@@ -22,7 +23,7 @@
 | 请求 / 图表   | alova + ECharts 6 + vue-echarts                                             |
 | ORM           | Drizzle ORM 0.45（`drizzle-orm/mysql2`），迁移用 drizzle-kit                |
 | 数据库        | MySQL 8，驱动 mysql2 连接池                                                 |
-| Redis         | 全局限流与定时清理任务分布式锁，可选配置                                    |
+| Redis         | 全局限流、RBAC 缓存与定时清理任务分布式锁，可选配置                         |
 | 配置          | `@nestjs/config` + zod 做启动期环境变量校验                                 |
 | 认证          | `@nestjs/jwt` + passport-jwt，双 token（access / refresh），bcryptjs 存密码 |
 | 校验          | class-validator / class-transformer，全局 `ValidationPipe`                  |
@@ -179,6 +180,16 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 **岗位与用户关系**。`sys_post` 保存岗位主数据，`sys_user_post` 支持一个用户拥有多个岗位。停用岗位不能新增分配，但已有关系可保留或解除；岗位仍有有效用户时拒绝删除。用户岗位接口同样受当前管理员的数据范围约束，不能通过猜测用户 ID 越权分配。
 
+**系统参数不是环境变量**。`sys_system_config` 只保存可由管理员维护的非敏感业务参数，支持文本、数字、布尔和 JSON 四种值类型；JWT 密钥、数据库密码、Redis 地址等部署机密仍只允许放在 `.env`。参数值在写入时按声明类型校验，内置参数允许改值但不允许改键或删除，自定义参数软删除后参数键也不可复用。业务模块可注入 `SystemConfigService` 并通过 `getEnabledValue(key)` 读取已经解析类型的启用参数。
+
+**授权与数据范围使用 Redis 缓存**。`PermissionService` 缓存普通用户的角色与权限码，`DataScopeService` 缓存可序列化的范围结果，不缓存 Drizzle SQL 对象；超级管理员仍直接短路。缓存键带用户版本，数据范围键额外带组织树全局版本：用户角色、角色权限/状态/数据范围或用户所属部门变化时递增用户版本，部门新增、移动、删除时递增树版本。旧版本无需 `SCAN` 删除，最多在 `RBAC_CACHE_TTL_SECONDS` 后自然回收。
+
+**缓存不是认证单点**。未配置 `REDIS_URL` 时直接查数据库；Redis 读取、写入或失效失败同样回源，并对错误日志限频。查询 miss 使用读取版本时生成的票据回写，因此查询期间恰好发生权限变更，也只会把旧结果写入旧版本键，不会污染失效后的新版本。主动失效和 TTL 共同保证一致性，默认 TTL 为 300 秒、最大 3600 秒。
+
+**通知公告使用发布快照**。`sys_notice` 保存正文与生命周期，`sys_notice_target` 保存草稿选择的部门、角色或用户范围；发布时解析当前启用用户并写入 `sys_notice_recipient`。发布后用户换部门、换角色不会改变既有接收历史，撤回只让收件箱停止展示，收件人快照仍保留用于阅读统计和再次发布。
+
+**消息入口与公告管理授权分离**。`/messages` 是所有登录用户都可访问的个人收件箱，Header 始终展示铃铛；没有通知公告菜单只代表不能创建、发布或管理公告。发布时系统按全员、部门、角色或指定用户解析收件人快照，消息查询也始终带当前用户 id，因此每个人只会看到推送给自己的消息。Header 通过 Bearer SSE 接收发布、撤回和已读事件，Redis Pub/Sub 负责多实例传播，Redis 未配置或故障时保留本机推送，浏览器断线期间回退到 60 秒轮询。
+
 **几条防自锁规则**。内置角色（`is_system`）不可删除、不可停用、不可改角色码——停用超管角色会把所有管理员一起锁在系统外；改角色码会让守卫里的超管短路判断失效。另外不允许修改自己的角色，否则误摘超管后只能去数据库手工恢复。改名称和备注不受限制。
 
 **菜单树的几条规则**。节点分三类：`directory` 只做分组、不对应页面也不能有 `component`；`menu` 必须有 `path`，前端根据当前用户菜单动态注册路由，`component` 可填写相对 `apps/web/src/views` 的组件路径，也可留空并按 `path` 自动匹配对应目录下的 `index.vue`；`external` 的 `path` 必须是完整 URL。只有目录能当父节点。改 `parentId` 时会拒绝指向自己或自己的后代，避免子树脱离主干成环。删除和「目录改成其他类型」在还有子节点时都会被拒绝——级联删一棵子树不可逆，让调用方显式逐个确认更安全。
@@ -225,7 +236,7 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 **Redis 故障时选择放行（fail-open）。** 换成 Redis 之后，限流从「进程内一个 Map」变成了外部依赖。如果 Redis 抖动就让所有请求 500，等于为了防暴力破解给系统加了个新的单点，代价明显不成比例。`AppThrottlerGuard.handleRequest` 捕获存储异常后放行并打 error 日志，但只吞存储错误——`ThrottlerException` 是「确实超限」的正常结果，必须原样上抛。
 
-**权限变更即时生效**。`JwtStrategy` 每个请求回库查用户与授权，所以改角色授权、禁用角色、禁用用户都不需要重新登录就会生效。代价是每个受保护请求多几次查询；要优化就在 `PermissionService` 加缓存，届时需一并解决「改权限后缓存何时失效」的一致性问题。
+**权限变更不要求重新登录**。`JwtStrategy` 每个请求仍回库校验用户和会话，角色与权限查询由 Redis 缓存承担。角色授权、角色状态、数据范围和用户角色关系的写接口在数据库提交后主动切换缓存版本；Redis 不可用时回退数据库，因此不会因为缓存故障阻断认证。
 
 **注入数据库**。任何 service 里 `@Inject(DRIZZLE) private readonly db: DrizzleDB`，即可获得带完整表结构推断的 Drizzle 实例。`DatabaseModule` 是 `@Global` 的，不必在各模块重复 import。
 
@@ -243,6 +254,8 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
     ├── sys_dept (自引用树)        └──< sys_role_dept >── sys_dept
     │       └──< sys_dept_transfer_log
     └──< sys_user_post >── sys_post
+    └──< sys_notice_recipient >── sys_notice ──< sys_notice_target
+sys_system_config (独立业务参数表)
 ```
 
 | 表                    | 作用                            | 关键约束                                                         |
@@ -251,6 +264,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | `sys_dept`            | 部门组织树                      | `code` 唯一；`parent_id` 组成层级                                |
 | `sys_dept_transfer_log` | 部门迁移历史                  | append-only；保存迁移前后父级、原因与操作人名称快照              |
 | `sys_post`            | 岗位主数据                      | `code` 唯一；停用后不可新增用户分配                              |
+| `sys_system_config`   | 非敏感业务参数                  | 参数键唯一；按声明类型校验；内置参数不可改键或删除                |
 | `sys_role`            | 角色                            | `code` 唯一；`data_scope` 数据权限范围；`is_system` 内置角色保护 |
 | `sys_permission`      | 权限码，如 `system:user:delete` | `code` 唯一；`module` 用于分配界面分组                           |
 | `sys_menu`            | 前端路由菜单树                  | `parent_id` 自引用，`type` 为 directory / menu / external        |
@@ -261,6 +275,9 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | `sys_role_dept`       | 角色自定义部门范围              | 联合主键                                                         |
 | `sys_refresh_token`   | 登录设备会话                    | `jti` 唯一；记录过期、吊销、轮换链、IP 与 User-Agent             |
 | `sys_operation_log`   | 操作审计日志                    | append-only；保存脱敏参数、结果、耗时与客户端信息                |
+| `sys_notice`          | 通知公告主表                    | 草稿 / 已发布 / 已撤回；保存发布人名称快照                       |
+| `sys_notice_target`   | 公告定向范围                    | 部门、角色或用户多态目标；联合主键防重复                         |
+| `sys_notice_recipient` | 用户收件箱                     | 发布时生成快照；公告与用户联合唯一；`read_at` 记录已读           |
 
 几条贯穿全表的约定：
 
@@ -274,7 +291,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 
 底层是 `nestjs-cls`（AsyncLocalStorage）：上下文由 `ClsMiddleware` 建立，当前用户 id 由 `RequestContextInterceptor` 写入。**用拦截器而不是中间件**是关键——中间件在守卫之前执行，那时 `request.user` 还不存在；拦截器一定在所有守卫之后运行。
 
-字段仍然可空，这是正常的：`@Public()` 接口（比如自助注册）没有登录态，seed 和定时任务这类非 HTTP 入口连 CLS 上下文都没有，两种情况都会写入 `null`。`RequestContext` 里用 `cls.isActive()` 做了保护，在没有上下文时返回 `null` 而不是抛错。
+字段仍然可空，这是正常的：尚未自行验明身份的 `@Public()` 接口、seed 和定时任务都可能没有操作人。refresh 接口会在 refreshToken 验签后通过 `RequestContext.setUser()` 写入可信身份，不能直接相信请求体里的 JWT 声明。`RequestContext` 在没有 CLS 上下文时返回 `null` 而不是抛错。
 
 ## 接口一览
 
@@ -294,6 +311,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | GET    | `/api/users/:id`                      | `system:user:read`         | 用户详情                                            |
 | PATCH  | `/api/users/:id`                      | `system:user:update`       | 更新用户（不含用户名和密码）                        |
 | DELETE | `/api/users/:id`                      | `system:user:delete`       | 删除用户                                            |
+| PATCH  | `/api/users/me/profile`               | 仅需登录                   | 修改自己的昵称、邮箱和手机号，支持清空              |
 | PATCH  | `/api/users/me/avatar`                | 仅需登录                   | 更新当前用户头像地址，传 `null` 恢复默认头像        |
 | GET    | `/api/users/:id/sessions`             | `system:user:session:list` | 查看指定用户的在线设备                              |
 | DELETE | `/api/users/:id/sessions/:sessionId`  | `system:user:force-logout` | 下线该用户的某台设备                                |
@@ -334,6 +352,26 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 | GET    | `/api/departments/:id/transfers`      | `system:dept:transfer:list` | 分页查询部门迁移历史                               |
 | PATCH  | `/api/departments/:id`                | `system:dept:update`       | 更新或移动部门；移动时迁移原因必填                  |
 | DELETE | `/api/departments/:id`                | `system:dept:delete`       | 删除空部门，有下级或直属用户时拒绝                  |
+| GET    | `/api/notices`                        | `system:notice:list`       | 分页查询通知公告与阅读统计                          |
+| POST   | `/api/notices`                        | `system:notice:create`     | 新增公告草稿                                        |
+| GET    | `/api/notices/target-options`         | 新增或更新公告权限         | 查询可选部门、角色或用户                            |
+| GET    | `/api/notices/:id`                    | `system:notice:read`       | 公告详情与接收范围                                  |
+| PATCH  | `/api/notices/:id`                    | `system:notice:update`     | 更新未发布或已撤回公告                              |
+| POST   | `/api/notices/:id/publish`            | `system:notice:publish`    | 发布并生成收件人快照                                |
+| POST   | `/api/notices/:id/withdraw`           | `system:notice:withdraw`   | 撤回已发布公告                                      |
+| DELETE | `/api/notices/:id`                    | `system:notice:delete`     | 删除未发布或已撤回公告                              |
+| GET    | `/api/system-configs`                 | `system:config:list`       | 分页查询系统参数                                    |
+| POST   | `/api/system-configs`                 | `system:config:create`     | 新增自定义系统参数                                  |
+| GET    | `/api/system-configs/:id`             | `system:config:read`       | 查询系统参数详情                                    |
+| PATCH  | `/api/system-configs/:id`             | `system:config:update`     | 更新系统参数；内置参数不可改键                      |
+| DELETE | `/api/system-configs/:id`             | `system:config:delete`     | 删除非内置系统参数                                  |
+| GET    | `/api/messages`                       | 仅需登录                   | 分页查询我的消息                                    |
+| GET    | `/api/messages/recent`                | 仅需登录                   | Header 最近五条消息                                 |
+| GET    | `/api/messages/unread-count`          | 仅需登录                   | 查询未读消息数量                                    |
+| GET    | `/api/messages/stream`                | 仅需登录                   | 订阅站内消息 SSE 实时事件                           |
+| GET    | `/api/messages/:id`                   | 仅需登录                   | 查询属于自己的消息详情                              |
+| PATCH  | `/api/messages/:id/read`              | 仅需登录                   | 标记一条消息已读                                    |
+| PATCH  | `/api/messages/read-all`              | 仅需登录                   | 全部标记已读                                        |
 
 ## 尚未包含
 
@@ -341,7 +379,6 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 
 - **日志归档到冷存储**。目前超期日志是直接物理删除。若有合规要求需要长期留存，应在 `LogCleanupService` 删除前先导出到对象存储或归档表。
 - **通用数据权限适配**。部门数据范围当前已用于用户列表；后续业务模块需要在各自查询入口复用 `DataScopeService`，按资源所有者或部门字段追加条件。
-- **Redis 业务缓存**。限流与清理任务分布式锁已经使用 Redis，用户和权限数据尚未做缓存。
 - **实时在线状态**。在线用户当前按有效登录会话判断，不包含 WebSocket 心跳、最后活跃时间或 IP 地理位置；浏览器关闭但会话未过期时仍会显示在线。
-- **鉴权查询缓存**。`JwtStrategy` 每个受保护请求都会校验会话、用户和授权，好处是退出、禁用与权限变更立即生效；量大时需要引入带主动失效机制的缓存。
+- **实时消息不做历史事件重放**。SSE 重连后会主动同步当前未读数和可见消息，Redis 只传播轻量失效事件；消息正文、收件人快照和已读状态仍以 MySQL 为准。
 - **构建缓存**。包数量变多、CI 变慢时可以再引入 Turborepo，现在 pnpm 原生编排够用。
