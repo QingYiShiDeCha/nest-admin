@@ -81,6 +81,17 @@ export const routes: RouteRecordRaw[] = [
           cacheName: 'LogPage',
         },
       },
+      {
+        path: 'system/online-user',
+        name: 'system-online-user',
+        component: () => import('@/views/system/online-user/index.vue'),
+        meta: {
+          title: '在线用户',
+          permission: PERMISSIONS.USER_SESSION_LIST,
+          keepAlive: true,
+          cacheName: 'OnlineUserPage',
+        },
+      },
     ],
   },
   {

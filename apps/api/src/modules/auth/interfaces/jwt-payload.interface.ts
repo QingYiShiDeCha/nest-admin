@@ -15,8 +15,7 @@ export interface JwtPayload {
   jti?: string;
   /**
    * 仅 accessToken 有，值等于它所属会话的 refreshToken jti。
-   * 只用来在会话列表里标出「当前设备」，鉴权时不校验它——
-   * accessToken 仍然是无状态的。
+   * 鉴权时用它确认会话仍有效，同时在会话列表标出「当前设备」。
    */
   sid?: string;
 }

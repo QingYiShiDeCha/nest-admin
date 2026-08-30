@@ -8,6 +8,7 @@ import { PermissionService } from '../../rbac/permission.service';
 import { UserService } from '../../user/user.service';
 import type { AuthUser } from '../interfaces/auth-user.interface';
 import type { JwtPayload } from '../interfaces/jwt-payload.interface';
+import { RefreshTokenService } from '../refresh-token.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -15,6 +16,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     config: ConfigService<Env, true>,
     private readonly userService: UserService,
     private readonly permissionService: PermissionService,
+    private readonly refreshTokens: RefreshTokenService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -30,6 +32,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload): Promise<AuthUser> {
     if (payload.type !== 'access') {
       throw new UnauthorizedException('请使用 accessToken 访问');
+    }
+
+    if (!payload.sid) {
+      throw new UnauthorizedException('登录态无法识别，请重新登录');
+    }
+
+    const session = await this.refreshTokens.check(payload.sid);
+
+    if (!session.ok || session.record.userId !== payload.sub) {
+      throw new UnauthorizedException('登录态已失效，请重新登录');
     }
 
     const user = await this.userService

@@ -83,6 +83,13 @@ const MENU_TREE: readonly MenuSeed[] = [
         icon: 'RiFileList3Line',
         sort: 30,
       },
+      {
+        name: '在线用户',
+        type: 'menu',
+        path: '/system/online-user',
+        icon: 'RiGlobalLine',
+        sort: 40,
+      },
     ],
   },
   {

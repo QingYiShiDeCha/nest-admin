@@ -7,6 +7,7 @@ export * from './constants/throttle';
 export * from './interfaces/api-response.interface';
 export * from './interfaces/file.interface';
 export * from './interfaces/menu.interface';
+export * from './interfaces/online-user.interface';
 export * from './interfaces/operation-log.interface';
 export * from './interfaces/role.interface';
 export * from './interfaces/user.interface';

@@ -1,15 +1,42 @@
-import { refreshTokens, type RefreshTokenRow } from '@nest-admin/database';
+import {
+  refreshTokens,
+  users,
+  type RefreshTokenRow,
+} from '@nest-admin/database';
+import type { OnlineUserSession, PaginatedResult } from '@nest-admin/shared';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, desc, eq, gt, isNull, lt, ne, sql } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gt,
+  isNull,
+  like,
+  lt,
+  ne,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 
 import { randomUUID } from 'node:crypto';
 
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
+import type { QueryOnlineUserDto } from './dto/query-online-user.dto';
 
 /** 校验一个 jti 的结果，交给调用方决定怎么响应 */
 export type RefreshTokenCheck =
   | { ok: true; record: RefreshTokenRow }
   | { ok: false; reason: 'unknown' | 'expired' | 'revoked' | 'reused' };
+
+export type OnlineUserSessionRow = Omit<
+  OnlineUserSession,
+  'createdAt' | 'expiresAt'
+> & {
+  createdAt: Date;
+  expiresAt: Date;
+};
 
 @Injectable()
 export class RefreshTokenService {
@@ -123,6 +150,73 @@ export class RefreshTokenService {
       .orderBy(desc(refreshTokens.createdAt));
   }
 
+  async findOnlinePage(
+    query: QueryOnlineUserDto,
+    currentSessionId: string | null,
+  ): Promise<PaginatedResult<OnlineUserSessionRow>> {
+    const keyword = query.keyword?.trim();
+    const ip = query.ip?.trim();
+    const conditions: SQL[] = [
+      isNull(refreshTokens.revokedAt),
+      gt(refreshTokens.expiresAt, new Date()),
+      isNull(users.deletedAt),
+      eq(users.status, 'active'),
+    ];
+
+    if (keyword) {
+      const keywordCondition = or(
+        like(users.username, `%${keyword}%`),
+        like(users.nickname, `%${keyword}%`),
+      );
+
+      if (keywordCondition) {
+        conditions.push(keywordCondition);
+      }
+    }
+
+    if (ip) {
+      conditions.push(like(refreshTokens.ip, `%${ip}%`));
+    }
+
+    const where = and(...conditions);
+    const [rows, [{ total }]] = await Promise.all([
+      this.db
+        .select({
+          id: refreshTokens.id,
+          userId: users.id,
+          username: users.username,
+          nickname: users.nickname,
+          avatar: users.avatar,
+          ip: refreshTokens.ip,
+          userAgent: refreshTokens.userAgent,
+          createdAt: refreshTokens.createdAt,
+          expiresAt: refreshTokens.expiresAt,
+          jti: refreshTokens.jti,
+        })
+        .from(refreshTokens)
+        .innerJoin(users, eq(refreshTokens.userId, users.id))
+        .where(where)
+        .orderBy(desc(refreshTokens.createdAt), desc(refreshTokens.id))
+        .limit(query.pageSize)
+        .offset(query.offset),
+      this.db
+        .select({ total: count() })
+        .from(refreshTokens)
+        .innerJoin(users, eq(refreshTokens.userId, users.id))
+        .where(where),
+    ]);
+
+    return {
+      list: rows.map(({ jti, ...row }) => ({
+        ...row,
+        current: currentSessionId !== null && jti === currentSessionId,
+      })),
+      total,
+      page: query.page,
+      pageSize: query.pageSize,
+    };
+  }
+
   /**
    * 按主键吊销，但**必须同时匹配 userId**——这是防越权的关键。
    * 只用 id 查会让任何登录用户猜 id 就能把别人的会话下掉。
@@ -185,11 +279,10 @@ export class RefreshTokenService {
     return others.length;
   }
 
-  /** 吊销单个 token，用于主动登出 */
+  /** 主动登出时物理删除当前有效会话；轮换或强制吊销记录仍保留 */
   async revoke(jti: string): Promise<void> {
     await this.db
-      .update(refreshTokens)
-      .set({ revokedAt: sql`CURRENT_TIMESTAMP` })
+      .delete(refreshTokens)
       .where(and(eq(refreshTokens.jti, jti), isNull(refreshTokens.revokedAt)));
   }
 

@@ -3,6 +3,7 @@ import type {
   LoginResult,
   MenuNode,
   MenuRecord,
+  OnlineUserSession,
   OperationLog,
   Role,
   RoleDetail,
@@ -16,6 +17,7 @@ import type {
 } from '@nest-admin/database';
 import type { AuthUser } from './modules/auth/interfaces/auth-user.interface';
 import type { AuthResult } from './modules/auth/interfaces/jwt-payload.interface';
+import type { OnlineUserSessionRow } from './modules/auth/refresh-token.service';
 import type { MenuTreeNode } from './modules/rbac/menu.service';
 import type { RoleDetail as BackendRoleDetail } from './modules/rbac/role.service';
 
@@ -78,6 +80,11 @@ type OperationLogContract = Assert<
   Serialized<OperationLogRow> extends OperationLog ? true : false
 >;
 
+// ---- 在线用户 ----
+type OnlineUserSessionContract = Assert<
+  Serialized<OnlineUserSessionRow> extends OnlineUserSession ? true : false
+>;
+
 // 引用一遍，防止被认为未使用而被工具清理；同时让 IDE 悬停可查
 export type WireContractChecks = [
   BasicUserContract,
@@ -88,4 +95,5 @@ export type WireContractChecks = [
   MenuRecordContract,
   MenuNodeContract,
   OperationLogContract,
+  OnlineUserSessionContract,
 ];
