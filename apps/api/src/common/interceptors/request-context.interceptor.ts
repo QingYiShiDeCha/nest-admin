@@ -18,7 +18,8 @@ import type { AppClsStore } from '../context/request-context.service';
  * 用拦截器而不是中间件：中间件在守卫之前执行，那时 request.user 还不存在。
  * 拦截器一定在所有守卫之后运行，此时 JwtAuthGuard 已经把 AuthUser 挂上去了。
  *
- * @Public() 接口不会有 user，此时只写 ip/ua，userId 保持为空。
+ * @Public() 接口不会有 user，此时先只写 ip/ua；若业务随后自行验明身份，
+ * 可通过 RequestContext.setUser 补充操作人。
  */
 @Injectable()
 export class RequestContextInterceptor implements NestInterceptor {
@@ -35,6 +36,7 @@ export class RequestContextInterceptor implements NestInterceptor {
 
     if (request.user) {
       this.cls.set('userId', request.user.id);
+      this.cls.set('username', request.user.username);
     }
 
     if (request.ip) {

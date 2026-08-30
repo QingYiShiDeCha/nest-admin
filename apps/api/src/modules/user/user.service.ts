@@ -37,11 +37,13 @@ import {
   type DataScopeSubject,
 } from '../rbac/data-scope.service';
 import { DepartmentService } from '../rbac/department.service';
+import { RbacCacheService } from '../rbac/rbac-cache.service';
 import type { Env } from '../../config/env.validation';
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
 import type { ChangePasswordDto } from './dto/change-password.dto';
 import type { CreateUserDto } from './dto/create-user.dto';
 import type { QueryUserDto } from './dto/query-user.dto';
+import type { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import type { UpdateUserDto } from './dto/update-user.dto';
 
 /** 复用的投影，保证 password 永远不会跟着查询结果溜出去 */
@@ -82,6 +84,7 @@ export class UserService {
     private readonly refreshTokens: RefreshTokenService,
     private readonly departments: DepartmentService,
     private readonly dataScopes: DataScopeService,
+    private readonly rbacCache: RbacCacheService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<SafeUser> {
@@ -239,6 +242,9 @@ export class UserService {
           .set({ ...dto, ...this.ctx.auditOnUpdate() })
           .where(alive(eq(users.id, id)));
       });
+      if (dto.deptId !== undefined) {
+        await this.rbacCache.invalidateUsers([id]);
+      }
       return this.findById(id);
     }
 
@@ -246,6 +252,10 @@ export class UserService {
       .update(users)
       .set({ ...dto, ...this.ctx.auditOnUpdate() })
       .where(alive(eq(users.id, id)));
+
+    if (dto.deptId !== undefined) {
+      await this.rbacCache.invalidateUsers([id]);
+    }
 
     return this.findById(id);
   }
@@ -289,6 +299,24 @@ export class UserService {
     return this.findById(id);
   }
 
+  async updateOwnProfile(
+    id: number,
+    dto: UpdateOwnProfileDto,
+  ): Promise<SafeUser> {
+    if (Object.keys(dto).length === 0) {
+      throw new BadRequestException('没有需要更新的资料');
+    }
+
+    await this.findById(id);
+
+    await this.db
+      .update(users)
+      .set({ ...dto, ...this.ctx.auditOnUpdate() })
+      .where(alive(eq(users.id, id)));
+
+    return this.findById(id);
+  }
+
   /** 管理员强制某用户下线，返回被吊销的会话数 */
   async forceLogout(id: number): Promise<{ revokedSessions: number }> {
     await this.findById(id);
@@ -316,6 +344,7 @@ export class UserService {
 
     // 人都删了，残留的会话没有存在意义
     await this.refreshTokens.revokeAllForUser(id);
+    await this.rbacCache.invalidateUsers([id]);
   }
 
   async touchLastLogin(id: number): Promise<void> {

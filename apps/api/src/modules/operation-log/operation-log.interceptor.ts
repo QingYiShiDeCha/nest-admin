@@ -11,6 +11,7 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { tap, type Observable } from 'rxjs';
 
+import { RequestContext } from '../../common/context/request-context.service';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface';
 import {
   OPERATION_LOG_KEY,
@@ -28,6 +29,7 @@ export class OperationLogInterceptor implements NestInterceptor {
   constructor(
     private readonly reflector: Reflector,
     private readonly service: OperationLogService,
+    private readonly requestContext: RequestContext,
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -98,13 +100,17 @@ export class OperationLogInterceptor implements NestInterceptor {
     status: OperationStatus,
     error?: unknown,
   ): void {
-    // user 由 JwtAuthGuard 挂上，@Public() 接口（如登录）没有，此时留空
+    // 普通接口从 JwtAuthGuard 的 request.user 取身份；refresh 这类公共接口
+    // 会在自行验签后把可信身份写入 CLS，因此再从请求上下文兜底。
     const user = request.user;
 
     void this.service
       .record({
-        userId: user?.id ?? null,
-        username: user?.username ?? this.guessUsername(request),
+        userId: user?.id ?? this.requestContext.userId,
+        username:
+          user?.username ??
+          this.requestContext.username ??
+          this.guessUsername(request),
         module: meta?.module ?? null,
         action: meta?.action ?? null,
         ...snapshot,

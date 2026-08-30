@@ -23,6 +23,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { QueryUserDto } from './dto/query-user.dto';
 import { UpdateAvatarDto } from './dto/update-avatar.dto';
+import { UpdateOwnProfileDto } from './dto/update-own-profile.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserService } from './user.service';
 import type { UserListItemRecord } from './user.service';
@@ -66,6 +67,16 @@ export class UserController {
     @Body() dto: ChangePasswordDto,
   ): Promise<void> {
     return this.userService.changePassword(userId, dto);
+  }
+
+  @Patch('me/profile')
+  @OperationLog({ module: '个人中心', action: '修改个人资料' })
+  @ApiOperation({ summary: '修改当前登录用户的昵称、邮箱和手机号' })
+  updateOwnProfile(
+    @CurrentUser('id') userId: number,
+    @Body() dto: UpdateOwnProfileDto,
+  ): Promise<SafeUser> {
+    return this.userService.updateOwnProfile(userId, dto);
   }
 
   @Patch('me/avatar')

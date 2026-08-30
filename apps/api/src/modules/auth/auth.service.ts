@@ -86,6 +86,9 @@ export class AuthService {
    */
   async refresh(refreshToken: string): Promise<AuthTokens> {
     const payload = await this.verifyRefreshToken(refreshToken);
+    // refresh 是公共路由，不会经过 JwtAuthGuard。验签成功后把可信身份写入
+    // 请求上下文，供操作日志记录操作人；绝不能在验签前读取请求体中的声明。
+    this.ctx.setUser(payload.sub, payload.username);
     const check = await this.refreshTokens.check(payload.jti);
 
     if (!check.ok) {

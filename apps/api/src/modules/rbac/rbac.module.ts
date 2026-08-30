@@ -12,6 +12,7 @@ import { PostController } from './post.controller';
 import { PostService } from './post.service';
 import { RoleController } from './role.controller';
 import { RoleService } from './role.service';
+import { RbacCacheService } from './rbac-cache.service';
 import { UserRoleController } from './user-role.controller';
 import { UserPostController } from './user-post.controller';
 
@@ -38,6 +39,7 @@ import { UserPostController } from './user-post.controller';
     DepartmentService,
     DataScopeService,
     PostService,
+    RbacCacheService,
   ],
   exports: [
     PermissionService,
@@ -47,6 +49,7 @@ import { UserPostController } from './user-post.controller';
     DepartmentService,
     DataScopeService,
     PostService,
+    RbacCacheService,
   ],
 })
 export class RbacModule {}

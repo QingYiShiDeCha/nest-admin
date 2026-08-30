@@ -5,6 +5,7 @@ import {
 } from './department.service';
 import type { DrizzleDB } from '../../database/database.constants';
 import type { RequestContext } from '../../common/context/request-context.service';
+import type { RbacCacheService } from './rbac-cache.service';
 import { BadRequestException, ConflictException } from '@nestjs/common';
 
 const department = (
@@ -99,11 +100,14 @@ function createUpdateHarness(selectRows: unknown[][], affectedRows = 1) {
     userId: 9,
     auditOnUpdate: () => ({ updatedBy: 9 }),
   } as unknown as RequestContext;
+  const invalidateDepartmentTree = jest.fn().mockResolvedValue(undefined);
+  const cache = { invalidateDepartmentTree } as unknown as RbacCacheService;
 
   return {
-    service: new DepartmentService(db, ctx),
+    service: new DepartmentService(db, ctx, cache),
     insertValues,
     transaction,
+    invalidateDepartmentTree,
   };
 }
 
@@ -123,25 +127,27 @@ describe('DepartmentService.update department transfer', () => {
   });
 
   it('在同一事务更新父级并保存名称与操作人快照', async () => {
-    const { service, insertValues, transaction } = createUpdateHarness([
-      [{ department: current, leaderName: null }],
-      [{ id: 3 }],
-      [
-        { department: department(1, '总公司', null), leaderName: null },
-        { department: current, leaderName: null },
-        { department: department(3, '技术委员会', 1), leaderName: null },
-      ],
-      [{ name: '总公司' }],
-      [{ name: '技术委员会' }],
-      [{ name: '管理员' }],
-      [{ department: moved, leaderName: null }],
-    ]);
+    const { service, insertValues, transaction, invalidateDepartmentTree } =
+      createUpdateHarness([
+        [{ department: current, leaderName: null }],
+        [{ id: 3 }],
+        [
+          { department: department(1, '总公司', null), leaderName: null },
+          { department: current, leaderName: null },
+          { department: department(3, '技术委员会', 1), leaderName: null },
+        ],
+        [{ name: '总公司' }],
+        [{ name: '技术委员会' }],
+        [{ name: '管理员' }],
+        [{ department: moved, leaderName: null }],
+      ]);
 
     await expect(
       service.update(2, { parentId: 3, moveReason: '组织架构调整' }),
     ).resolves.toMatchObject({ id: 2, parentId: 3 });
 
     expect(transaction).toHaveBeenCalledTimes(1);
+    expect(invalidateDepartmentTree).toHaveBeenCalledTimes(1);
     expect(insertValues).toHaveBeenCalledWith({
       deptId: 2,
       deptName: '研发中心',

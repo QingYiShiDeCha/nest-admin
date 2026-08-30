@@ -4,6 +4,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { RequestContext } from '../../common/context/request-context.service';
 import { DRIZZLE } from '../../database/database.constants';
 import { RoleService } from './role.service';
+import { RbacCacheService } from './rbac-cache.service';
 
 /**
  * 这里只测不依赖真实 SQL 的分支——即那些在发起查询之前就该拦下的规则。
@@ -13,6 +14,7 @@ import { RoleService } from './role.service';
 describe('RoleService 的保护性规则', () => {
   let service: RoleService;
   let db: { select: jest.Mock };
+  let cache: { invalidateUsers: jest.Mock };
 
   /** 当前操作人固定为 1，用来验证「不允许改自己的角色」这条规则 */
   const ctx = {
@@ -29,12 +31,17 @@ describe('RoleService 的保护性规则', () => {
 
   beforeEach(async () => {
     db = { select: jest.fn() };
+    cache = { invalidateUsers: jest.fn().mockResolvedValue(undefined) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RoleService,
         { provide: DRIZZLE, useValue: db },
         { provide: RequestContext, useValue: ctx },
+        {
+          provide: RbacCacheService,
+          useValue: cache,
+        },
       ],
     }).compile();
 
@@ -107,5 +114,30 @@ describe('RoleService 的保护性规则', () => {
 
     await expect(service.update(2, { remark: 'ok' })).resolves.toBeDefined();
     expect(update).toHaveBeenCalled();
+    expect(cache.invalidateUsers).not.toHaveBeenCalled();
+  });
+
+  it('替换用户角色后主动失效该用户授权与数据范围缓存', async () => {
+    mockSelectOnce([{ id: 2 }]);
+    db.select.mockReturnValueOnce({
+      from: () => ({ where: () => Promise.resolve([{ id: 3 }]) }),
+    });
+
+    const deleteWhere = jest.fn().mockResolvedValue(undefined);
+    const insertValues = jest.fn().mockResolvedValue(undefined);
+    (db as unknown as { transaction: unknown }).transaction = async (
+      callback: (tx: {
+        delete: () => { where: typeof deleteWhere };
+        insert: () => { values: typeof insertValues };
+      }) => Promise<void>,
+    ) =>
+      callback({
+        delete: () => ({ where: deleteWhere }),
+        insert: () => ({ values: insertValues }),
+      });
+
+    await service.setUserRoles(2, [3]);
+
+    expect(cache.invalidateUsers).toHaveBeenCalledWith([2]);
   });
 });

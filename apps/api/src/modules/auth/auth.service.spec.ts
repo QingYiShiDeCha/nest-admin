@@ -68,6 +68,10 @@ describe('AuthService', () => {
       | 'revokeOthers'
     >
   >;
+  let requestContext: {
+    client: jest.Mock;
+    setUser: jest.Mock;
+  };
 
   beforeAll(async () => {
     passwordHash = await hash(PASSWORD, 4);
@@ -95,6 +99,10 @@ describe('AuthService', () => {
       revokeOwned: jest.fn().mockResolvedValue(true),
       revokeOthers: jest.fn().mockResolvedValue(3),
     };
+    requestContext = {
+      client: jest.fn(() => ({ ip: '127.0.0.1', userAgent: 'jest' })),
+      setUser: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [
@@ -113,7 +121,7 @@ describe('AuthService', () => {
         { provide: RefreshTokenService, useValue: refreshTokens },
         {
           provide: RequestContext,
-          useValue: { client: () => ({ ip: '127.0.0.1', userAgent: 'jest' }) },
+          useValue: requestContext,
         },
       ],
     }).compile();
@@ -196,6 +204,7 @@ describe('AuthService', () => {
         secret: ACCESS_SECRET,
       }),
     ).resolves.toMatchObject({ type: 'access' });
+    expect(requestContext.setUser).toHaveBeenCalledWith(USER.id, USER.username);
   });
 
   it('拿 accessToken 当 refreshToken 用会被拒绝', async () => {
@@ -219,6 +228,7 @@ describe('AuthService', () => {
     await expect(service.refresh(forged)).rejects.toThrow(
       new UnauthorizedException('refreshToken 无效或已过期'),
     );
+    expect(requestContext.setUser).not.toHaveBeenCalled();
   });
 
   const signRefresh = (jti: string | undefined) =>

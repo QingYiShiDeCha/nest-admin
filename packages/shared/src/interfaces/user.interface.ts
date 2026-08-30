@@ -39,6 +39,13 @@ export interface UserProfile extends BasicUser {
   sessionId: string | null;
 }
 
+/** 当前用户可自行维护的基础资料；null 表示清空对应字段。 */
+export interface UpdateOwnProfilePayload {
+  nickname?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}
+
 export interface LoginPayload {
   username: string;
   password: string;

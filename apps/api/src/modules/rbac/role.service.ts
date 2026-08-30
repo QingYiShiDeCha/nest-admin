@@ -41,6 +41,7 @@ import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
 import type { CreateRoleDto } from './dto/create-role.dto';
 import type { QueryRoleDto } from './dto/query-role.dto';
 import type { UpdateRoleDto } from './dto/update-role.dto';
+import { RbacCacheService } from './rbac-cache.service';
 
 export interface RoleDetail extends RoleRow {
   permissionIds: number[];
@@ -58,6 +59,7 @@ export class RoleService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     private readonly ctx: RequestContext,
+    private readonly cache: RbacCacheService,
   ) {}
 
   async findPage(query: QueryRoleDto): Promise<PaginatedResult<RoleRow>> {
@@ -202,6 +204,15 @@ export class RoleService {
       }
     });
 
+    if (
+      roleValues.code !== undefined ||
+      roleValues.status !== undefined ||
+      roleValues.dataScope !== undefined ||
+      departmentIds !== undefined
+    ) {
+      await this.invalidateRoleUsers(id);
+    }
+
     return this.findRoleOrFail(id);
   }
 
@@ -221,6 +232,8 @@ export class RoleService {
       .update(roles)
       .set({ deletedAt: sql`CURRENT_TIMESTAMP`, ...this.ctx.auditOnUpdate() })
       .where(aliveRole(eq(roles.id, id)));
+
+    await this.invalidateRoleUsers(id);
   }
 
   /** 全量替换角色的权限码 */
@@ -243,6 +256,8 @@ export class RoleService {
         );
       }
     });
+
+    await this.invalidateRoleUsers(roleId);
   }
 
   /** 全量替换角色的菜单 */
@@ -298,6 +313,8 @@ export class RoleService {
         );
       }
     });
+
+    await this.cache.invalidateUsers([userId]);
   }
 
   /** 查用户当前拥有的角色 id，供分配界面回显 */
@@ -323,6 +340,15 @@ export class RoleService {
     }
 
     return role;
+  }
+
+  private async invalidateRoleUsers(roleId: number): Promise<void> {
+    const rows = await this.db
+      .select({ id: userRoles.userId })
+      .from(userRoles)
+      .where(eq(userRoles.roleId, roleId));
+
+    await this.cache.invalidateUsers(rows.map((row) => row.id));
   }
 
   /**

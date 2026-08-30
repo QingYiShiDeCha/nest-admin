@@ -31,6 +31,7 @@ import type { CreateDepartmentDto } from './dto/create-department.dto';
 import type { QueryDepartmentDto } from './dto/query-department.dto';
 import type { QueryDepartmentTransferDto } from './dto/query-department-transfer.dto';
 import type { UpdateDepartmentDto } from './dto/update-department.dto';
+import { RbacCacheService } from './rbac-cache.service';
 
 export interface DepartmentRecord extends DepartmentRow {
   leaderName: string | null;
@@ -46,6 +47,7 @@ export class DepartmentService {
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     private readonly ctx: RequestContext,
+    private readonly cache: RbacCacheService,
   ) {}
 
   async findTree(
@@ -114,6 +116,8 @@ export class DepartmentService {
       parentId: dto.parentId ?? null,
       ...this.ctx.auditOnCreate(),
     });
+
+    await this.cache.invalidateDepartmentTree();
 
     return this.findDepartmentOrFail(result.insertId);
   }
@@ -203,6 +207,8 @@ export class DepartmentService {
       });
     });
 
+    await this.cache.invalidateDepartmentTree();
+
     return this.findDepartmentOrFail(id);
   }
 
@@ -264,6 +270,8 @@ export class DepartmentService {
       .update(departments)
       .set({ deletedAt: sql`CURRENT_TIMESTAMP`, ...this.ctx.auditOnUpdate() })
       .where(and(eq(departments.id, id), isNull(departments.deletedAt)));
+
+    await this.cache.invalidateDepartmentTree();
   }
 
   async findDescendantIds(id: number): Promise<number[]> {

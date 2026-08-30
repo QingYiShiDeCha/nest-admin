@@ -3,21 +3,31 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { DRIZZLE } from '../../database/database.constants';
 import { DataScopeService } from './data-scope.service';
 import { DepartmentService } from './department.service';
+import { RbacCacheService } from './rbac-cache.service';
 
 describe('DataScopeService', () => {
   let service: DataScopeService;
   let db: { select: jest.Mock; selectDistinct: jest.Mock };
   let departments: { findDescendantIds: jest.Mock };
+  let cache: {
+    lookupDataScope: jest.Mock;
+    store: jest.Mock;
+  };
 
   beforeEach(async () => {
     db = { select: jest.fn(), selectDistinct: jest.fn() };
     departments = { findDescendantIds: jest.fn() };
+    cache = {
+      lookupDataScope: jest.fn().mockResolvedValue({ key: 'scope-key' }),
+      store: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DataScopeService,
         { provide: DRIZZLE, useValue: db },
         { provide: DepartmentService, useValue: departments },
+        { provide: RbacCacheService, useValue: cache },
       ],
     }).compile();
 
@@ -37,6 +47,7 @@ describe('DataScopeService', () => {
       service.buildUserCondition({ id: 1, deptId: 1, isSuperAdmin: true }),
     ).resolves.toBeUndefined();
     expect(db.select).not.toHaveBeenCalled();
+    expect(cache.lookupDataScope).not.toHaveBeenCalled();
   });
 
   it('任一角色拥有 all 时返回全量', async () => {
@@ -70,6 +81,26 @@ describe('DataScopeService', () => {
       service.buildUserCondition({ id: 8, deptId: null, isSuperAdmin: false }),
     ).resolves.toBeDefined();
     expect(db.selectDistinct).toHaveBeenCalledTimes(1);
+  });
+
+  it('缓存命中时不再查询角色、部门树或自定义范围', async () => {
+    cache.lookupDataScope.mockResolvedValue({
+      key: 'scope-key',
+      value: {
+        unrestricted: false,
+        self: true,
+        departmentIds: [5, 6],
+      },
+    });
+
+    await expect(
+      service.buildUserCondition({ id: 8, deptId: 5, isSuperAdmin: false }),
+    ).resolves.toBeDefined();
+
+    expect(db.select).not.toHaveBeenCalled();
+    expect(db.selectDistinct).not.toHaveBeenCalled();
+    expect(departments.findDescendantIds).not.toHaveBeenCalled();
+    expect(cache.store).not.toHaveBeenCalled();
   });
 
   it('没有有效角色时返回拒绝全部数据的条件', async () => {

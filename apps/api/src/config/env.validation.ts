@@ -83,6 +83,13 @@ const baseEnvSchema = z.object({
   UPLOAD_S3_PUBLIC_BASE_URL: optionalUrl,
 
   REDIS_URL: optionalUrl,
+  /** 用户授权与数据范围缓存 TTL；主动失效失败时由它限制最久陈旧时间。 */
+  RBAC_CACHE_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(10)
+    .max(3600)
+    .default(300),
 });
 
 export const envSchema = baseEnvSchema.superRefine((env, context) => {

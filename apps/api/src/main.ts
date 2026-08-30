@@ -72,6 +72,11 @@ async function bootstrap(): Promise<void> {
       ? '限流存储：Redis（多实例共享计数）'
       : '限流存储：进程内存（多实例部署时配额会按实例数翻倍）',
   );
+  logger.log(
+    config.get('REDIS_URL', { infer: true })
+      ? `RBAC 缓存：Redis（TTL ${config.get('RBAC_CACHE_TTL_SECONDS', { infer: true })} 秒）`
+      : 'RBAC 缓存：关闭（授权与数据范围直接查询数据库）',
+  );
   logger.log(`文件存储：${config.get('UPLOAD_DRIVER', { infer: true })}`);
   if (docsPath) {
     logger.log(`接口文档：http://localhost:${port}/${docsPath}`);

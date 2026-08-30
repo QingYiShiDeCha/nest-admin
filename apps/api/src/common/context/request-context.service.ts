@@ -4,6 +4,7 @@ import { ClsService, type ClsStore } from 'nestjs-cls';
 /** CLS 里存的内容。将来放 traceId 之类的也从这里扩展 */
 export interface AppClsStore extends ClsStore {
   userId?: number;
+  username?: string;
   ip?: string;
   userAgent?: string;
 }
@@ -21,11 +22,23 @@ export class RequestContext {
 
   /**
    * 当前操作人 id。以下情况返回 null，调用方要能接受：
-   * - @Public() 接口（没有登录态）
+   * - 尚未完成身份校验的 @Public() 接口
    * - seed、定时任务等非 HTTP 入口（压根没有 CLS 上下文）
    */
   get userId(): number | null {
     return this.read('userId');
+  }
+
+  get username(): string | null {
+    return this.read('username');
+  }
+
+  /** 供已自行完成身份校验的公共接口补充操作人信息。 */
+  setUser(userId: number, username: string): void {
+    if (!this.cls.isActive()) return;
+
+    this.cls.set('userId', userId);
+    this.cls.set('username', username);
   }
 
   /** 客户端 IP，用于 refreshToken 的签发记录 */
