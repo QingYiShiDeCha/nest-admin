@@ -44,6 +44,7 @@ const componentStubs = vi.hoisted(() => ({
       scroll: Object,
       size: String,
       expandedRowKeys: Array,
+      expandable: Object,
     },
     emits: ['update:expandedRowKeys'],
     template:
@@ -77,6 +78,7 @@ const TableForRow = ProTable as unknown as DefineComponent<{
   showIndex?: boolean;
   pagination?: boolean;
   expandedRowKeys?: Array<string | number>;
+  rowExpandable?: (record: Row) => boolean;
   'onUpdate:expandedRowKeys'?: (keys: Array<string | number>) => void;
 }>;
 
@@ -115,7 +117,11 @@ describe('ProTable', () => {
     const tableCard = wrapper.get('.rounded-lg');
 
     expect(tableCard.classes()).toEqual(
-      expect.arrayContaining(['border', 'border-solid', 'a-border-border-secondary']),
+      expect.arrayContaining([
+        'border',
+        'border-solid',
+        'a-border-border-secondary',
+      ]),
     );
     expect(reload).toHaveBeenCalledOnce();
     expect(renderedTable.props('dataSource')).toEqual(table.list.value);
@@ -124,7 +130,7 @@ describe('ProTable', () => {
       current: 3,
       pageSize: 10,
       total: 21,
-      size: 'large',
+      size: 'middle',
       showQuickJumper: true,
     });
   });
@@ -150,9 +156,7 @@ describe('ProTable', () => {
     expect(wrapper.classes()).not.toContain(
       '[&_.ant-spin-nested-loading]:flex-1',
     );
-    expect(wrapper.classes()).not.toContain(
-      '[&_.ant-table-wrapper]:h-full',
-    );
+    expect(wrapper.classes()).not.toContain('[&_.ant-table-wrapper]:h-full');
   });
 
   it('序号使用 rowOffset，刷新按钮复用 reload', async () => {
@@ -166,7 +170,9 @@ describe('ProTable', () => {
       render: (value: unknown, record: Row, index: number) => string;
     };
 
-    expect(indexColumn.render(undefined, { id: 1, name: 'admin' }, 2)).toBe('23');
+    expect(indexColumn.render(undefined, { id: 1, name: 'admin' }, 2)).toBe(
+      '23',
+    );
 
     const refreshButton = wrapper.get('button[title="刷新"]');
     expect(refreshButton.classes()).toEqual(
@@ -196,14 +202,14 @@ describe('ProTable', () => {
       { key: 'small', label: '紧凑' },
     ]);
     expect(menu.selectable).toBe(true);
-    expect(menu.selectedKeys).toEqual(['large']);
-    expect(renderedTable.props('size')).toBe('large');
+    expect(menu.selectedKeys).toEqual(['middle']);
+    expect(renderedTable.props('size')).toBe('middle');
 
     menu.onClick({ key: 'small' });
     await nextTick();
 
     expect(renderedTable.props('size')).toBe('small');
-    expect(renderedTable.props('pagination')).toMatchObject({ size: 'large' });
+    expect(renderedTable.props('pagination')).toMatchObject({ size: 'middle' });
     expect(wrapper.find('button[title="密度：紧凑"]').exists()).toBe(true);
   });
 
@@ -211,7 +217,9 @@ describe('ProTable', () => {
     const { wrapper } = mountTable(true);
     await nextTick();
 
-    expect(wrapper.get('[data-testid="table"]').text()).toContain('自定义：admin');
+    expect(wrapper.get('[data-testid="table"]').text()).toContain(
+      '自定义：admin',
+    );
   });
 
   it('支持无分页树数据并转发展开行双向绑定', async () => {
@@ -243,5 +251,21 @@ describe('ProTable', () => {
 
     await wrapper.get('[data-testid="expand"]').trigger('click');
     expect(onExpandedRowKeys).toHaveBeenCalledWith([1]);
+  });
+
+  it('向 a-table 转发展开条件以隐藏叶子节点按钮', async () => {
+    const rowExpandable = (record: Row) => record.id === 1;
+    const { wrapper } = mountTable();
+
+    await wrapper.setProps({ rowExpandable });
+    await nextTick();
+
+    const expandable = wrapper
+      .getComponent(componentStubs.table)
+      .props('expandable') as { rowExpandable: (record: Row) => boolean };
+
+    expect(expandable.rowExpandable).toBe(rowExpandable);
+    expect(expandable.rowExpandable({ id: 1, name: '父节点' })).toBe(true);
+    expect(expandable.rowExpandable({ id: 2, name: '叶子节点' })).toBe(false);
   });
 });

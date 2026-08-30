@@ -36,6 +36,8 @@ const props = withDefaults(
     pagination?: boolean;
     /** 树形数据的受控展开行 */
     expandedRowKeys?: RowKey[];
+    /** 控制树表格哪些行可以展开 */
+    rowExpandable?: (record: T) => boolean;
   }>(),
   {
     rowKey: 'id',
@@ -130,6 +132,10 @@ const resolvedPagination = computed(() => {
     pageSize: props.table.pagination.value.pageSize ?? 20,
   };
 });
+
+const expandableConfig = computed(() =>
+  props.rowExpandable ? { rowExpandable: props.rowExpandable } : undefined,
+);
 
 function handleExpandedRowKeys(keys: readonly RowKey[]): void {
   emit('update:expandedRowKeys', [...keys]);
@@ -228,6 +234,7 @@ const stretchChain =
         :pagination="resolvedPagination"
         :size="tableSize"
         :scroll="{ y: 200 }"
+        :expandable="expandableConfig"
         :expanded-row-keys="expandedRowKeys"
         @update:expanded-row-keys="handleExpandedRowKeys"
       >
