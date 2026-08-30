@@ -72,6 +72,13 @@ vi.mock('@/layouts/components/TabBar.vue', () => ({
   },
 }));
 
+vi.mock('@/layouts/components/notification-popover/index.vue', () => ({
+  default: {
+    name: 'NotificationPopover',
+    template: '<div data-testid="notification-popover" />',
+  },
+}));
+
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     isSuperAdmin: false,
@@ -102,6 +109,14 @@ vi.mock('@/stores/tabs', () => ({
 }));
 
 describe('AdminLayout scroll ownership', () => {
+  it('所有登录用户都显示个人消息通知入口', () => {
+    const wrapper = mount(AdminLayout);
+
+    expect(
+      wrapper.find('[data-testid="notification-popover"]').exists(),
+    ).toBe(true);
+  });
+
   it('从 Header 控制侧栏收起和展开', async () => {
     const wrapper = mount(AdminLayout);
     const sider = wrapper.getComponent({ name: 'ALayoutSider' });

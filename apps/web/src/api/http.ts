@@ -3,12 +3,8 @@ import { createAlova } from 'alova';
 import adapterFetch from 'alova/fetch';
 
 import { emitUnauthorized } from '@/utils/auth-events';
-import {
-  clearTokens,
-  getAccessToken,
-  getRefreshToken,
-  saveTokens,
-} from '@/utils/auth-token';
+import { API_BASE_URL, refreshAccessToken } from '@/utils/auth-refresh';
+import { clearTokens, getAccessToken } from '@/utils/auth-token';
 
 /** 统一的接口错误。httpStatus 是 HTTP 状态码，bizCode 是响应体里的 code */
 export class ApiError extends Error {
@@ -21,8 +17,6 @@ export class ApiError extends Error {
     this.name = 'ApiError';
   }
 }
-
-const BASE_URL = import.meta.env.VITE_API_BASE || '/api';
 
 /**
  * 不参与「401 → 刷新 → 重试」的接口。它们本身就是认证入口：
@@ -41,52 +35,10 @@ const NO_REFRESH_PATHS = [
  * 第一个成功后旧 refreshToken 已被轮换作废，后面的会全部失败，
  * 还会触发后端的盗用检测把账号整个踢下线。
  */
-let refreshing: Promise<boolean> | null = null;
-
-async function tryRefresh(): Promise<boolean> {
-  const refreshToken = getRefreshToken();
-
-  if (!refreshToken) {
-    return false;
-  }
-
-  refreshing ??= (async () => {
-    try {
-      // 用裸 fetch：走 alova 实例会被自己的 401 逻辑拦住，形成递归
-      const response = await fetch(`${BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-      const body = (await response.json().catch(() => null)) as {
-        code?: number;
-        data?: { accessToken?: string; refreshToken?: string };
-      } | null;
-
-      if (!response.ok || body?.code !== 0 || !body.data?.accessToken || !body.data.refreshToken) {
-        return false;
-      }
-
-      saveTokens({
-        accessToken: body.data.accessToken,
-        refreshToken: body.data.refreshToken,
-      });
-
-      return true;
-    } catch {
-      return false;
-    } finally {
-      refreshing = null;
-    }
-  })();
-
-  return refreshing;
-}
-
 export const alova = createAlova({
   // 少了它所有请求都会打到站点根路径（/users 而不是 /api/users）。
   // 开发时 vite 代理只转发 /api 前缀，缺失会直接命中前端页面而不是后端
-  baseURL: BASE_URL,
+  baseURL: API_BASE_URL,
   requestAdapter: adapterFetch(),
   timeout: 15_000,
   /**
@@ -161,7 +113,7 @@ async function sendWithRetry<T>(
       error instanceof ApiError &&
       error.httpStatus === 401 &&
       !NO_REFRESH_PATHS.some((path) => url.includes(path)) &&
-      (await tryRefresh());
+      (await refreshAccessToken());
 
     if (!shouldRetry) {
       if (error instanceof ApiError && error.httpStatus === 401) {

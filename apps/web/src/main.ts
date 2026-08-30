@@ -12,6 +12,7 @@ import { vPermission } from './directives/permission';
 import { resetDynamicRoutes } from './router/dynamic-routes';
 import { useAuthStore } from './stores/auth';
 import { useMenuStore } from './stores/menu';
+import { useNotificationsStore } from './stores/notifications';
 import { useTabsStore } from './stores/tabs';
 import { onUnauthorized } from './utils/auth-events';
 
@@ -35,6 +36,7 @@ onUnauthorized(() => {
 
   useAuthStore(pinia).reset();
   useMenuStore(pinia).reset();
+  useNotificationsStore(pinia).reset();
   useTabsStore(pinia).reset();
   resetDynamicRoutes();
 

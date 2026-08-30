@@ -11,6 +11,7 @@ import { resolveImageUrl } from '@/utils/image-url';
 import { resetDynamicRoutes } from '@/router/dynamic-routes';
 import AdminBreadcrumb from './AdminBreadcrumb.vue';
 import LayoutSettingsDrawer from './LayoutSettingsDrawer.vue';
+import NotificationPopover from './notification-popover/index.vue';
 import type { MenuItems } from '../menu-tree';
 
 defineProps<{
@@ -84,6 +85,7 @@ async function handleUserMenuClick({
     </div>
 
     <div class="flex items-center gap-4">
+      <NotificationPopover />
       <LayoutSettingsDrawer />
 
       <a-dropdown

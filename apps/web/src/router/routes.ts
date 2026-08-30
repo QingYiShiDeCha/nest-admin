@@ -1,7 +1,7 @@
 import type { RouteRecordRaw } from 'vue-router';
 import { ADMIN_ROUTE_NAME } from './dynamic-routes';
 
-/** 这里只保留应用外壳和公共页面，业务页面由当前用户的菜单树动态注册。 */
+/** 管理页面由菜单树动态注册；消息中心是所有登录用户的个人收件箱。 */
 export const routes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -14,7 +14,19 @@ export const routes: RouteRecordRaw[] = [
     name: ADMIN_ROUTE_NAME,
     component: () => import('@/layouts/AdminLayout.vue'),
     redirect: '/dashboard',
-    children: [],
+    children: [
+      {
+        path: '/messages',
+        name: 'message-center',
+        component: () => import('@/views/messages/index.vue'),
+        meta: {
+          title: '消息中心',
+          icon: 'RiNotification3Line',
+          keepAlive: true,
+          cacheName: 'MessageCenterPage',
+        },
+      },
+    ],
   },
   {
     path: '/403',

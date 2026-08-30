@@ -36,6 +36,12 @@ export const MENU_ICON_OPTIONS = [
     keywords: 'setting config',
   },
   {
+    value: 'RiListSettingsLine',
+    icon: 'i-ri:list-settings-line',
+    label: '参数配置',
+    keywords: 'list settings config parameters',
+  },
+  {
     value: 'RiToolsLine',
     icon: 'i-ri:tools-line',
     label: '工具',
