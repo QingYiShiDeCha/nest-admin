@@ -1,23 +1,36 @@
 # nest-admin
 
-基于 NestJS 11 + Drizzle ORM + MySQL 8 的后台管理系统骨架，pnpm monorepo 结构。当前范围是**基础设施 + 认证**：配置校验、数据库接入、JWT 登录、统一响应、Swagger 文档，以及一套用户 CRUD。RBAC 权限体系尚未实现（见文末「尚未包含」）。
+基于 NestJS 11、Vue 3、Drizzle ORM 和 MySQL 8 的全栈后台管理系统，采用 pnpm monorepo 组织。项目已经覆盖认证与会话安全、RBAC、用户/角色/菜单管理、操作日志、在线用户、文件上传、主题切换和通用表格/图表组件，可直接作为管理后台的开发基础。
+
+## 已实现功能
+
+- **认证与会话**：access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效。
+- **RBAC**：用户、角色、权限码、菜单树和按钮级权限控制，内置超管防自锁规则。
+- **系统管理**：用户、角色、菜单、操作日志、在线用户等页面，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
+- **界面基础设施**：浅色/深色/跟随系统主题、可切换主色和菜单风格、KeepAlive 页签、内容区独立刷新、Remix Icon 图标体系。
+- **数据展示**：封装折线图、柱状图、饼图/环形图和热力图，统一处理主题、自适应尺寸、空状态和动画。
+- **文件与头像**：本地或 S3 兼容存储，个人中心支持上传头像，图片地址统一适配 API 前缀。
 
 ## 技术栈
 
-| 层面 | 选型 |
-| --- | --- |
-| 运行时 / 语言 | Node.js 22、TypeScript 5.7（`module: nodenext`、`target: ES2023`） |
-| 框架 | NestJS 11 + Express |
-| ORM | Drizzle ORM 0.45（`drizzle-orm/mysql2`），迁移用 drizzle-kit |
-| 数据库 | MySQL 8，驱动 mysql2 连接池 |
-| 配置 | `@nestjs/config` + zod 做启动期环境变量校验 |
-| 认证 | `@nestjs/jwt` + passport-jwt，双 token（access / refresh），bcryptjs 存密码 |
-| 校验 | class-validator / class-transformer，全局 `ValidationPipe` |
-| 文档 | `@nestjs/swagger` |
-| 文件存储 | 本地文件系统或 AWS S3 / S3 兼容对象存储（`@aws-sdk/client-s3`） |
-| 测试 | Jest 30 + ts-jest，e2e 用 supertest |
-| 规范 | ESLint 9 flat config + typescript-eslint + Prettier |
-| 仓库结构 | pnpm 11 workspace，跨包脚本用 pnpm 原生 `-r` / `--filter` 编排 |
+| 层面          | 选型                                                                        |
+| ------------- | --------------------------------------------------------------------------- |
+| 运行时 / 语言 | Node.js 22、TypeScript（后端 NodeNext / ES2023，前端 Vue TSC）              |
+| 后端          | NestJS 11 + Express                                                         |
+| 前端          | Vue 3.5 + Vite 8 + Vue Router 5 + Pinia 4                                   |
+| UI / 样式     | antdv-next + UnoCSS + Remix Icon                                            |
+| 请求 / 图表   | alova + ECharts 6 + vue-echarts                                             |
+| ORM           | Drizzle ORM 0.45（`drizzle-orm/mysql2`），迁移用 drizzle-kit                |
+| 数据库        | MySQL 8，驱动 mysql2 连接池                                                 |
+| Redis         | 全局限流与定时清理任务分布式锁，可选配置                                    |
+| 配置          | `@nestjs/config` + zod 做启动期环境变量校验                                 |
+| 认证          | `@nestjs/jwt` + passport-jwt，双 token（access / refresh），bcryptjs 存密码 |
+| 校验          | class-validator / class-transformer，全局 `ValidationPipe`                  |
+| 文档          | `@nestjs/swagger`                                                           |
+| 文件存储      | 本地文件系统或 AWS S3 / S3 兼容对象存储（`@aws-sdk/client-s3`）             |
+| 测试          | Jest 30 + ts-jest、Vitest 4 + Vue Test Utils，e2e 用 supertest              |
+| 规范          | ESLint 9 flat config + typescript-eslint + eslint-plugin-vue + Prettier     |
+| 仓库结构      | pnpm 11 workspace，跨包脚本用 pnpm 原生 `-r` / `--filter` 编排              |
 
 ## 仓库结构
 
@@ -29,15 +42,21 @@ nest-admin/
 ├─ eslint.config.mjs         # 全仓库唯一一份 flat config
 ├─ .env / .env.example       # 唯一一份环境变量，各包都从仓库根读
 ├─ apps/
-│  └─ api/                   # @nest-admin/api，NestJS HTTP 服务
-│     ├─ src/
-│     │  ├─ main.ts          # 全局前缀、管道、拦截器、过滤器、Swagger
-│     │  ├─ app.module.ts
-│     │  ├─ config/          # zod 环境变量 schema、Swagger 装配
-│     │  ├─ common/          # 装饰器、分页 DTO、异常过滤、响应包装
-│     │  ├─ database/        # Nest 侧的 DI 封装（token + 全局模块）
-│     │  └─ modules/         # auth、user
-│     └─ test/               # e2e
+│  ├─ api/                   # @nest-admin/api，NestJS HTTP 服务
+│  │  ├─ src/
+│  │  │  ├─ main.ts          # 全局前缀、管道、拦截器、过滤器、Swagger
+│  │  │  ├─ app.module.ts
+│  │  │  ├─ config/          # zod 环境变量 schema、Swagger 装配
+│  │  │  ├─ common/          # 装饰器、分页 DTO、异常过滤、响应包装
+│  │  │  ├─ database/        # Nest 侧的 DI 封装（token + 全局模块）
+│  │  │  └─ modules/         # auth、user、rbac、operation-log、file
+│  │  └─ test/               # e2e
+│  └─ web/                   # @nest-admin/web，Vue 管理端
+│     ├─ src/api/            # alova 请求封装与业务 API
+│     ├─ src/components/     # 基础组件、图表、选择器、ProTable/ProSearch
+│     ├─ src/layouts/        # 后台布局、菜单、Header、TabBar、设置抽屉
+│     ├─ src/stores/         # 认证、菜单、页签和主题状态
+│     └─ src/views/          # 仪表盘、个人中心和系统管理页面
 └─ packages/
    ├─ database/              # @nest-admin/database
    │  ├─ src/schema/         # Drizzle 表定义，drizzle-kit 的输入
@@ -46,13 +65,13 @@ nest-admin/
    │  ├─ scripts/            # CLI 专用：env 解析、seed（不进 dist）
    │  └─ migrations/         # 生成的迁移 SQL，需要提交
    └─ shared/                # @nest-admin/shared
-      ├─ src/                # 响应结构、分页常量、用户状态枚举
+      ├─ src/                # 前后端契约、权限码、枚举与分页结构
       └─ src/node/           # Node 专用子路径，定位仓库根 .env
 ```
 
-包依赖方向是 `shared ← database ← api`，无环。`pnpm -r` 会按这个拓扑顺序执行。
+依赖方向是 `shared ← database ← api`，Web 只依赖 `shared`，禁止前端跨层引用数据库或 API 内部类型。`pnpm -r` 会按拓扑顺序执行。
 
-**为什么这么分**。`shared` 主入口不碰任何运行时框架，将来加 `apps/web` 可以直接引用而不会被 Drizzle 拖进去；Node 专用的工具单独放在 `@nest-admin/shared/node` 子路径导出，避免污染主入口。`database` 只管 schema 和连接，Nest 的 DI 封装留在 `apps/api/src/database`，这样定时任务、CLI 之类的非 Nest 进程也能复用同一套表定义和连接参数。
+**为什么这么分**。`shared` 主入口不碰任何运行时框架，Web 可直接引用线上契约而不会被 Drizzle 拖进去；Node 专用工具从 `@nest-admin/shared/node` 子路径导出，避免污染浏览器入口。`database` 只管 schema 和连接，Nest 的 DI 封装留在 `apps/api/src/database`，这样定时任务、CLI 等非 Nest 进程也能复用同一套表定义和连接参数。
 
 ## 快速开始
 
@@ -74,7 +93,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-启动后：接口前缀 `http://localhost:3000/api`，文档 `http://localhost:3000/api/docs`，健康检查 `GET /api/health`。
+启动后：管理端 `http://localhost:5173`，接口前缀 `http://localhost:3000/api`，Swagger `http://localhost:3000/api/docs`，健康检查 `GET /api/health`。
 
 环境变量只在仓库根维护一份。各包运行时 cwd 不同（`pnpm --filter` 会把 cwd 设到包目录），所以定位 `.env` 不靠相对层级，而是由 `@nest-admin/shared/node` 的 `findWorkspaceRoot()` 向上找 `pnpm-workspace.yaml`。本机若要覆盖某几项而不动 `.env`，可以另建 `.env.local`，它优先级更高。
 
@@ -82,37 +101,42 @@ pnpm dev
 
 根目录的命令会自动处理包之间的依赖顺序，日常用它们就够了：
 
-| 命令 | 说明 |
-| --- | --- |
-| `pnpm dev` | 先构建 packages，然后**并行**启动 api（:3000）与 web（:5173），带包名前缀的混合输出 |
-| `pnpm dev:api` / `pnpm dev:web` | 只启动其中一端 |
-| `pnpm build` | 按拓扑顺序构建全部包 |
-| `pnpm typecheck` / `pnpm lint` | 全仓库类型检查 / ESLint 自动修复（前后端各自的配置） |
-| `pnpm lint:api` / `pnpm lint:web` | 单独跑后端 / 前端的 lint，两者配置独立 |
-| `pnpm format` / `pnpm format:web` | 后端 / 前端的 prettier |
-| `pnpm test` / `pnpm test:e2e` | 单元测试 / 端到端测试（会先构建依赖包） |
-| `pnpm clean` | 删除所有 dist 与 tsbuildinfo |
-| `pnpm db:generate` | 对比 schema 生成迁移 SQL 到 `packages/database/migrations` |
-| `pnpm db:migrate` | 把未执行的迁移应用到数据库 |
-| `pnpm db:push` | 不生成迁移文件直接同步 schema，**仅限本地试验** |
-| `pnpm db:studio` | 打开 Drizzle Studio 可视化查看数据 |
-| `pnpm db:seed` | 幂等地创建初始管理员 |
+| 命令                              | 说明                                                                                |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| `pnpm dev`                        | 先构建 packages，然后**并行**启动 api（:3000）与 web（:5173），带包名前缀的混合输出 |
+| `pnpm dev:api` / `pnpm dev:web`   | 只启动其中一端                                                                      |
+| `pnpm build`                      | 按拓扑顺序构建全部包                                                                |
+| `pnpm typecheck` / `pnpm lint`    | 全仓库类型检查 / ESLint 自动修复（前后端各自的配置）                                |
+| `pnpm lint:api` / `pnpm lint:web` | 单独跑后端 / 前端的 lint，两者配置独立                                              |
+| `pnpm format` / `pnpm format:web` | 后端 / 前端的 prettier                                                              |
+| `pnpm test` / `pnpm test:e2e`     | 单元测试 / 端到端测试（会先构建依赖包）                                             |
+| `pnpm clean`                      | 删除所有 dist 与 tsbuildinfo                                                        |
+| `pnpm db:generate`                | 对比 schema 生成迁移 SQL 到 `packages/database/migrations`                          |
+| `pnpm db:migrate`                 | 把未执行的迁移应用到数据库                                                          |
+| `pnpm db:push`                    | 不生成迁移文件直接同步 schema，**仅限本地试验**                                     |
+| `pnpm db:studio`                  | 打开 Drizzle Studio 可视化查看数据                                                  |
+| `pnpm db:seed`                    | 幂等地创建初始管理员、权限码目录和默认菜单树                                        |
 
 要只操作某个包，用 `pnpm --filter @nest-admin/api <script>`。
 
-**类型即时生效，运行时需要构建**。`tsconfig.base.json` 里配了 `customConditions: ["@nest-admin/source"]`，各包 `exports` 中对应的分支指向 `src`，所以**编辑器和 `pnpm typecheck` 直接读源码**——改了 `packages` 下的类型，`apps/api` 立刻能看到，不需要先构建。Node 运行时不认识这个自定义条件，会落到 `default` 分支走 `dist`，因此**跑服务或测试前仍要 `pnpm build:packages`**（`pnpm dev` / `pnpm test` 已经内置了这一步）。
-
-这个设计是为了根除一类恼人的问题：早先跨包类型只能来自 `dist`，一旦执行过 `pnpm clean`、切分支或新克隆仓库还没构建，编辑器里所有 `@nest-admin/*` 导入都会解析失败，连带报出成片的 `no-unsafe-assignment` 之类的错误，而命令行却是干净的。注意各包的 `tsconfig.build.json` 里必须保留 `"customConditions": []`，否则 `tsc` 会把别的包的源码当成本包的输入文件，撞上 `rootDir` 限制。
+**修改共享包后先构建**。`apps/web` 的 Vite 开发环境通过 `@nest-admin/source` condition 直接读取 `packages/shared` 源码，但 API 与各包的独立 typecheck 读取构建产物。修改 `packages/shared` 或 `packages/database` 后应先执行 `pnpm build:packages`，否则可能仍看到旧的 `dist` 类型。`pnpm dev`、`pnpm test` 和数据库脚本已经内置这一步。
 
 ## 前端（apps/web）
 
 Vue 3.5 + Vite 8 + TypeScript + vue-router 5 + Pinia 4 + antdv-next（按需自动引入）+ UnoCSS（wind4 preset）。`create-vue` 脚手架起步。
 
+前端公共能力已经按用途收敛到 `src/components/core`：
+
+- `tables`：`ProSearch`、`ProTable` 与 `useTable` 组合，统一查询、分页、竞态防护、列显隐、密度、全屏和树表格行为。
+- `charts`：`BaseChart`、`LineChart`、`BarChart`、`PieChart`、`HeatmapChart`，统一 ECharts 注册、主题、动画、自适应尺寸和空状态。
+- `base` / `selectors`：`AppIcon`、`AppTag` 和精选 Remix Icon 图标选择器，图标 class 由 UnoCSS safelist 保证运行时可用。
+- `layouts`：Sidebar、Header、面包屑、TabBar 和设置抽屉分层组织；页面刷新只重建内容区域，不重载侧栏与头部。
+
 **ESLint 配置前后端是分开的两套**：根那份面向 Node/NestJS（类型感知、flat config），ignore 了 `apps/web`；前端在自己的 `eslint.config.ts` 里用 `eslint-plugin-vue` + `@vue/eslint-config-typescript`（create-vue 官方组合）。互不解析对方的文件。
 
 **TypeScript 版本是故意分叉的**：后端 5.9.3（根依赖）、前端 6.0.x（本包依赖），pnpm 会各装一份。Volar（Vue 语言服务）用包自己的版本，不会互相干扰；但 VS Code 的 `typescript.tsdk` 指向根那份 5.9.3，只对 `.ts` 生效，Vue 文件由 Volar 接管。
 
-**HTTP 请求用 alova**（`src/api/http.ts`）。响应统一解包：后端的 `{ code: 0, data }` 直接解出 `data`，失败一律抛 `ApiError`（带 `httpStatus` 与 `bizCode`），断网超时归一成 `httpStatus: 0`。**204 空响应体视为成功**——后端有 10 个接口（登出、删除、改密、配置授权等）返回 204，对空体调 `json()` 会抛错。
+**HTTP 请求用 alova**（`src/api/http.ts`）。响应统一解包：后端的 `{ code: 0, data }` 直接解出 `data`，失败一律抛 `ApiError`（带 `httpStatus` 与 `bizCode`），断网超时归一成 `httpStatus: 0`。**204 空响应体视为成功**——登出、删除、改密、配置授权等接口会返回 204，对空体调 `json()` 会抛错。
 
 **401 会静默刷新并重试一次，且多个并发 401 只刷新一次。** 这不是性能优化而是必须：后端的 refreshToken 是轮换式的，第一个刷新成功后旧令牌立即作废，若每个 401 各自去刷，后面的全会失败，还会触发后端的**盗用检测把整个账号踢下线**。刷新本身用裸 fetch 而不是 alova 实例，否则会被自己的 401 逻辑拦住形成递归。`/auth/login`、`/auth/refresh` 等认证入口豁免重试。
 
@@ -120,7 +144,7 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 开发时前端把 `/api` 代理到 `http://localhost:3000`（配置在 `vite.config.ts` 的 `server.proxy`），所以前端代码里统一写相对路径 `/api/...`，不需要关心后端端口也不存在跨域问题。
 
-样式入口是 `main.ts` 里的 `import 'virtual:uno.css'`，UnoCSS 靠这个虚拟模块注入生成的工具类，**漏掉这行插件就整个空跑**（脚手架默认不自带，是手工配的，漏过一次）。antdv 的组件不用手动 import，`AntdvNextResolver` 按需自动注册。
+样式入口是 `main.ts` 里的 `import 'virtual:uno.css'`，UnoCSS 靠这个虚拟模块注入生成的工具类，**漏掉这行插件就整个空跑**（脚手架默认不自带，是手工配的，漏过一次）。模板中的 antdv 组件由 `AntdvNextResolver` 按需自动注册；在 `h()` / TSX 中使用的组件仍需显式 import。
 
 ## 文件上传
 
@@ -128,7 +152,7 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 存储由 `UPLOAD_DRIVER` 切换：
 
-- `local`：写入仓库根下的 `UPLOAD_LOCAL_DIR`，默认 `.uploads`，并通过 `UPLOAD_LOCAL_URL_PREFIX` 暴露静态访问路径，默认 `/uploads`。
+- `local`：写入仓库根下的 `UPLOAD_LOCAL_DIR`，默认 `.uploads`，并同时通过直接路径和 API 前缀路径暴露，例如 `/uploads/...` 与 `/api/uploads/...`。
 - `s3`：使用 AWS SDK v3 的 `PutObject`，同时支持 AWS S3、MinIO 和提供 S3 兼容接口的 OSS。AWS S3 可不配 endpoint；兼容服务填写 `UPLOAD_S3_ENDPOINT`。凭证留空时走 AWS SDK 默认凭证链。上传请求不会主动设置 `public-read` ACL，公开读取应由 Bucket Policy、对象存储控制台或 CDN 配置负责。
 
 上传使用内存缓冲，`UPLOAD_MAX_FILE_SIZE_MB` 是单文件硬上限，默认 10 MB、最高 100 MB。`UPLOAD_ALLOWED_MIME_TYPES` 是逗号分隔白名单，支持 `image/*` 和 `*/*` 通配符。存储 key 的扩展名由 MIME 映射生成，不采用客户端文件名里的扩展名，避免上传伪装成普通文本的 HTML 后在同域执行。若对象通过私有域名、CDN 或自定义 Bucket 域名访问，配置 `UPLOAD_S3_PUBLIC_BASE_URL`；否则服务会根据 endpoint、bucket 和 region 生成对象 URL。
@@ -155,21 +179,19 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 `GET /menus/mine` 是前端渲染侧边栏的入口，不需要菜单管理权限。超管拿到全部启用菜单，其余按角色授权返回，并且**会自动补齐授权节点的祖先**：只授子菜单而没授父目录时，子节点会因为找不到父亲而在建树时被丢掉，整块入口就消失了。反过来，停用一个目录会连带隐藏它下面的所有入口。`visible: false` 的节点仍会返回，它表示「不在侧边栏显示但路由可访问」（详情页那类），由前端决定怎么处理。
 
-**refreshToken 可吊销，且每次刷新都轮换**。`sys_refresh_token` 记录每个 refreshToken 的 jti，刷新时作废旧 jti 并签发新的。存 jti 而不存 token 本身：token 是 bearer 凭证，落库等于多一处泄漏面，而签名校验由 JWT 自己完成，这张表只回答「这个 jti 还有效吗」。
+**refreshToken 可吊销，且每次刷新都轮换**。`sys_refresh_token` 记录每个 refreshToken 的 jti，刷新时作废旧 jti 并签发新的。存 jti 而不存 token 本身：token 是 bearer 凭证，落库等于多一处泄漏面，而签名校验由 JWT 自己完成，这张表只保存会话状态与客户端信息。
 
-**「已吊销」分两种，混为一谈会出 bug**。`replaced_by_jti` 非空表示它是被轮换掉的——正常客户端拿到新 token 后不会再用旧的，旧的再次出现说明被复制走了，此时吊销该用户全部会话并要求重新登录。`replaced_by_jti` 为空则是主动登出、改密或被踢下线，属于预期内失效，只拒绝这一次请求。我最初把两者都当成盗用，结果在一台设备上登出会把其他设备的登录态一起弄掉，`auth.service.spec.ts` 里有专门的回归用例守着这条。
+**不同失效原因采用不同保留策略**。轮换后的旧记录保留 `replaced_by_jti`，旧 token 再次出现时视为可能被复制，系统会吊销该用户全部会话。改密、删除用户或管理员强制下线会写入 `revoked_at`。用户主动退出时则物理删除当前有效会话，不留下仍被在线列表识别的记录。
 
-改密码和软删除用户会自动吊销该用户全部会话——密码泄漏后改密是第一反应，如果旧 refreshToken 还能继续换新，改密就等于没改。
+**accessToken 与会话状态绑定**。签发时把所属会话的 jti 写进 accessToken 的 `sid` claim；`JwtStrategy` 每次鉴权都会确认该会话仍有效且属于 token 中的用户。退出、改密或强制下线后，对应 accessToken 会立即被拒绝，不必等待自身过期。
 
-**会话列表靠 accessToken 里的 `sid`**。签发时把所属会话的 jti 写进 accessToken 的 `sid` claim，`AuthUser.sessionId` 透出来，列表据此标出「当前设备」。鉴权时不校验 `sid`，accessToken 依然无状态——它只用来回答「这条记录是不是我正在用的这台」。
+改密码和软删除用户会自动吊销该用户全部会话——密码泄漏后改密是第一反应，如果旧会话还能继续访问，改密就等于没改。
 
 列表刻意不返回 jti，只给数据库主键 id 用于下线。下线时**归属校验写在 SQL 条件里**（`id = ? AND user_id = ?`），只按 id 查会让任何登录用户猜 id 就能下掉别人的会话。未命中一律返回 404，不区分「不是你的」和「本来就没有」，否则这个接口就成了探测他人会话 id 的工具。
 
-管理员那组接口（`/users/:id/sessions`）与用户自己的那组是分开的：后者只能操作自己、不需要权限，前者能操作任意用户、受权限码保护。读和写也拆成两个码——看是 `system:user:session:list`，踢是 `system:user:force-logout`。管理员下线时会话必须确实属于路径上的那个用户，否则返回 404，避免拼错 id 就把别人的设备下掉。
+管理员会话接口与用户自己的接口分开：后者只能操作自己、不需要权限，前者能操作任意用户、受权限码保护。`GET /online-users` 按有效登录设备分页展示用户、IP、User-Agent、登录时间和过期时间；读取使用 `system:user:session:list`，下线使用 `system:user:force-logout`。管理员下线时会话必须确实属于路径上的用户，否则返回 404，避免拼错 id 就把别人的设备下掉。
 
-`revoke-others` 在识别不出当前设备时（用早期版本签发的 accessToken）直接拒绝，而不是退化成「全部下线」——那会把发起操作的人自己也踢掉。
-
-**accessToken 仍是无状态的**，吊销 refreshToken 不会让已签发的 accessToken 立刻失效，它最多再活 `JWT_ACCESS_EXPIRES_IN`（默认 30 分钟）。需要立刻阻断请把用户状态改成 `disabled`，那是每次请求都会校验的。
+`revoke-others` 在识别不出当前设备时（用早期版本签发的 accessToken）直接拒绝，而不是退化成「全部下线」——那会把发起操作的人自己也踢掉。没有 `sid` 的旧 accessToken 同样会被鉴权拒绝，要求重新登录。
 
 **操作日志**。所有写操作（POST/PUT/PATCH/DELETE）由 `OperationLogInterceptor` 自动记录，无需在每个 service 里手写。GET 不记——量级太大且没有审计价值，记了只会淹没真正要看的东西。用 `@OperationLog({ module, action })` 补上可读的中文标签，不标也会记录，只是只能靠 method + path 辨认；确实不该记的用 `@SkipOperationLog()`。
 
@@ -215,15 +237,17 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
                                    └──< sys_role_menu >── sys_menu (自引用树)
 ```
 
-| 表 | 作用 | 关键约束 |
-| --- | --- | --- |
-| `sys_user` | 用户 | `username` 唯一 |
-| `sys_role` | 角色 | `code` 唯一；`data_scope` 数据权限范围；`is_system` 内置角色保护 |
-| `sys_permission` | 权限码，如 `system:user:delete` | `code` 唯一；`module` 用于分配界面分组 |
-| `sys_menu` | 前端路由菜单树 | `parent_id` 自引用，`type` 为 directory / menu / external |
-| `sys_user_role` | 用户授角色 | 联合主键 |
-| `sys_role_permission` | 角色授权限 | 联合主键 |
-| `sys_role_menu` | 角色授菜单 | 联合主键 |
+| 表                    | 作用                            | 关键约束                                                         |
+| --------------------- | ------------------------------- | ---------------------------------------------------------------- |
+| `sys_user`            | 用户                            | `username` 唯一                                                  |
+| `sys_role`            | 角色                            | `code` 唯一；`data_scope` 数据权限范围；`is_system` 内置角色保护 |
+| `sys_permission`      | 权限码，如 `system:user:delete` | `code` 唯一；`module` 用于分配界面分组                           |
+| `sys_menu`            | 前端路由菜单树                  | `parent_id` 自引用，`type` 为 directory / menu / external        |
+| `sys_user_role`       | 用户授角色                      | 联合主键                                                         |
+| `sys_role_permission` | 角色授权限                      | 联合主键                                                         |
+| `sys_role_menu`       | 角色授菜单                      | 联合主键                                                         |
+| `sys_refresh_token`   | 登录设备会话                    | `jti` 唯一；记录过期、吊销、轮换链、IP 与 User-Agent             |
+| `sys_operation_log`   | 操作审计日志                    | append-only；保存脱敏参数、结果、耗时与客户端信息                |
 
 几条贯穿全表的约定：
 
@@ -235,53 +259,55 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 
 **审计字段自动填充**。`created_by` / `updated_by` 由 `RequestContext` 统一写入，service 里只要 `...this.ctx.auditOnCreate()` 或 `...this.ctx.auditOnUpdate()`，不需要把 `operatorId` 从 controller 一路当参数传下来。
 
-底层是 `nestjs-cls`（AsyncLocalStorage）：上下文由 `ClsMiddleware` 建立，当前用户 id 由 `CurrentUserInterceptor` 写入。**用拦截器而不是中间件**是关键——中间件在守卫之前执行，那时 `request.user` 还不存在；拦截器一定在所有守卫之后运行。
+底层是 `nestjs-cls`（AsyncLocalStorage）：上下文由 `ClsMiddleware` 建立，当前用户 id 由 `RequestContextInterceptor` 写入。**用拦截器而不是中间件**是关键——中间件在守卫之前执行，那时 `request.user` 还不存在；拦截器一定在所有守卫之后运行。
 
 字段仍然可空，这是正常的：`@Public()` 接口（比如自助注册）没有登录态，seed 和定时任务这类非 HTTP 入口连 CLS 上下文都没有，两种情况都会写入 `null`。`RequestContext` 里用 `cls.isActive()` 做了保护，在没有上下文时返回 `null` 而不是抛错。
 
 ## 接口一览
 
-| 方法 | 路径 | 鉴权 | 说明 |
-| --- | --- | --- | --- |
-| GET | `/api/health` | 公开 | 健康检查，数据库不通时返回 `degraded` |
-| POST | `/api/auth/register` | 公开 | 注册并直接返回 token |
-| POST | `/api/auth/login` | 公开 | 账号密码登录 |
-| POST | `/api/auth/refresh` | 公开 | 用 refreshToken 换新 token 对（会轮换旧的） |
-| POST | `/api/auth/logout` | 公开 | 登出，吊销本次提交的 refreshToken |
-| GET | `/api/auth/sessions` | 仅需登录 | 我的登录设备列表，当前设备排最前 |
-| DELETE | `/api/auth/sessions/:id` | 仅需登录 | 下线自己的指定设备 |
-| POST | `/api/auth/sessions/revoke-others` | 仅需登录 | 下线除当前设备外的全部会话 |
-| GET | `/api/auth/profile` | 需要 | 当前登录用户信息，含角色码与权限码 |
-| GET | `/api/users` | `system:user:list` | 分页查询，支持 `keyword` / `status` |
-| POST | `/api/users` | `system:user:create` | 新增用户 |
-| GET | `/api/users/:id` | `system:user:read` | 用户详情 |
-| PATCH | `/api/users/:id` | `system:user:update` | 更新用户（不含用户名和密码） |
-| DELETE | `/api/users/:id` | `system:user:delete` | 删除用户 |
-| GET | `/api/users/:id/sessions` | `system:user:session:list` | 查看指定用户的在线设备 |
-| DELETE | `/api/users/:id/sessions/:sessionId` | `system:user:force-logout` | 下线该用户的某台设备 |
-| POST | `/api/users/:id/force-logout` | `system:user:force-logout` | 强制该用户下线，吊销其全部会话 |
-| PUT | `/api/users/me/password` | 仅需登录 | 修改自己的密码，需校验旧密码 |
-| GET | `/api/users/:id/roles` | `system:user:assign-role` | 用户已分配的角色 id，供分配界面回显 |
-| PUT | `/api/users/:id/roles` | `system:user:assign-role` | 全量替换用户的角色 |
-| GET | `/api/roles` | `system:role:list` | 分页查询角色 |
-| POST | `/api/roles` | `system:role:create` | 新增角色 |
-| GET | `/api/roles/:id` | `system:role:read` | 角色详情，含 `permissionIds` / `menuIds` |
-| PATCH | `/api/roles/:id` | `system:role:update` | 更新角色 |
-| DELETE | `/api/roles/:id` | `system:role:delete` | 删除角色（软删除） |
-| PUT | `/api/roles/:id/permissions` | `system:role:assign` | 全量替换角色的权限码 |
-| PUT | `/api/roles/:id/menus` | `system:role:assign` | 全量替换角色的菜单 |
-| GET | `/api/permissions` | `system:permission:list` | 权限码目录，供授权界面拉取可选项 |
-| GET | `/api/operation-logs` | `system:log:list` | 分页查询操作日志，支持用户名/模块/结果/时间范围过滤 |
-| GET | `/api/operation-logs/:id` | `system:log:read` | 日志详情，含脱敏后的请求参数快照 |
-| GET | `/api/operation-logs/cleanup/preview` | `system:log:clean` | 预览本次清理会删掉多少行 |
-| POST | `/api/operation-logs/cleanup` | `system:log:clean` | 立即执行一次清理 |
-| POST | `/api/files/upload` | 仅需登录 | 上传单个文件，multipart 字段名为 `file` |
-| GET | `/api/menus/mine` | 仅需登录 | 当前用户可见的菜单树，前端渲染侧边栏 |
-| GET | `/api/menus` | `system:menu:list` | 完整菜单树（管理端），含停用与隐藏节点 |
-| POST | `/api/menus` | `system:menu:create` | 新增菜单 |
-| GET | `/api/menus/:id` | `system:menu:read` | 菜单详情 |
-| PATCH | `/api/menus/:id` | `system:menu:update` | 更新菜单 |
-| DELETE | `/api/menus/:id` | `system:menu:delete` | 删除菜单（软删除），有子菜单时拒绝 |
+| 方法   | 路径                                  | 鉴权                       | 说明                                                |
+| ------ | ------------------------------------- | -------------------------- | --------------------------------------------------- |
+| GET    | `/api/health`                         | 公开                       | 健康检查，数据库不通时返回 `degraded`               |
+| POST   | `/api/auth/register`                  | 公开                       | 注册并直接返回 token                                |
+| POST   | `/api/auth/login`                     | 公开                       | 账号密码登录                                        |
+| POST   | `/api/auth/refresh`                   | 公开                       | 用 refreshToken 换新 token 对（会轮换旧的）         |
+| POST   | `/api/auth/logout`                    | 公开                       | 登出，物理删除本次提交的当前有效会话                |
+| GET    | `/api/auth/sessions`                  | 仅需登录                   | 我的登录设备列表，当前设备排最前                    |
+| DELETE | `/api/auth/sessions/:id`              | 仅需登录                   | 下线自己的指定设备                                  |
+| POST   | `/api/auth/sessions/revoke-others`    | 仅需登录                   | 下线除当前设备外的全部会话                          |
+| GET    | `/api/auth/profile`                   | 需要                       | 当前登录用户信息，含角色码与权限码                  |
+| GET    | `/api/users`                          | `system:user:list`         | 分页查询，支持 `keyword` / `status`                 |
+| POST   | `/api/users`                          | `system:user:create`       | 新增用户                                            |
+| GET    | `/api/users/:id`                      | `system:user:read`         | 用户详情                                            |
+| PATCH  | `/api/users/:id`                      | `system:user:update`       | 更新用户（不含用户名和密码）                        |
+| DELETE | `/api/users/:id`                      | `system:user:delete`       | 删除用户                                            |
+| PATCH  | `/api/users/me/avatar`                | 仅需登录                   | 更新当前用户头像地址，传 `null` 恢复默认头像        |
+| GET    | `/api/users/:id/sessions`             | `system:user:session:list` | 查看指定用户的在线设备                              |
+| DELETE | `/api/users/:id/sessions/:sessionId`  | `system:user:force-logout` | 下线该用户的某台设备                                |
+| POST   | `/api/users/:id/force-logout`         | `system:user:force-logout` | 强制该用户下线，吊销其全部会话                      |
+| GET    | `/api/online-users`                   | `system:user:session:list` | 分页查询全部有效登录设备，支持用户与 IP 筛选        |
+| PUT    | `/api/users/me/password`              | 仅需登录                   | 修改自己的密码，需校验旧密码                        |
+| GET    | `/api/users/:id/roles`                | `system:user:assign-role`  | 用户已分配的角色 id，供分配界面回显                 |
+| PUT    | `/api/users/:id/roles`                | `system:user:assign-role`  | 全量替换用户的角色                                  |
+| GET    | `/api/roles`                          | `system:role:list`         | 分页查询角色                                        |
+| POST   | `/api/roles`                          | `system:role:create`       | 新增角色                                            |
+| GET    | `/api/roles/:id`                      | `system:role:read`         | 角色详情，含 `permissionIds` / `menuIds`            |
+| PATCH  | `/api/roles/:id`                      | `system:role:update`       | 更新角色                                            |
+| DELETE | `/api/roles/:id`                      | `system:role:delete`       | 删除角色（软删除）                                  |
+| PUT    | `/api/roles/:id/permissions`          | `system:role:assign`       | 全量替换角色的权限码                                |
+| PUT    | `/api/roles/:id/menus`                | `system:role:assign`       | 全量替换角色的菜单                                  |
+| GET    | `/api/permissions`                    | `system:permission:list`   | 权限码目录，供授权界面拉取可选项                    |
+| GET    | `/api/operation-logs`                 | `system:log:list`          | 分页查询操作日志，支持用户名/模块/结果/时间范围过滤 |
+| GET    | `/api/operation-logs/:id`             | `system:log:read`          | 日志详情，含脱敏后的请求参数快照                    |
+| GET    | `/api/operation-logs/cleanup/preview` | `system:log:clean`         | 预览本次清理会删掉多少行                            |
+| POST   | `/api/operation-logs/cleanup`         | `system:log:clean`         | 立即执行一次清理                                    |
+| POST   | `/api/files/upload`                   | 仅需登录                   | 上传单个文件，multipart 字段名为 `file`             |
+| GET    | `/api/menus/mine`                     | 仅需登录                   | 当前用户可见的菜单树，前端渲染侧边栏                |
+| GET    | `/api/menus`                          | `system:menu:list`         | 完整菜单树（管理端），含停用与隐藏节点              |
+| POST   | `/api/menus`                          | `system:menu:create`       | 新增菜单                                            |
+| GET    | `/api/menus/:id`                      | `system:menu:read`         | 菜单详情                                            |
+| PATCH  | `/api/menus/:id`                      | `system:menu:update`       | 更新菜单                                            |
+| DELETE | `/api/menus/:id`                      | `system:menu:delete`       | 删除菜单（软删除），有子菜单时拒绝                  |
 
 ## 尚未包含
 
@@ -289,7 +315,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
 
 - **日志归档到冷存储**。目前超期日志是直接物理删除。若有合规要求需要长期留存，应在 `LogCleanupService` 删除前先导出到对象存储或归档表。
 - **部门表与数据权限**。`sys_role.data_scope` 已经落库但还没有任何地方消费它，需要先有 `sys_dept` 才能把「本部门」「本部门及以下」这些范围翻译成查询条件。
-- **Redis 的其他用途**。目前只有限流在用它，`RedisModule` 已经把客户端抽出来了，后续做缓存、分布式锁可以直接注入 `REDIS_CLIENT`。
 - **Redis 业务缓存**。限流与清理任务分布式锁已经使用 Redis，用户和权限数据尚未做缓存。
-- **`JwtStrategy` 每请求回库**。当前每个受保护请求都会按主键查一次用户，好处是禁用/删除立即生效，量大时需要在这里加缓存。
+- **实时在线状态**。在线用户当前按有效登录会话判断，不包含 WebSocket 心跳、最后活跃时间或 IP 地理位置；浏览器关闭但会话未过期时仍会显示在线。
+- **鉴权查询缓存**。`JwtStrategy` 每个受保护请求都会校验会话、用户和授权，好处是退出、禁用与权限变更立即生效；量大时需要引入带主动失效机制的缓存。
 - **构建缓存**。包数量变多、CI 变慢时可以再引入 Turborepo，现在 pnpm 原生编排够用。
