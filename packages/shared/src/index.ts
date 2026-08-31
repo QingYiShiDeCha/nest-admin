@@ -1,4 +1,5 @@
 export * from './constants/operation';
+export * from './constants/dictionary';
 export * from './constants/notice';
 export * from './constants/pagination';
 export * from './constants/permissions';
@@ -8,6 +9,7 @@ export * from './constants/system-config';
 export * from './constants/throttle';
 export * from './interfaces/api-response.interface';
 export * from './interfaces/department.interface';
+export * from './interfaces/dictionary.interface';
 export * from './interfaces/file.interface';
 export * from './interfaces/menu.interface';
 export * from './interfaces/notice.interface';

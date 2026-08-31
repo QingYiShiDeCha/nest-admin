@@ -69,6 +69,12 @@ export const PERMISSIONS = {
   CONFIG_UPDATE: 'system:config:update',
   CONFIG_DELETE: 'system:config:delete',
 
+  DICT_LIST: 'system:dict:list',
+  DICT_READ: 'system:dict:read',
+  DICT_CREATE: 'system:dict:create',
+  DICT_UPDATE: 'system:dict:update',
+  DICT_DELETE: 'system:dict:delete',
+
   /** 权限码目录只读，供角色授权界面拉取可选项 */
   PERMISSION_LIST: 'system:permission:list',
 } as const;
@@ -153,6 +159,11 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   { code: PERMISSIONS.CONFIG_CREATE, name: '新增系统参数', module: 'system' },
   { code: PERMISSIONS.CONFIG_UPDATE, name: '更新系统参数', module: 'system' },
   { code: PERMISSIONS.CONFIG_DELETE, name: '删除系统参数', module: 'system' },
+  { code: PERMISSIONS.DICT_LIST, name: '查询数据字典', module: 'system' },
+  { code: PERMISSIONS.DICT_READ, name: '查看数据字典', module: 'system' },
+  { code: PERMISSIONS.DICT_CREATE, name: '新增数据字典', module: 'system' },
+  { code: PERMISSIONS.DICT_UPDATE, name: '更新数据字典', module: 'system' },
+  { code: PERMISSIONS.DICT_DELETE, name: '删除数据字典', module: 'system' },
   {
     code: PERMISSIONS.PERMISSION_LIST,
     name: '查询权限码目录',
