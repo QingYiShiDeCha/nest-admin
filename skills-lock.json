@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "alova-client-usage": {
+      "source": "alovajs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/alova-client-usage/SKILL.md",
+      "computedHash": "176d17b85af9b633518cc43d8af55fd36708e13f0de876218f13bc93717391a1"
+    }
+  }
+}
