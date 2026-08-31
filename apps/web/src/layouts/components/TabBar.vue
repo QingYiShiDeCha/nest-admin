@@ -118,7 +118,7 @@ function handleMore({ key }: { key: string | number }): void {
         <span class="max-w-30 truncate">{{ tab.title }}</span>
         <span
           v-if="!tab.affix"
-          class="inline-grid place-items-center w-4.5 h-4.5 rounded-[3px] text-xs hover:a-bg-error hover:text-white"
+          class="inline-grid place-items-center w-4.5 h-4.5 rounded-[3px] text-xs hover:a-bg-error hover:text-white cursor-pointer"
           title="关闭"
           @click.stop="handleClose(tab)"
         >
