@@ -8,6 +8,8 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { createDatabaseClient } from '../src/client';
 import {
   departments,
+  dictionaryItems,
+  dictionaryTypes,
   menus,
   permissions,
   posts,
@@ -56,6 +58,19 @@ const DEFAULT_SYSTEM_CONFIGS = [
     value: '10',
     valueType: 'number',
     remark: '列表组件默认分页条数',
+  },
+] as const;
+
+const DEFAULT_DICTIONARIES = [
+  {
+    name: '业务优先级',
+    code: 'business.priority',
+    remark: '供业务模块复用的可配置优先级示例',
+    items: [
+      { label: '低', value: 'low', tone: 'info', sort: 10 },
+      { label: '中', value: 'medium', tone: 'warning', sort: 20 },
+      { label: '高', value: 'high', tone: 'error', sort: 30 },
+    ],
   },
 ] as const;
 
@@ -171,6 +186,15 @@ const MENU_TREE: readonly MenuSeed[] = [
         component: 'system/config/index',
         icon: 'RiListSettingsLine',
         sort: 55,
+        keepAlive: true,
+      },
+      {
+        name: '数据字典',
+        type: 'menu',
+        path: '/system/dictionary',
+        component: 'system/dictionary/index',
+        icon: 'RiBook2Line',
+        sort: 60,
         keepAlive: true,
       },
     ],
@@ -356,6 +380,54 @@ async function ensureDefaultSystemConfigs(db: DrizzleDB): Promise<void> {
   }
 }
 
+async function ensureDefaultDictionaries(db: DrizzleDB): Promise<void> {
+  for (const dictionary of DEFAULT_DICTIONARIES) {
+    const [existingType] = await db
+      .select({ id: dictionaryTypes.id, deletedAt: dictionaryTypes.deletedAt })
+      .from(dictionaryTypes)
+      .where(eq(dictionaryTypes.code, dictionary.code))
+      .limit(1);
+
+    if (existingType?.deletedAt) {
+      console.log(`示例字典 ${dictionary.code} 已被删除，跳过恢复`);
+      continue;
+    }
+
+    let typeId = existingType?.id;
+    if (!typeId) {
+      const [result] = await db.insert(dictionaryTypes).values({
+        name: dictionary.name,
+        code: dictionary.code,
+        status: 'active',
+        remark: dictionary.remark,
+      });
+      typeId = result.insertId;
+      console.log(`已创建示例字典 ${dictionary.code}`);
+    }
+
+    for (const item of dictionary.items) {
+      const [existingItem] = await db
+        .select({ id: dictionaryItems.id })
+        .from(dictionaryItems)
+        .where(
+          and(
+            eq(dictionaryItems.typeId, typeId),
+            eq(dictionaryItems.value, item.value),
+          ),
+        )
+        .limit(1);
+
+      if (!existingItem) {
+        await db.insert(dictionaryItems).values({
+          typeId,
+          ...item,
+          status: 'active',
+        });
+      }
+    }
+  }
+}
+
 async function ensureUserRole(
   db: DrizzleDB,
   userId: number,
@@ -508,6 +580,7 @@ async function seed(): Promise<void> {
     await ensureUserRole(db, userId, roleId);
     await ensurePermissions(db);
     await ensureDefaultSystemConfigs(db);
+    await ensureDefaultDictionaries(db);
 
     const createdMenus = await ensureMenuTree(db, MENU_TREE);
     console.log(

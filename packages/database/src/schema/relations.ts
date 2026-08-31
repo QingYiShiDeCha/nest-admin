@@ -1,6 +1,7 @@
 import { relations } from 'drizzle-orm';
 
 import { departments } from './departments';
+import { dictionaryItems, dictionaryTypes } from './dictionaries';
 import {
   roleDepartments,
   roleMenus,
@@ -89,6 +90,23 @@ export const departmentsRelations = relations(departments, ({ one, many }) => ({
   users: many(users, { relationName: 'department_members' }),
   roleDepartments: many(roleDepartments),
 }));
+
+export const dictionaryTypesRelations = relations(
+  dictionaryTypes,
+  ({ many }) => ({
+    items: many(dictionaryItems),
+  }),
+);
+
+export const dictionaryItemsRelations = relations(
+  dictionaryItems,
+  ({ one }) => ({
+    type: one(dictionaryTypes, {
+      fields: [dictionaryItems.typeId],
+      references: [dictionaryTypes.id],
+    }),
+  }),
+);
 
 export const permissionsRelations = relations(permissions, ({ many }) => ({
   rolePermissions: many(rolePermissions),

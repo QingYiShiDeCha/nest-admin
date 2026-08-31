@@ -1,6 +1,7 @@
 export * from './columns';
 export * from './departments';
 export * from './department-transfers';
+export * from './dictionaries';
 export * from './grants';
 export * from './menus';
 export * from './notice-recipients';
