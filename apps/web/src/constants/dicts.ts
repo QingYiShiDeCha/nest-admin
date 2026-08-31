@@ -7,6 +7,7 @@ import type {
   NOTICE_TYPE,
   STATUS,
   SYSTEM_CONFIG_VALUE_TYPE,
+  DictionaryTone,
 } from '@nest-admin/shared';
 
 import { SEMANTIC_COLORS } from '@/constants/palette';
@@ -19,8 +20,7 @@ export type NoticeType = (typeof NOTICE_TYPE)[number];
 export type NoticePriority = (typeof NOTICE_PRIORITY)[number];
 export type NoticeStatus = (typeof NOTICE_STATUS)[number];
 export type NoticeTargetType = (typeof NOTICE_TARGET_TYPE)[number];
-export type SystemConfigValueType =
-  (typeof SYSTEM_CONFIG_VALUE_TYPE)[number];
+export type SystemConfigValueType = (typeof SYSTEM_CONFIG_VALUE_TYPE)[number];
 
 interface Option<T> {
   label: string;
@@ -56,6 +56,15 @@ export const SYSTEM_CONFIG_VALUE_TYPE_OPTIONS = Object.entries(
   value: value as SystemConfigValueType,
   label: meta.label,
 }));
+
+export const DICTIONARY_TONE_OPTIONS: Option<DictionaryTone>[] = [
+  { label: '默认', value: 'default' },
+  { label: '主色', value: 'primary' },
+  { label: '成功', value: 'success' },
+  { label: '警告', value: 'warning' },
+  { label: '危险', value: 'error' },
+  { label: '信息', value: 'info' },
+];
 
 export const MENU_TYPE_META: Record<
   MenuType,
@@ -130,12 +139,12 @@ export const NOTICE_TARGET_META: Record<NoticeTargetType, string> = {
 export const NOTICE_TYPE_OPTIONS = Object.entries(NOTICE_TYPE_META).map(
   ([value, meta]) => ({ value: value as NoticeType, label: meta.label }),
 );
-export const NOTICE_PRIORITY_OPTIONS = Object.entries(
-  NOTICE_PRIORITY_META,
-).map(([value, meta]) => ({
-  value: value as NoticePriority,
-  label: meta.label,
-}));
+export const NOTICE_PRIORITY_OPTIONS = Object.entries(NOTICE_PRIORITY_META).map(
+  ([value, meta]) => ({
+    value: value as NoticePriority,
+    label: meta.label,
+  }),
+);
 export const NOTICE_STATUS_OPTIONS = Object.entries(NOTICE_STATUS_META).map(
   ([value, meta]) => ({ value: value as NoticeStatus, label: meta.label }),
 );

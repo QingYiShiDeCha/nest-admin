@@ -42,6 +42,12 @@ export const MENU_ICON_OPTIONS = [
     keywords: 'list settings config parameters',
   },
   {
+    value: 'RiBook2Line',
+    icon: 'i-ri:book-2-line',
+    label: '数据字典',
+    keywords: 'book dictionary data',
+  },
+  {
     value: 'RiToolsLine',
     icon: 'i-ri:tools-line',
     label: '工具',
