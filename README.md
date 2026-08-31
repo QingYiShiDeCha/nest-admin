@@ -1,12 +1,13 @@
 # nest-admin
 
-基于 NestJS 11、Vue 3、Drizzle ORM 和 MySQL 8 的全栈后台管理系统，采用 pnpm monorepo 组织。项目已经覆盖认证与会话安全、RBAC、用户/角色/菜单/组织架构/岗位管理、部门数据权限、通知公告、操作日志、在线用户、文件上传、主题切换和通用表格/图表组件，可直接作为管理后台的开发基础。
+基于 NestJS 11、Vue 3、Drizzle ORM 和 MySQL 8 的全栈后台管理系统，采用 pnpm monorepo 组织。项目已经覆盖认证与会话安全、RBAC、用户/角色/菜单/组织架构/岗位管理、部门数据权限、数据字典、通知公告、操作日志、在线用户、文件上传、主题切换和通用表格/图表组件，可直接作为管理后台的开发基础。
 
 ## 已实现功能
 
 - **认证与会话**：access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效。
 - **RBAC**：用户、角色、权限码、菜单树、部门数据范围和按钮级权限控制，支持 Redis 授权/数据范围缓存及主动失效，内置超管防自锁规则。
-- **系统管理**：用户、组织架构、岗位、角色、菜单、参数配置、通知公告、操作日志、在线用户等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
+- **系统管理**：用户、组织架构、岗位、角色、菜单、参数配置、数据字典、通知公告、操作日志、在线用户等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
+- **数据字典**：字典类型与字典项 CRUD、状态和排序管理，业务侧通过 `useDict(code)` 复用启用选项，Redis 版本票据保证写后主动失效。
 - **通知与消息**：公告草稿、发布、撤回和阅读统计，支持全员、部门、角色、指定用户发送；Header 展示未读角标和最近消息，SSE + Redis Pub/Sub 实时同步多实例事件，断线自动回退轮询。
 - **界面基础设施**：浅色/深色/跟随系统主题、可切换主色和菜单风格、KeepAlive 页签、内容区独立刷新、Remix Icon 图标体系。
 - **数据展示**：封装折线图、柱状图、饼图/环形图和热力图，统一处理主题、自适应尺寸、空状态和动画。
@@ -23,7 +24,7 @@
 | 请求 / 图表   | alova + ECharts 6 + vue-echarts                                             |
 | ORM           | Drizzle ORM 0.45（`drizzle-orm/mysql2`），迁移用 drizzle-kit                |
 | 数据库        | MySQL 8，驱动 mysql2 连接池                                                 |
-| Redis         | 全局限流、RBAC 缓存与定时清理任务分布式锁，可选配置                         |
+| Redis         | 全局限流、RBAC/数据字典缓存、消息传播与定时任务分布式锁，可选配置             |
 | 配置          | `@nestjs/config` + zod 做启动期环境变量校验                                 |
 | 认证          | `@nestjs/jwt` + passport-jwt，双 token（access / refresh），bcryptjs 存密码 |
 | 校验          | class-validator / class-transformer，全局 `ValidationPipe`                  |
@@ -116,7 +117,7 @@ pnpm dev
 | `pnpm db:migrate`                 | 把未执行的迁移应用到数据库                                                          |
 | `pnpm db:push`                    | 不生成迁移文件直接同步 schema，**仅限本地试验**                                     |
 | `pnpm db:studio`                  | 打开 Drizzle Studio 可视化查看数据                                                  |
-| `pnpm db:seed`                    | 幂等地创建初始管理员、根部门、默认岗位、权限码目录和默认菜单树                      |
+| `pnpm db:seed`                    | 幂等地创建管理员、组织岗位、权限菜单、内置参数和示例业务字典                       |
 
 要只操作某个包，用 `pnpm --filter @nest-admin/api <script>`。
 
@@ -131,6 +132,7 @@ Vue 3.5 + Vite 8 + TypeScript + vue-router 5 + Pinia 4 + antdv-next（按需自�
 - `tables`：`ProSearch`、`ProTable` 与 `useTable` 组合，统一查询、分页、竞态防护、列显隐、密度、全屏和树表格行为。
 - `charts`：`BaseChart`、`LineChart`、`BarChart`、`PieChart`、`HeatmapChart`，统一 ECharts 注册、主题、动画、自适应尺寸和空状态。
 - `base` / `selectors`：`AppIcon`、`AppTag` 和精选 Remix Icon 图标选择器，图标 class 由 UnoCSS safelist 保证运行时可用。
+- `composables`：`useTable` 统一列表状态机，`useDict(code)` 统一加载动态业务选项并处理请求竞态。
 - `layouts`：Sidebar、Header、面包屑、TabBar 和设置抽屉分层组织；页面刷新只重建内容区域，不重载侧栏与头部。
 
 **ESLint 配置前后端是分开的两套**：根那份面向 Node/NestJS（类型感知、flat config），ignore 了 `apps/web`；前端在自己的 `eslint.config.ts` 里用 `eslint-plugin-vue` + `@vue/eslint-config-typescript`（create-vue 官方组合）。互不解析对方的文件。
@@ -181,6 +183,10 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 **岗位与用户关系**。`sys_post` 保存岗位主数据，`sys_user_post` 支持一个用户拥有多个岗位。停用岗位不能新增分配，但已有关系可保留或解除；岗位仍有有效用户时拒绝删除。用户岗位接口同样受当前管理员的数据范围约束，不能通过猜测用户 ID 越权分配。
 
 **系统参数不是环境变量**。`sys_system_config` 只保存可由管理员维护的非敏感业务参数，支持文本、数字、布尔和 JSON 四种值类型；JWT 密钥、数据库密码、Redis 地址等部署机密仍只允许放在 `.env`。参数值在写入时按声明类型校验，内置参数允许改值但不允许改键或删除，自定义参数软删除后参数键也不可复用。业务模块可注入 `SystemConfigService` 并通过 `getEnabledValue(key)` 读取已经解析类型的启用参数。
+
+**动态字典不替代核心枚举**。`sys_dict_type` 与 `sys_dict_item` 用于业务人员可配置的显示选项，类型编码和同类型业务值在软删除后都不可复用。`STATUS`、`MENU_TYPE`、`DATA_SCOPE` 等参与权限、路由或状态机判断的核心枚举继续由 `@nest-admin/shared` 静态维护，不能在管理页改写。业务读取接口只返回启用类型下的启用项，并按 `sort/id` 升序；前端通过 `useDict(code)` 消费。
+
+**字典缓存使用版本票据**。读取 `/api/dictionaries/:code` 时缓存键包含字典编码版本，字典类型或字典项写入后只递增版本，不扫描旧键。并发中的旧查询最多回写旧版本键，不会污染新结果；Redis 未配置或故障时直接回源 MySQL，`DICT_CACHE_TTL_SECONDS` 默认 300 秒。
 
 **授权与数据范围使用 Redis 缓存**。`PermissionService` 缓存普通用户的角色与权限码，`DataScopeService` 缓存可序列化的范围结果，不缓存 Drizzle SQL 对象；超级管理员仍直接短路。缓存键带用户版本，数据范围键额外带组织树全局版本：用户角色、角色权限/状态/数据范围或用户所属部门变化时递增用户版本，部门新增、移动、删除时递增树版本。旧版本无需 `SCAN` 删除，最多在 `RBAC_CACHE_TTL_SECONDS` 后自然回收。
 
@@ -365,6 +371,16 @@ sys_system_config (独立业务参数表)
 | GET    | `/api/system-configs/:id`             | `system:config:read`       | 查询系统参数详情                                    |
 | PATCH  | `/api/system-configs/:id`             | `system:config:update`     | 更新系统参数；内置参数不可改键                      |
 | DELETE | `/api/system-configs/:id`             | `system:config:delete`     | 删除非内置系统参数                                  |
+| GET    | `/api/dictionary-types`               | `system:dict:list`         | 分页查询字典类型                                    |
+| POST   | `/api/dictionary-types`               | `system:dict:create`       | 新增字典类型                                        |
+| GET    | `/api/dictionary-types/:id`           | `system:dict:read`         | 查询字典类型详情                                    |
+| PATCH  | `/api/dictionary-types/:id`           | `system:dict:update`       | 更新字典类型                                        |
+| DELETE | `/api/dictionary-types/:id`           | `system:dict:delete`       | 删除字典类型及所属字典项                            |
+| GET    | `/api/dictionary-types/:id/items`     | `system:dict:list`         | 查询指定类型的字典项                                |
+| POST   | `/api/dictionary-types/:id/items`     | `system:dict:create`       | 新增字典项                                          |
+| PATCH  | `/api/dictionary-items/:id`           | `system:dict:update`       | 更新字典项、排序与状态                              |
+| DELETE | `/api/dictionary-items/:id`           | `system:dict:delete`       | 删除字典项                                          |
+| GET    | `/api/dictionaries/:code`             | 仅需登录                   | 按编码读取启用字典选项                              |
 | GET    | `/api/messages`                       | 仅需登录                   | 分页查询我的消息                                    |
 | GET    | `/api/messages/recent`                | 仅需登录                   | Header 最近五条消息                                 |
 | GET    | `/api/messages/unread-count`          | 仅需登录                   | 查询未读消息数量                                    |
