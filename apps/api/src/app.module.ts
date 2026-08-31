@@ -14,6 +14,7 @@ import { AppThrottlerGuard } from './common/guards/throttler.guard';
 import { RequestContextInterceptor } from './common/interceptors/request-context.interceptor';
 import { validateEnv, type Env } from './config/env.validation';
 import { DatabaseModule } from './database/database.module';
+import { DictionaryModule } from './modules/dictionary/dictionary.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { RefreshTokenModule } from './modules/auth/refresh-token.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
@@ -62,6 +63,7 @@ import { RedisModule } from './redis/redis.module';
       }),
     }),
     DatabaseModule,
+    DictionaryModule,
     RefreshTokenModule,
     FileModule,
     OperationLogModule,

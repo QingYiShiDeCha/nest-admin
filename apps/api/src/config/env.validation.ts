@@ -90,6 +90,13 @@ const baseEnvSchema = z.object({
     .min(10)
     .max(3600)
     .default(300),
+  /** 数据字典缓存 TTL；写操作通过版本票据主动失效。 */
+  DICT_CACHE_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(10)
+    .max(3600)
+    .default(300),
 });
 
 export const envSchema = baseEnvSchema.superRefine((env, context) => {
