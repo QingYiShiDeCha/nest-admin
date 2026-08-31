@@ -9,8 +9,8 @@ import {
   type NoticeRealtimeEventType,
 } from '@nest-admin/shared';
 
+import { API_BASE_URL, refreshAccessToken } from '@/api/http';
 import { emitUnauthorized } from '@/utils/auth-events';
-import { API_BASE_URL, refreshAccessToken } from '@/utils/auth-refresh';
 import { clearTokens, getAccessToken } from '@/utils/auth-token';
 
 const RETRY_INTERVAL_MS = 3_000;

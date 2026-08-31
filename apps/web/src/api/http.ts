@@ -1,10 +1,19 @@
-import type { RequestBody } from 'alova';
+import type { Method, RequestBody } from 'alova';
 import { createAlova } from 'alova';
+import { createServerTokenAuthentication } from 'alova/client';
 import adapterFetch from 'alova/fetch';
+import VueHook from 'alova/vue';
 
 import { emitUnauthorized } from '@/utils/auth-events';
-import { API_BASE_URL, refreshAccessToken } from '@/utils/auth-refresh';
-import { clearTokens, getAccessToken } from '@/utils/auth-token';
+import {
+  clearTokens,
+  getAccessToken,
+  getRefreshToken,
+  saveTokens,
+  type StoredTokens,
+} from '@/utils/auth-token';
+
+export const API_BASE_URL = import.meta.env.VITE_API_BASE || '/api';
 
 /** 统一的接口错误。httpStatus 是 HTTP 状态码，bizCode 是响应体里的 code */
 export class ApiError extends Error {
@@ -18,27 +27,62 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * 不参与「401 → 刷新 → 重试」的接口。它们本身就是认证入口：
- * 带着旧令牌去刷只会死循环，登录失败就该停在登录页。
- */
-const NO_REFRESH_PATHS = [
-  '/auth/login',
-  '/auth/register',
-  '/auth/refresh',
-  '/auth/logout',
-];
+type AuthRole = 'login' | 'refreshToken' | null;
+
+const AUTH_ROLES = new Map<string, AuthRole>([
+  ['/auth/login', 'login'],
+  ['/auth/register', null],
+  ['/auth/refresh', 'refreshToken'],
+  ['/auth/logout', null],
+]);
+
+function withAuthRole<TMethod extends Method>(
+  url: string,
+  method: TMethod,
+): TMethod {
+  const queryIndex = url.indexOf('?');
+  const path = queryIndex === -1 ? url : url.slice(0, queryIndex);
+  const authRole = AUTH_ROLES.get(path);
+
+  if (authRole !== undefined) {
+    method.meta = { ...method.meta, authRole };
+  }
+
+  return method;
+}
 
 /**
- * 正在进行的刷新。多个请求同时撞上 401 时只发一次刷新，
- * 其余等同一个 Promise——否则每个 401 都去刷新，
- * 第一个成功后旧 refreshToken 已被轮换作废，后面的会全部失败，
- * 还会触发后端的盗用检测把账号整个踢下线。
+ * Alova 官方认证拦截器会协调普通请求的并发刷新；这里额外保留同一个
+ * Promise，让独立的 SSE 连接与普通请求同时过期时也只轮换一次令牌。
  */
+let refreshing: Promise<boolean> | null = null;
+
+const { onAuthRequired, onResponseRefreshToken } =
+  createServerTokenAuthentication<typeof VueHook>({
+    assignToken(method) {
+      if (method.meta?.authRole === 'refreshToken') return;
+
+      const token = getAccessToken();
+      if (token) method.config.headers.Authorization = `Bearer ${token}`;
+    },
+    refreshTokenOnSuccess: {
+      isExpired: (response) => response.status === 401,
+      async handler() {
+        if (await refreshAccessToken()) return;
+
+        clearTokens();
+        emitUnauthorized();
+        // 官方拦截器要求刷新失败必须抛错，避免继续重发失效请求。
+        throw new ApiError(401, '登录状态已失效');
+      },
+    },
+  });
+
 export const alova = createAlova({
   // 少了它所有请求都会打到站点根路径（/users 而不是 /api/users）。
   // 开发时 vite 代理只转发 /api 前缀，缺失会直接命中前端页面而不是后端
   baseURL: API_BASE_URL,
+  statesHook: VueHook,
   requestAdapter: adapterFetch(),
   timeout: 15_000,
   /**
@@ -47,14 +91,8 @@ export const alova = createAlova({
    * 真需要缓存的列表页由页面自己决定开。
    */
   cacheFor: { GET: 0 },
-  beforeRequest(method) {
-    const token = getAccessToken();
-
-    if (token) {
-      method.config.headers.Authorization = `Bearer ${token}`;
-    }
-  },
-  responded: {
+  beforeRequest: onAuthRequired(),
+  responded: onResponseRefreshToken({
     /**
      * 后端成功是 { code: 0, message, data }，失败一律带对应 HTTP 状态码
      * 和 { code: 状态码, message }。这里把两种都归一：
@@ -92,42 +130,41 @@ export const alova = createAlova({
 
       throw new ApiError(0, '网络异常，请稍后重试');
     },
-  },
+  }),
 });
 
 /**
- * 发请求并处理「401 → 静默刷新 → 重发一次」。
- *
- * 重发是重新调 factory 而不是复用旧 Method：新 Method 走 beforeRequest
- * 才能拿到刚刷新的 token。refresh 失败时清掉本地令牌——
- * 留着只会让后续每个请求都白走一遍 401。
+ * 创建官方要求的 refreshToken Method。该 Method 通过 metadata 标记后，
+ * 不会再次触发「401 → 刷新」，从而避免刷新接口递归调用自身。
  */
-async function sendWithRetry<T>(
-  url: string,
-  create: () => Promise<T>,
-): Promise<T> {
-  try {
-    return await create();
-  } catch (error) {
-    const shouldRetry =
-      error instanceof ApiError &&
-      error.httpStatus === 401 &&
-      !NO_REFRESH_PATHS.some((path) => url.includes(path)) &&
-      (await refreshAccessToken());
+export function refreshAccessToken(): Promise<boolean> {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return Promise.resolve(false);
 
-    if (!shouldRetry) {
-      if (error instanceof ApiError && error.httpStatus === 401) {
-        clearTokens();
-        // 通知应用跳登录页。这里只发事件，不 import router——
-        // 一个纯请求模块不该依赖路由实例
-        emitUnauthorized();
+  refreshing ??= (async () => {
+    try {
+      const tokens = await withAuthRole(
+        '/auth/refresh',
+        alova.Post<StoredTokens>('/auth/refresh', { refreshToken }),
+      );
+
+      if (
+        typeof tokens?.accessToken !== 'string' ||
+        typeof tokens.refreshToken !== 'string'
+      ) {
+        return false;
       }
 
-      throw error;
+      saveTokens(tokens);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshing = null;
     }
+  })();
 
-    return create();
-  }
+  return refreshing;
 }
 
 /**
@@ -151,21 +188,21 @@ export function withQuery(
 }
 
 export function httpGet<T>(url: string): Promise<T> {
-  return sendWithRetry(url, () => alova.Get<T>(url));
+  return withAuthRole(url, alova.Get<T>(url));
 }
 
 export function httpPost<T>(url: string, data?: RequestBody): Promise<T> {
-  return sendWithRetry(url, () => alova.Post<T>(url, data));
+  return withAuthRole(url, alova.Post<T>(url, data));
 }
 
 export function httpPut<T>(url: string, data?: RequestBody): Promise<T> {
-  return sendWithRetry(url, () => alova.Put<T>(url, data));
+  return withAuthRole(url, alova.Put<T>(url, data));
 }
 
 export function httpPatch<T>(url: string, data?: RequestBody): Promise<T> {
-  return sendWithRetry(url, () => alova.Patch<T>(url, data));
+  return withAuthRole(url, alova.Patch<T>(url, data));
 }
 
 export function httpDelete<T>(url: string): Promise<T> {
-  return sendWithRetry(url, () => alova.Delete<T>(url));
+  return withAuthRole(url, alova.Delete<T>(url));
 }
