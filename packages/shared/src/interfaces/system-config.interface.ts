@@ -13,3 +13,8 @@ export interface SystemConfig {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface RuntimeSystemConfig {
+  systemName: string;
+  defaultPageSize: number;
+}

@@ -1,7 +1,14 @@
 import { systemConfigs, type SystemConfigRow } from '@nest-admin/database';
 import type {
   PaginatedResult,
+  RuntimeSystemConfig,
   SystemConfigValueType,
+} from '@nest-admin/shared';
+import {
+  DEFAULT_PAGE_SIZE,
+  DEFAULT_SYSTEM_NAME,
+  MAX_PAGE_SIZE,
+  SYSTEM_CONFIG_KEYS,
 } from '@nest-admin/shared';
 import {
   BadRequestException,
@@ -15,6 +22,7 @@ import {
   count,
   desc,
   eq,
+  inArray,
   isNull,
   like,
   or,
@@ -35,6 +43,12 @@ export type SystemConfigResolvedValue =
   | null
   | SystemConfigResolvedValue[]
   | { [key: string]: SystemConfigResolvedValue };
+
+interface RuntimeConfigRecord {
+  key: string;
+  value: string;
+  valueType: SystemConfigValueType;
+}
 
 function aliveConfig(...conditions: (SQL | undefined)[]): SQL {
   return and(isNull(systemConfigs.deletedAt), ...conditions)!;
@@ -84,6 +98,7 @@ export class SystemConfigService {
   async create(dto: CreateSystemConfigDto): Promise<SystemConfigRow> {
     const valueType = dto.valueType ?? 'string';
     validateSystemConfigValue(dto.value, valueType);
+    validateKnownSystemConfigValue(dto.key, dto.value, valueType);
     await this.assertKeyAvailable(dto.key);
 
     const [result] = await this.db.insert(systemConfigs).values({
@@ -114,7 +129,9 @@ export class SystemConfigService {
 
     const nextType = dto.valueType ?? current.valueType;
     const nextValue = dto.value ?? current.value;
+    const nextKey = dto.key ?? current.key;
     validateSystemConfigValue(nextValue, nextType);
+    validateKnownSystemConfigValue(nextKey, nextValue, nextType);
 
     await this.db
       .update(systemConfigs)
@@ -159,6 +176,24 @@ export class SystemConfigService {
       : undefined;
   }
 
+  async getRuntimeConfig(): Promise<RuntimeSystemConfig> {
+    const records = await this.db
+      .select({
+        key: systemConfigs.key,
+        value: systemConfigs.value,
+        valueType: systemConfigs.valueType,
+      })
+      .from(systemConfigs)
+      .where(
+        aliveConfig(
+          eq(systemConfigs.status, 'active'),
+          inArray(systemConfigs.key, Object.values(SYSTEM_CONFIG_KEYS)),
+        ),
+      );
+
+    return resolveRuntimeSystemConfig(records);
+  }
+
   private async findConfigOrFail(id: number): Promise<SystemConfigRow> {
     const [record] = await this.db
       .select()
@@ -192,6 +227,66 @@ export function validateSystemConfigValue(
   valueType: SystemConfigValueType,
 ): void {
   resolveSystemConfigValue(value, valueType);
+}
+
+export function validateKnownSystemConfigValue(
+  key: string,
+  value: string,
+  valueType: SystemConfigValueType,
+): void {
+  if (key === SYSTEM_CONFIG_KEYS.SYSTEM_NAME) {
+    if (valueType !== 'string') {
+      throw new BadRequestException('系统名称参数的值类型必须是 string');
+    }
+    if (value.trim() === '') {
+      throw new BadRequestException('系统名称不能为空');
+    }
+    return;
+  }
+
+  if (key === SYSTEM_CONFIG_KEYS.DEFAULT_PAGE_SIZE) {
+    if (valueType !== 'number') {
+      throw new BadRequestException('默认分页条数的值类型必须是 number');
+    }
+
+    const pageSize = Number(value);
+    if (
+      !Number.isInteger(pageSize) ||
+      pageSize < 1 ||
+      pageSize > MAX_PAGE_SIZE
+    ) {
+      throw new BadRequestException(
+        `默认分页条数必须是 1 到 ${MAX_PAGE_SIZE} 之间的整数`,
+      );
+    }
+  }
+}
+
+export function resolveRuntimeSystemConfig(
+  records: readonly RuntimeConfigRecord[],
+): RuntimeSystemConfig {
+  let systemName = DEFAULT_SYSTEM_NAME;
+  let defaultPageSize = DEFAULT_PAGE_SIZE;
+
+  for (const record of records) {
+    try {
+      validateKnownSystemConfigValue(
+        record.key,
+        record.value,
+        record.valueType,
+      );
+    } catch {
+      continue;
+    }
+
+    if (record.key === SYSTEM_CONFIG_KEYS.SYSTEM_NAME) {
+      systemName = record.value.trim();
+    } else if (record.key === SYSTEM_CONFIG_KEYS.DEFAULT_PAGE_SIZE) {
+      defaultPageSize = Number(record.value);
+    }
+  }
+
+  return { systemName, defaultPageSize };
 }
 
 export function resolveSystemConfigValue(

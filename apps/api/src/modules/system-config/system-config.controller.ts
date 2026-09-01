@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import { Public } from '../../common/decorators/public.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
 import { OperationLog } from '../operation-log/operation-log.decorator';
 import { CreateSystemConfigDto } from './dto/create-system-config.dto';
@@ -35,6 +36,13 @@ export class SystemConfigController {
     @Query() query: QuerySystemConfigDto,
   ): Promise<PaginatedResult<SystemConfigRow>> {
     return this.service.findPage(query);
+  }
+
+  @Get('runtime')
+  @Public()
+  @ApiOperation({ summary: '查询公开运行时参数' })
+  getRuntimeConfig() {
+    return this.service.getRuntimeConfig();
   }
 
   @Post()

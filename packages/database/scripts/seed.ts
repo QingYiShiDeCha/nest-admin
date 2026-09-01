@@ -1,7 +1,10 @@
 import { hash } from 'bcryptjs';
 import {
+  DEFAULT_PAGE_SIZE,
+  DEFAULT_SYSTEM_NAME,
   PERMISSION_DEFINITIONS,
   SUPER_ADMIN_ROLE_CODE,
+  SYSTEM_CONFIG_KEYS,
 } from '@nest-admin/shared';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
@@ -47,15 +50,15 @@ const DEFAULT_POST = {
 const DEFAULT_SYSTEM_CONFIGS = [
   {
     name: '系统名称',
-    key: 'system.name',
-    value: 'Nest Admin',
+    key: SYSTEM_CONFIG_KEYS.SYSTEM_NAME,
+    value: DEFAULT_SYSTEM_NAME,
     valueType: 'string',
     remark: '系统展示名称',
   },
   {
     name: '默认分页条数',
-    key: 'system.pagination.default_page_size',
-    value: '10',
+    key: SYSTEM_CONFIG_KEYS.DEFAULT_PAGE_SIZE,
+    value: String(DEFAULT_PAGE_SIZE),
     valueType: 'number',
     remark: '列表组件默认分页条数',
   },
