@@ -125,6 +125,15 @@ body {
   animation: rotate180 0.5s;
 }
 
+.notification-trigger:hover .notification-icon {
+  transform-origin: 50% 12%;
+  animation: notification-ring 0.7s ease-in-out;
+}
+
+.theme-toggle-trigger:hover .theme-toggle-icon {
+  transform: rotate(20deg) scale(1.08);
+}
+
 @keyframes rotate180 {
   0% {
     transform: rotate(0);
@@ -132,5 +141,38 @@ body {
 
   100% {
     transform: rotate(180deg);
+  }
+}
+
+@keyframes notification-ring {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+
+  20% {
+    transform: rotate(14deg);
+  }
+
+  40% {
+    transform: rotate(-12deg);
+  }
+
+  60% {
+    transform: rotate(8deg);
+  }
+
+  80% {
+    transform: rotate(-5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notification-trigger:hover .notification-icon {
+    animation: none;
+  }
+
+  .theme-toggle-trigger:hover .theme-toggle-icon {
+    transform: none;
   }
 }

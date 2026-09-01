@@ -18,7 +18,7 @@ vi.mock('antdv-next', () => ({
   },
   ConfigProvider: {
     name: 'AConfigProvider',
-    props: { locale: Object, theme: Object },
+    props: { locale: Object, notification: Object, theme: Object },
     template: '<div><slot /></div>',
   },
   theme: {
@@ -58,7 +58,7 @@ describe('App theme provider', () => {
         colorFillSecondary: '#EDEFF0',
         colorFillTertiary: '#F2F4F5',
         colorFillQuaternary: '#F9FAFB',
-        colorText: '#323251',
+        colorText: 'color-mix(in srgb, #323251 62%, #ffffff)',
         colorTextSecondary: '#4D5875',
         colorBorder: '#E2E8EE',
         colorBorderSecondary: 'rgba(0, 0, 0, 0.08)',
@@ -67,6 +67,34 @@ describe('App theme provider', () => {
         controlItemBgActive: '#F2F4F5',
       },
       components: {
+        Button: {
+          fontWeight: 500,
+          primaryShadow: 'none',
+          defaultHoverBg: '#EDEFF0',
+          defaultActiveBg: '#F2F4F5',
+        },
+        Input: {
+          addonBg: '#F9FAFB',
+          activeBorderColor: '#5D87FF',
+          activeShadow:
+            '0 0 0 2px color-mix(in srgb, #5D87FF 18%, transparent)',
+        },
+        Select: {
+          optionSelectedColor: '#5D87FF',
+          optionSelectedBg: '#F2F4F5',
+          optionActiveBg: '#EDEFF0',
+        },
+        Modal: {
+          headerBg: '#FFFFFF',
+          contentBg: '#FFFFFF',
+          footerBg: '#FFFFFF',
+          titleColor: '#323251',
+        },
+        Notification: {
+          progressBg: '#5D87FF',
+          colorSuccessBg: 'color-mix(in srgb, #13DEB9 12%, #FFFFFF)',
+          colorErrorBg: 'color-mix(in srgb, #FF4D4F 10%, #FFFFFF)',
+        },
         Message: {
           contentBg: '#FFFFFF',
         },
@@ -83,6 +111,21 @@ describe('App theme provider', () => {
           itemHoverBg: '#EDEFF0',
           itemSelectedBg: '#F2F4F5',
         },
+        Card: {
+          headerBg: '#FFFFFF',
+          colorBorderSecondary: 'rgba(0, 0, 0, 0.08)',
+        },
+        Table: {
+          headerBg: '#F9FAFB',
+          rowHoverBg: '#EDEFF0',
+          borderColor: '#E2E8EE',
+        },
+      },
+    });
+    expect(provider.props('locale')).toEqual({ locale: 'zh-cn' });
+    expect(provider.props('notification')).toEqual({
+      classes: {
+        root: 'border border-solid a-border-border',
       },
     });
     expect(document.documentElement.dataset.theme).toBe('light');
@@ -124,6 +167,30 @@ describe('App theme provider', () => {
         controlItemBgActive: '#2E2E38',
       },
       components: {
+        Button: {
+          defaultHoverBg: '#252530',
+          defaultActiveBg: '#202226',
+        },
+        Input: {
+          addonBg: '#110F0F',
+          activeBorderColor: '#B48DF3',
+        },
+        Select: {
+          optionSelectedColor: '#B48DF3',
+          optionSelectedBg: '#202226',
+          optionActiveBg: '#252530',
+        },
+        Modal: {
+          headerBg: '#161618',
+          contentBg: '#161618',
+          footerBg: '#161618',
+          titleColor: '#E3E3E8',
+        },
+        Notification: {
+          progressBg: '#B48DF3',
+          colorSuccessBg: 'color-mix(in srgb, #13DEB9 18%, #161618)',
+          colorErrorBg: 'color-mix(in srgb, #FF4D4F 18%, #161618)',
+        },
         Message: {
           contentBg: '#161618',
         },
@@ -138,6 +205,15 @@ describe('App theme provider', () => {
           itemSelectedBg: '#2E2E38',
           darkItemBg: '#191A23',
           darkItemColor: '#BABBBD',
+        },
+        Card: {
+          headerBg: '#161618',
+          colorBorderSecondary: 'rgba(255, 255, 255, 0.08)',
+        },
+        Table: {
+          headerBg: '#110F0F',
+          rowHoverBg: '#252530',
+          borderColor: 'rgba(255, 255, 255, 0.1)',
         },
       },
     });

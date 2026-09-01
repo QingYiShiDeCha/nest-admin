@@ -55,6 +55,9 @@ export const DARK_GRAY_COLORS = {
 } as const;
 
 export const LIGHT_THEME_COLORS = {
+  foreground: {
+    default: 'color-mix(in srgb, #323251 62%, #ffffff)',
+  },
   background: {
     layout: '#FAFBFC',
     container: '#FFFFFF',
@@ -121,4 +124,59 @@ export const SEMANTIC_COLORS = {
   /** 错误：状态展示用的软红，antd 无对应全局通道，按需手动使用 */
   error: '#FA896B',
   info: '#38C0FC',
+} as const;
+
+export function mixColor(
+  color: string,
+  percentage: number,
+  background: string,
+): string {
+  return `color-mix(in srgb, ${color} ${percentage}%, ${background})`;
+}
+
+export const STATUS_SURFACE_COLORS = {
+  light: {
+    success: mixColor(
+      SEMANTIC_COLORS.success,
+      12,
+      LIGHT_THEME_COLORS.background.container,
+    ),
+    warning: mixColor(
+      SEMANTIC_COLORS.warning,
+      12,
+      LIGHT_THEME_COLORS.background.container,
+    ),
+    error: mixColor(
+      SEMANTIC_COLORS.danger,
+      10,
+      LIGHT_THEME_COLORS.background.container,
+    ),
+    info: mixColor(
+      SEMANTIC_COLORS.info,
+      12,
+      LIGHT_THEME_COLORS.background.container,
+    ),
+  },
+  dark: {
+    success: mixColor(
+      SEMANTIC_COLORS.success,
+      18,
+      DARK_THEME_COLORS.background.container,
+    ),
+    warning: mixColor(
+      SEMANTIC_COLORS.warning,
+      18,
+      DARK_THEME_COLORS.background.container,
+    ),
+    error: mixColor(
+      SEMANTIC_COLORS.danger,
+      18,
+      DARK_THEME_COLORS.background.container,
+    ),
+    info: mixColor(
+      SEMANTIC_COLORS.info,
+      18,
+      DARK_THEME_COLORS.background.container,
+    ),
+  },
 } as const;
