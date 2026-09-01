@@ -1,7 +1,9 @@
 import type { PaginatedResult } from '@nest-admin/shared';
 import type { TableColumnsType, TablePaginationConfig } from 'antdv-next';
-import { computed, reactive, ref, shallowRef } from 'vue';
+import { computed, reactive, ref, shallowRef, watch } from 'vue';
 import type { ComputedRef, Ref, ShallowRef } from 'vue';
+
+import { useSystemConfigStore } from '@/stores/system-config';
 
 export interface PageQuery {
   page: number;
@@ -91,7 +93,10 @@ export function useTable<T, F extends object = Record<string, unknown>>(
   const initialFilters = { ...options.filters };
   const filters = reactive({ ...options.filters }) as F;
   const page = ref(1);
-  const pageSize = ref(options.defaultPageSize ?? 10);
+  const systemConfig = useSystemConfigStore();
+  const pageSize = ref(options.defaultPageSize ?? systemConfig.defaultPageSize);
+  let followsSystemPageSize = options.defaultPageSize === undefined;
+  let hasLoaded = false;
 
   // 行数据总是整体替换、从不原地改，shallowRef 足够且省去深层代理开销
   const list = shallowRef<T[]>([]);
@@ -143,6 +148,7 @@ export function useTable<T, F extends object = Record<string, unknown>>(
       }
 
       list.value = result.list;
+      hasLoaded = true;
       return true;
     } catch (error) {
       if (ticket === seq) {
@@ -183,10 +189,24 @@ export function useTable<T, F extends object = Record<string, unknown>>(
   /** a-table 的 pagination.onChange。翻页/改每页条数后立即重新查询 */
   function onPaginationChange(current: number, size: number): void {
     // 每页条数变化时回到第一页：不同页高下 data 的切片完全对不上
+    if (size !== pageSize.value) {
+      followsSystemPageSize = false;
+    }
     page.value = size === pageSize.value ? current : 1;
     pageSize.value = size;
     void reload();
   }
+
+  watch(
+    () => systemConfig.defaultPageSize,
+    (size) => {
+      if (!followsSystemPageSize || options.pagination === false) return;
+
+      page.value = 1;
+      pageSize.value = size;
+      if (hasLoaded) void reload();
+    },
+  );
 
   /** 表格序号列只需要偏移量，不暴露内部页码状态 */
   const rowOffset =

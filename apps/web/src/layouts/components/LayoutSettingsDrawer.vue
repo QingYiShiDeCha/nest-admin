@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { reactive } from 'vue';
 
 import themeDarkPreview from '@/assets/images/settings/theme_styles/dark.png';
 import themeLightPreview from '@/assets/images/settings/theme_styles/light.png';
@@ -7,7 +7,7 @@ import themeSystemPreview from '@/assets/images/settings/theme_styles/system.png
 import { BRAND_COLORS } from '@/constants/palette';
 import { useSettingsStore } from '@/stores/settings';
 
-const open = ref(false);
+const open = defineModel<boolean>('open', { default: false });
 const settings = useSettingsStore();
 
 const menuBackgroundOptions = [
@@ -51,18 +51,8 @@ const basicSettings = reactive([
 </script>
 
 <template>
-  <div class="contents">
-    <button
-      class="layout-settings-trigger w-9 h-9 inline-grid place-items-center shrink-0 border-none rounded-md bg-transparent text-xl a-color-text cursor-pointer transition-colors duration-200 hover:a-bg-fill-secondary"
-      type="button"
-      title="界面设置"
-      @click="open = true"
-    >
-      <i class="layout-settings-icon i-ri:settings-line" />
-    </button>
-
-    <a-drawer v-model:open="open" title="界面设置" size="372px">
-      <div class="flex flex-col gap-8">
+  <a-drawer v-model:open="open" title="界面设置" size="372px">
+    <div class="flex flex-col gap-8">
         <section>
           <h3 class="mb-4 text-center text-sm font-medium a-color-text">
             主题风格
@@ -151,7 +141,6 @@ const basicSettings = reactive([
             </div>
           </div>
         </section>
-      </div>
-    </a-drawer>
-  </div>
+    </div>
+  </a-drawer>
 </template>

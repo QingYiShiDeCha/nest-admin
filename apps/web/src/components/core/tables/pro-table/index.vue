@@ -1,6 +1,6 @@
 <script setup lang="ts" generic="T extends object">
 import type { MenuProps, TableColumnsType } from 'antdv-next';
-import { computed, onMounted, ref } from 'vue';
+import { computed, h, onMounted, ref } from 'vue';
 
 import type { UseTableReturn } from '@/composables/use-table';
 
@@ -13,6 +13,14 @@ type PresentableTable<T extends object> = Pick<
   };
 
 type RowKey = string | number;
+
+interface ExpandIconRenderOptions<T extends object> {
+  prefixCls: string;
+  expanded: boolean;
+  expandable: boolean;
+  record: T;
+  onExpand: (record: T, event: MouseEvent) => void;
+}
 
 /**
  * 表格卡片：工具栏 + a-table + 可选分页，纵向撑满父容器的剩余空间。
@@ -133,8 +141,36 @@ const resolvedPagination = computed(() => {
   };
 });
 
+function renderExpandIcon(options: ExpandIconRenderOptions<T>) {
+  const { expanded, expandable, onExpand, prefixCls, record } = options;
+  const iconPrefix = `${prefixCls}-row-expand-icon`;
+  const canExpand = props.rowExpandable?.(record) ?? expandable;
+
+  if (!canExpand) {
+    return h('span', {
+      class: [iconPrefix, `${iconPrefix}-spaced`],
+    });
+  }
+
+  return h('button', {
+    type: 'button',
+    class: [iconPrefix, `${iconPrefix}-${expanded ? 'expanded' : 'collapsed'}`],
+    'aria-label': expanded ? '收起行' : '展开行',
+    'aria-expanded': expanded,
+    onClick: (event: MouseEvent) => {
+      onExpand(record, event);
+      event.stopPropagation();
+    },
+  });
+}
+
 const expandableConfig = computed(() =>
-  props.rowExpandable ? { rowExpandable: props.rowExpandable } : undefined,
+  props.rowExpandable
+    ? {
+        rowExpandable: props.rowExpandable,
+        expandIcon: renderExpandIcon,
+      }
+    : undefined,
 );
 
 function handleExpandedRowKeys(keys: readonly RowKey[]): void {

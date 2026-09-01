@@ -264,10 +264,49 @@ describe('ProTable', () => {
 
     const expandable = wrapper
       .getComponent(componentStubs.table)
-      .props('expandable') as { rowExpandable: (record: Row) => boolean };
+      .props('expandable') as {
+      expandIcon: (options: {
+        prefixCls: string;
+        expanded: boolean;
+        expandable: boolean;
+        record: Row;
+        onExpand: (record: Row, event: MouseEvent) => void;
+      }) => { props: { class: string[] }; type: string };
+      rowExpandable: (record: Row) => boolean;
+    };
 
     expect(expandable.rowExpandable).toBe(rowExpandable);
     expect(expandable.rowExpandable({ id: 1, name: '父节点' })).toBe(true);
     expect(expandable.rowExpandable({ id: 2, name: '叶子节点' })).toBe(false);
+
+    const leafIcon = expandable.expandIcon({
+      prefixCls: 'ant-table',
+      expanded: false,
+      expandable: true,
+      record: { id: 2, name: '叶子节点' },
+      onExpand: vi.fn(),
+    });
+
+    expect(leafIcon.type).toBe('span');
+    expect(leafIcon.props.class).toContain('ant-table-row-expand-icon-spaced');
+
+    const onExpand = vi.fn();
+    const parentIcon = expandable.expandIcon({
+      prefixCls: 'ant-table',
+      expanded: false,
+      expandable: true,
+      record: { id: 1, name: '父节点' },
+      onExpand,
+    }) as typeof leafIcon & {
+      props: { onClick: (event: MouseEvent) => void };
+    };
+
+    parentIcon.props.onClick(new MouseEvent('click'));
+
+    expect(parentIcon.type).toBe('button');
+    expect(parentIcon.props.class).toContain(
+      'ant-table-row-expand-icon-collapsed',
+    );
+    expect(onExpand).toHaveBeenCalledOnce();
   });
 });

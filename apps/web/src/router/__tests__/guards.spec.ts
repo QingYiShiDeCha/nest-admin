@@ -27,6 +27,9 @@ vi.mock('@/stores/menu', () => ({ useMenuStore: () => mocks.menu }));
 vi.mock('@/stores/tabs', () => ({
   useTabsStore: () => ({ reset: mocks.tabsReset }),
 }));
+vi.mock('@/stores/system-config', () => ({
+  useSystemConfigStore: () => ({ systemName: 'Nest Admin' }),
+}));
 vi.mock('@/utils/auth-token', () => ({ getAccessToken: () => 'token' }));
 vi.mock('@/router/dynamic-routes', () => ({
   resetDynamicRoutes: mocks.resetDynamicRoutes,

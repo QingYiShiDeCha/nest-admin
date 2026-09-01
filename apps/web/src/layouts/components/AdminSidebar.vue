@@ -7,6 +7,7 @@ import logoUrl from '@/assets/logo.svg';
 import { DARK_THEME_COLORS, LIGHT_THEME_COLORS } from '@/constants/palette';
 import { useMenuStore } from '@/stores/menu';
 import { useSettingsStore } from '@/stores/settings';
+import { useSystemConfigStore } from '@/stores/system-config';
 import {
   findAncestorKeys,
   findByKey,
@@ -22,6 +23,7 @@ const route = useRoute();
 const router = useRouter();
 const menu = useMenuStore();
 const settings = useSettingsStore();
+const systemConfig = useSystemConfigStore();
 
 const menuColors = computed(() => {
   if (settings.menuBackground === 'dark') {
@@ -95,13 +97,17 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
       class="h-16 px-4 flex items-center justify-center gap-2 overflow-hidden border-r border-solid a-border-border-secondary"
       :style="siderStyle"
     >
-      <img :src="logoUrl" alt="nest-admin" class="h-9 w-9 shrink-0" />
+      <img
+        :src="logoUrl"
+        :alt="systemConfig.systemName"
+        class="h-9 w-9 shrink-0"
+      />
       <span
         v-if="!collapsed"
         class="whitespace-nowrap text-xl font-semibold"
         :style="systemNameStyle"
       >
-        Nest Admin
+        {{ systemConfig.systemName }}
       </span>
     </div>
 

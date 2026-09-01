@@ -1,5 +1,6 @@
 import type {
   PaginatedResult,
+  RuntimeSystemConfig,
   Status,
   SystemConfig,
   SystemConfigValueType,
@@ -32,6 +33,10 @@ export function apiSystemConfigPage(
   query: SystemConfigQuery & { page: number; pageSize: number },
 ): Promise<PaginatedResult<SystemConfig>> {
   return httpGet(withQuery('/system-configs', { ...query }));
+}
+
+export function apiRuntimeSystemConfig(): Promise<RuntimeSystemConfig> {
+  return httpGet('/system-configs/runtime');
 }
 
 export function apiSystemConfigCreate(

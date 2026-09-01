@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PaginatedResult } from '@nest-admin/shared';
+import { createPinia, setActivePinia } from 'pinia';
 import { useTable } from '@/composables/use-table';
+import { useSystemConfigStore } from '@/stores/system-config';
 
 const pageOf = <T>(list: T[], total: number): PaginatedResult<T> => ({
   list,
@@ -22,6 +24,7 @@ function makeFetcher<T>(
 describe('useTable', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setActivePinia(createPinia());
   });
 
   it('首次 reload 拉取数据并填充分页信息', async () => {
@@ -95,6 +98,32 @@ describe('useTable', () => {
 
     expect(fetcher).toHaveBeenCalledWith({ page: 1, pageSize: 25 });
     expect(table.pagination.value.pageSize).toBe(25);
+  });
+
+  it('未单独指定时使用系统参数配置的默认页大小', async () => {
+    const systemConfig = useSystemConfigStore();
+    systemConfig.defaultPageSize = 30;
+    const fetcher = makeFetcher(async () => pageOf([], 0));
+    const table = useTable<string>({ columns: [], fetcher });
+
+    await table.reload();
+
+    expect(fetcher).toHaveBeenCalledWith({ page: 1, pageSize: 30 });
+    expect(table.pagination.value.pageSize).toBe(30);
+  });
+
+  it('系统默认页大小更新后重新加载已查询的表格', async () => {
+    const systemConfig = useSystemConfigStore();
+    const fetcher = makeFetcher(async () => pageOf([], 0));
+    const table = useTable<string>({ columns: [], fetcher });
+    await table.reload();
+
+    systemConfig.defaultPageSize = 30;
+
+    await vi.waitFor(() =>
+      expect(fetcher).toHaveBeenLastCalledWith({ page: 1, pageSize: 30 }),
+    );
+    expect(table.pagination.value.pageSize).toBe(30);
   });
 
   it('非分页模式直接加载列表且不注入分页参数', async () => {

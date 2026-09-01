@@ -9,6 +9,7 @@ import AppIcon from '@/components/core/base/app-icon/index.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
 import { useSettingsStore } from '@/stores/settings';
+import { useSystemConfigStore } from '@/stores/system-config';
 import LoginCharacters from './components/LoginCharacters.vue';
 import { resolveLoginRedirect } from './login-redirect';
 
@@ -17,6 +18,7 @@ const router = useRouter();
 const auth = useAuthStore();
 const menu = useMenuStore();
 const settings = useSettingsStore();
+const systemConfig = useSystemConfigStore();
 
 const form = reactive({ username: '', password: '' });
 const rules: FormProps['rules'] = {
@@ -106,14 +108,16 @@ defineOptions({ name: 'LoginPage' });
         <span
           class="h-11 w-11 grid shrink-0 place-items-center border border-solid rounded-lg a-border-border a-bg-container"
         >
-          <img :src="logoUrl" alt="Nest Admin" class="h-9 w-9" />
+          <img :src="logoUrl" :alt="systemConfig.systemName" class="h-9 w-9" />
         </span>
-        <span class="text-lg font-semibold a-color-text">Nest Admin</span>
+        <span class="text-lg font-semibold a-color-text">{{
+          systemConfig.systemName
+        }}</span>
       </div>
 
       <div class="relative my-auto w-full max-w-[620px] self-center">
         <h1 class="m-0 text-5xl font-semibold leading-tight a-color-text">
-          Nest Admin
+          {{ systemConfig.systemName }}
         </h1>
         <p class="mb-0 mt-4 text-xl font-medium a-color-text-secondary">
           企业级后台管理系统
@@ -129,7 +133,7 @@ defineOptions({ name: 'LoginPage' });
       </div>
 
       <p class="relative mb-0 text-xs a-color-text-tertiary">
-        © 2026 Nest Admin. All rights reserved.
+        © 2026 {{ systemConfig.systemName }}. All rights reserved.
       </p>
     </section>
 
@@ -141,8 +145,14 @@ defineOptions({ name: 'LoginPage' });
       >
         <div class="mb-8 min-h-10 flex items-center justify-between">
           <div class="flex items-center gap-3 lg:hidden">
-            <img :src="logoUrl" alt="Nest Admin" class="h-10 w-10 shrink-0" />
-            <span class="text-base font-semibold a-color-text">Nest Admin</span>
+            <img
+              :src="logoUrl"
+              :alt="systemConfig.systemName"
+              class="h-10 w-10 shrink-0"
+            />
+            <span class="text-base font-semibold a-color-text">{{
+              systemConfig.systemName
+            }}</span>
           </div>
 
           <button
@@ -161,7 +171,7 @@ defineOptions({ name: 'LoginPage' });
             欢迎回来
           </h2>
           <p class="mb-0 mt-3 text-sm a-color-text-secondary">
-            登录 Nest Admin 管理工作台
+            登录 {{ systemConfig.systemName }} 管理工作台
           </p>
         </header>
 

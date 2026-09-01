@@ -2,11 +2,10 @@ import type { Router } from 'vue-router';
 
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
+import { useSystemConfigStore } from '@/stores/system-config';
 import { useTabsStore } from '@/stores/tabs';
 import { getAccessToken } from '@/utils/auth-token';
 import { resetDynamicRoutes, syncDynamicRoutes } from './dynamic-routes';
-
-const APP_TITLE = 'nest-admin';
 
 export function setupGuards(router: Router): void {
   router.beforeEach(async (to) => {
@@ -69,6 +68,6 @@ export function setupGuards(router: Router): void {
   });
 
   router.afterEach((to) => {
-    document.title = `${to.meta.title} · ${APP_TITLE}`;
+    document.title = `${to.meta.title} · ${useSystemConfigStore().systemName}`;
   });
 }

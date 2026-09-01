@@ -1,6 +1,7 @@
 import type { TableColumnsType } from 'antdv-next';
+import { createPinia, setActivePinia } from 'pinia';
 import { h, isVNode } from 'vue';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useTable } from '@/composables/use-table';
 
@@ -10,6 +11,10 @@ interface Row {
 }
 
 describe('useTable columns', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
   it('原样保留 h 函数与 TSX 列渲染器', () => {
     const hRender = (_value: unknown, record: Row) =>
       h('strong', { class: 'h-cell' }, record.name);

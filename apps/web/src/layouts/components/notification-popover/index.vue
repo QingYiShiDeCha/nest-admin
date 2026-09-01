@@ -108,20 +108,7 @@ onBeforeUnmount(() => notifications.stopRealtime());
       :overlay-inner-style="{ padding: 0 }"
       @open-change="handleOpenChange"
     >
-      <button
-        class="w-9 h-9 inline-grid place-items-center border-none rounded-md bg-transparent text-xl a-color-text cursor-pointer transition-colors hover:a-bg-fill-secondary"
-        type="button"
-        title="消息通知"
-        aria-label="打开消息通知"
-      >
-        <a-badge
-          :count="notifications.unreadCount"
-          :overflow-count="99"
-          size="small"
-        >
-          <i class="i-ri:notification-3-line a-color-text text-xl" />
-        </a-badge>
-      </button>
+      <slot name="trigger" :unread-count="notifications.unreadCount" />
 
       <template #content>
         <div class="w-90 max-w-[calc(100vw-30px)]">

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   go: vi.fn(),
   pageMounts: 0,
   push: vi.fn(),
+  setThemeMode: vi.fn(),
   route: {
     fullPath: '/dashboard',
     meta: { cacheName: 'DashboardPage', title: '首页' },
@@ -32,6 +33,7 @@ vi.mock('antdv-next', () => {
   });
 
   return {
+    Badge: stub('ABadge', 'badge'),
     Breadcrumb: stub('ABreadcrumb', 'breadcrumb'),
     Avatar: stub('AAvatar', 'avatar'),
     Dropdown: stub('ADropdown', 'dropdown'),
@@ -75,7 +77,8 @@ vi.mock('@/layouts/components/TabBar.vue', () => ({
 vi.mock('@/layouts/components/notification-popover/index.vue', () => ({
   default: {
     name: 'NotificationPopover',
-    template: '<div data-testid="notification-popover" />',
+    template:
+      '<div data-testid="notification-popover"><slot name="trigger" :unread-count="1" /></div>',
   },
 }));
 
@@ -100,8 +103,12 @@ vi.mock('@/stores/settings', () => ({
     resolvedTheme: 'light',
     setPrimaryColor: vi.fn(),
     setMenuBackground: vi.fn(),
-    setThemeMode: vi.fn(),
+    setThemeMode: mocks.setThemeMode,
   }),
+}));
+
+vi.mock('@/stores/system-config', () => ({
+  useSystemConfigStore: () => ({ systemName: 'Nest Admin' }),
 }));
 
 vi.mock('@/stores/tabs', () => ({
@@ -111,10 +118,30 @@ vi.mock('@/stores/tabs', () => ({
 describe('AdminLayout scroll ownership', () => {
   it('所有登录用户都显示个人消息通知入口', () => {
     const wrapper = mount(AdminLayout);
+    const notificationTrigger = wrapper.get('button[title="消息通知"]');
+    const settingsTrigger = wrapper.get('button[title="界面设置"]');
 
-    expect(
-      wrapper.find('[data-testid="notification-popover"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-testid="notification-popover"]').exists()).toBe(
+      true,
+    );
+    expect(notificationTrigger.classes()).toContain('notification-trigger');
+    expect(notificationTrigger.get('i').classes()).toContain(
+      'i-ri:notification-3-line',
+    );
+    expect(settingsTrigger.classes()).toContain('layout-settings-trigger');
+    expect(settingsTrigger.get('i').classes()).toContain('i-ri:settings-line');
+  });
+
+  it('在铃铛旁快捷切换浅色和深色主题', async () => {
+    mocks.setThemeMode.mockClear();
+    const wrapper = mount(AdminLayout);
+    const themeTrigger = wrapper.get('button[title="切换深色主题"]');
+
+    expect(themeTrigger.classes()).toContain('theme-toggle-trigger');
+    expect(themeTrigger.get('i').classes()).toContain('i-ri:moon-line');
+
+    await themeTrigger.trigger('click');
+    expect(mocks.setThemeMode).toHaveBeenCalledWith('dark');
   });
 
   it('从 Header 控制侧栏收起和展开', async () => {
@@ -133,7 +160,7 @@ describe('AdminLayout scroll ownership', () => {
     expect(sider.props('collapsed')).toBe(true);
     expect(wrapper.find('button[title="展开菜单"]').exists()).toBe(true);
     expect(wrapper.text()).not.toContain('Nest Admin');
-    expect(wrapper.find('img[alt="nest-admin"]').exists()).toBe(true);
+    expect(wrapper.find('img[alt="Nest Admin"]').exists()).toBe(true);
     expect(wrapper.get('button[title="展开菜单"]').classes()).toContain(
       '-ml-2',
     );

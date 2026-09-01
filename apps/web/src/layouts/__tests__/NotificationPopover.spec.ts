@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { h } from 'vue';
 
 import NotificationPopover from '@/layouts/components/notification-popover/index.vue';
 
@@ -104,6 +105,17 @@ describe('NotificationPopover', () => {
 
     return wrapper;
   }
+
+  it('通过 trigger 插槽向 Header 暴露未读数量', () => {
+    const wrapper = mount(NotificationPopover, {
+      slots: {
+        trigger: ({ unreadCount }: { unreadCount: number }) =>
+          h('span', { 'data-testid': 'trigger-count' }, String(unreadCount)),
+      },
+    });
+
+    expect(wrapper.get('[data-testid="trigger-count"]').text()).toBe('1');
+  });
 
   it('点击最近消息在当前页面打开抽屉并标记已读', async () => {
     const wrapper = await mountOpenedPopover();

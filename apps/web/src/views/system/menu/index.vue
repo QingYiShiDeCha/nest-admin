@@ -13,11 +13,12 @@ import {
   type MenuPayload,
 } from '@/api/menu';
 import AppTag from '@/components/core/base/app-tag/index.vue';
+import AppIcon from '@/components/core/base/app-icon/index.vue';
 import IconPicker from '@/components/core/selectors/icon-picker/index.vue';
 import ProTable from '@/components/core/tables/pro-table/index.vue';
 import { usePermission } from '@/composables/use-permission';
 import { useTable } from '@/composables/use-table';
-import { MENU_ICON_OPTIONS } from '@/layouts/menu-icons';
+import { MENU_ICON_OPTIONS, resolveMenuIcon } from '@/layouts/menu-icons';
 import {
   MENU_TYPE_META,
   MENU_TYPE_OPTIONS,
@@ -42,6 +43,24 @@ const columns: TableColumnsType<MenuNode> = [
       ),
   },
   { title: '路由路径', dataIndex: 'path', key: 'path' },
+  { title: '前端组件', dataIndex: 'component', key: 'component' },
+  {
+    title: '图标',
+    dataIndex: 'icon',
+    key: 'icon',
+    width: 90,
+    render: (_, record) => {
+      const icon = resolveMenuIcon(record.icon);
+
+      return icon
+        ? h(AppIcon, {
+            icon,
+            alt: `${record.name}图标`,
+            class: 'text-xl a-color-text-secondary',
+          })
+        : '-';
+    },
+  },
   { title: '排序', dataIndex: 'sort', width: 70 },
   {
     title: '侧边栏',

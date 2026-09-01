@@ -35,24 +35,22 @@ describe('LayoutSettingsDrawer', () => {
     setActivePinia(pinia);
   });
 
-  function mountDrawer() {
-    return mount(LayoutSettingsDrawer, { global: { plugins: [pinia] } });
+  function mountDrawer(open = true) {
+    return mount(LayoutSettingsDrawer, {
+      props: { open },
+      global: { plugins: [pinia] },
+    });
   }
 
-  it('从 Header 入口打开静态设置抽屉', async () => {
-    const wrapper = mountDrawer();
-    const trigger = wrapper.get('button[title="界面设置"]');
+  it('只渲染由外部 open 状态控制的设置抽屉', async () => {
+    const wrapper = mountDrawer(false);
 
     expect(wrapper.find('[data-testid="settings-drawer"]').exists()).toBe(
       false,
     );
-    expect(trigger.classes()).toContain('layout-settings-trigger');
-    expect(trigger.classes()).toEqual(
-      expect.arrayContaining(['w-9', 'h-9', 'text-xl']),
-    );
-    expect(trigger.get('i').classes()).toContain('layout-settings-icon');
+    expect(wrapper.find('button[title="界面设置"]').exists()).toBe(false);
 
-    await trigger.trigger('click');
+    await wrapper.setProps({ open: true });
 
     const drawer = wrapper.get('[data-testid="settings-drawer"]');
     expect(wrapper.getComponent({ name: 'ADrawer' }).props('size')).toBe(
@@ -70,7 +68,6 @@ describe('LayoutSettingsDrawer', () => {
   it('从抽屉切换全局主题模式', async () => {
     const wrapper = mountDrawer();
     const settings = useSettingsStore(pinia);
-    await wrapper.get('button[title="界面设置"]').trigger('click');
 
     const darkTheme = wrapper.get('button[title="深色主题"]');
     expect(darkTheme.attributes('aria-pressed')).toBe('false');
@@ -85,7 +82,6 @@ describe('LayoutSettingsDrawer', () => {
   it('菜单背景默认浅色，并从抽屉切换为深色', async () => {
     const wrapper = mountDrawer();
     const settings = useSettingsStore(pinia);
-    await wrapper.get('button[title="界面设置"]').trigger('click');
 
     const menuBackground = wrapper.findAllComponents({
       name: 'ASegmented',
@@ -102,7 +98,6 @@ describe('LayoutSettingsDrawer', () => {
   it('从抽屉切换主题色', async () => {
     const wrapper = mountDrawer();
     const settings = useSettingsStore(pinia);
-    await wrapper.get('button[title="界面设置"]').trigger('click');
 
     const greenTheme = wrapper.get('button[title="绿色主题色"]');
     expect(greenTheme.attributes('aria-pressed')).toBe('false');

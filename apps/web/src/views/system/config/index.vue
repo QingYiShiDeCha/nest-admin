@@ -24,6 +24,7 @@ import type { FilterField } from '@/components/core/tables/pro-search/types';
 import ProTable from '@/components/core/tables/pro-table/index.vue';
 import { usePermission } from '@/composables/use-permission';
 import { useTable } from '@/composables/use-table';
+import { useSystemConfigStore } from '@/stores/system-config';
 import {
   STATUS_META,
   STATUS_OPTIONS,
@@ -34,6 +35,7 @@ import { formatDateTime } from '@/utils/format';
 
 const { message } = App.useApp();
 const { can } = usePermission();
+const systemConfig = useSystemConfigStore();
 
 const columns: TableColumnsType<SystemConfig> = [
   { title: '参数名称', dataIndex: 'name', key: 'name', width: 160 },
@@ -42,11 +44,7 @@ const columns: TableColumnsType<SystemConfig> = [
     title: '参数值',
     key: 'value',
     render: (_value, record) =>
-      h(
-        'span',
-        { class: 'block truncate', title: record.value },
-        record.value,
-      ),
+      h('span', { class: 'block truncate', title: record.value }, record.value),
   },
   {
     title: '值类型',
@@ -300,6 +298,7 @@ async function submit(): Promise<void> {
       await apiSystemConfigCreate(payload);
       void message.success('系统参数已创建');
     }
+    await systemConfig.load(true);
     modalOpen.value = false;
     await table.reload();
   } finally {
@@ -393,18 +392,10 @@ defineOptions({ name: 'SystemConfigPage' });
             :rows="6"
             :maxlength="10000"
           />
-          <a-input
-            v-else
-            v-model:value="form.value"
-            :maxlength="10000"
-          />
+          <a-input v-else v-model:value="form.value" :maxlength="10000" />
         </a-form-item>
         <a-form-item class="md:col-span-2" label="备注" name="remark">
-          <a-textarea
-            v-model:value="form.remark"
-            :rows="3"
-            :maxlength="255"
-          />
+          <a-textarea v-model:value="form.remark" :rows="3" :maxlength="255" />
         </a-form-item>
       </a-form>
     </a-modal>
