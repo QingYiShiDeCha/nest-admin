@@ -235,6 +235,15 @@ const MENU_TREE: readonly MenuSeed[] = [
         sort: 70,
         keepAlive: true,
       },
+      {
+        name: '系统监控',
+        type: 'menu',
+        path: '/system/monitor',
+        component: 'system/monitor/index',
+        icon: 'RiServerLine',
+        sort: 75,
+        keepAlive: true,
+      },
     ],
   },
   {
