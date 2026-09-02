@@ -70,6 +70,9 @@ export const PERMISSIONS = {
   FILE_READ: 'system:file:read',
   FILE_DELETE: 'system:file:delete',
 
+  /** 查看部署实例、依赖连通性与运行时负载。 */
+  MONITOR_READ: 'system:monitor:read',
+
   NOTICE_LIST: 'system:notice:list',
   NOTICE_READ: 'system:notice:read',
   NOTICE_CREATE: 'system:notice:create',
@@ -210,6 +213,7 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   { code: PERMISSIONS.FILE_LIST, name: '查询文件资源', module: 'system' },
   { code: PERMISSIONS.FILE_READ, name: '查看文件资源', module: 'system' },
   { code: PERMISSIONS.FILE_DELETE, name: '删除文件资源', module: 'system' },
+  { code: PERMISSIONS.MONITOR_READ, name: '查看系统监控', module: 'system' },
   { code: PERMISSIONS.NOTICE_LIST, name: '查询通知公告', module: 'system' },
   { code: PERMISSIONS.NOTICE_READ, name: '查看通知公告', module: 'system' },
   { code: PERMISSIONS.NOTICE_CREATE, name: '新增通知公告', module: 'system' },

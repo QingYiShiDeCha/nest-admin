@@ -22,4 +22,5 @@ export * from './interfaces/post.interface';
 export * from './interfaces/role.interface';
 export * from './interfaces/scheduled-task.interface';
 export * from './interfaces/system-config.interface';
+export * from './interfaces/system-monitor.interface';
 export * from './interfaces/user.interface';
