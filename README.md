@@ -1,18 +1,19 @@
 # nest-admin
 
-基于 NestJS 11、Vue 3、Drizzle ORM 和 MySQL 8 的全栈后台管理系统，采用 pnpm monorepo 组织。项目已经覆盖认证与会话安全、RBAC、用户/角色/菜单/组织架构/岗位管理、部门数据权限、数据字典、通知公告、操作日志、在线用户、文件资源管理、主题切换和通用表格/图表组件，可直接作为管理后台的开发基础。
+基于 NestJS 11、Vue 3、Drizzle ORM 和 MySQL 8 的全栈后台管理系统，采用 pnpm monorepo 组织。项目已经覆盖认证与会话安全、RBAC、用户/角色/菜单/组织架构/岗位管理、部门数据权限、数据字典、通知公告、操作日志、在线用户、系统监控、文件资源管理、主题切换和通用表格/图表组件，可直接作为管理后台的开发基础。
 
 ## 已实现功能
 
 - **认证与会话**：access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效。
 - **RBAC**：用户、角色、权限码、菜单树、部门数据范围和按钮级权限控制，支持 Redis 授权/数据范围缓存及主动失效，内置超管防自锁规则。
-- **系统管理**：用户、组织架构、岗位、角色、菜单、参数配置、数据字典、通知公告、操作日志、在线用户等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
+- **系统管理**：用户、组织架构、岗位、角色、菜单、参数配置、数据字典、通知公告、操作日志、在线用户、系统监控等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
 - **数据字典**：字典类型与字典项 CRUD、状态和排序管理，业务侧通过 `useDict(code)` 复用启用选项，Redis 版本票据保证写后主动失效。
 - **通知与消息**：公告草稿、发布、撤回和阅读统计，支持全员、部门、角色、指定用户发送；Header 展示未读角标和最近消息，SSE + Redis Pub/Sub 实时同步多实例事件，断线自动回退轮询。
 - **界面基础设施**：浅色/深色/跟随系统主题、可切换主色和菜单风格、KeepAlive 页签、内容区独立刷新、Remix Icon 图标体系。
 - **数据展示**：封装折线图、柱状图、饼图/环形图和热力图，统一处理主题、自适应尺寸、空状态和动画。
 - **文件资源**：本地或 S3 兼容存储，上传资源自动登记元数据和上传人；管理页支持分类筛选、预览、复制地址、引用检查与物理删除。
 - **定时任务**：后端预注册任务白名单、Cron/时区配置、启停、异步手动触发、执行日志、Redis 多实例防重和配置对账。
+- **系统监控**：按权限查看当前实例的数据库/Redis 连通性、主机与 Node.js 进程信息、在线会话、定时任务和最近 20 次 CPU/内存采样，不写入监控采样表。
 
 ## 技术栈
 
@@ -52,7 +53,7 @@ nest-admin/
 │  │  │  ├─ config/          # zod 环境变量 schema、Swagger 装配
 │  │  │  ├─ common/          # 装饰器、分页 DTO、异常过滤、响应包装
 │  │  │  ├─ database/        # Nest 侧的 DI 封装（token + 全局模块）
-│  │  │  └─ modules/         # auth、user、rbac、operation-log、file
+│  │  │  └─ modules/         # auth、user、rbac、operation-log、file、system-monitor
 │  │  └─ test/               # e2e
 │  └─ web/                   # @nest-admin/web，Vue 管理端
 │     ├─ src/api/            # alova 请求封装与业务 API
@@ -233,6 +234,8 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 **日志与过期会话清理是首个内置任务**。保留天数仍由 `LOG_RETENTION_DAYS` 控制；`LOG_CLEANUP_CRON` 和 `LOG_CLEANUP_ENABLED` 只在首次创建内置计划时作为初值，之后以定时任务管理页中的配置为准。
 
+**系统监控是只读快照**。`GET /api/system-monitor/overview` 只返回当前 API 实例的非敏感运行信息；数据库或 Redis 探测失败会分别标记为异常，不会让整个概览接口失败。趋势采样只保留在当前进程内存中的最近 20 条，页面每 30 秒刷新一次，实例重启后自然清空。
+
 **删除是分批的。** 一条 `DELETE WHERE created_at < ?` 打在几百万行上会长时间持锁、撑爆 undo 和 binlog，线上表现就是整个库卡住。这里每批 1000 行、单次最多 100 批，超出部分留到下一轮。
 
 **多实例下靠 Redis 锁保证只跑一份。** 锁用 `SET NX PX` 获取、Lua 脚本比对持有者后删除——分两步做的话，恰好在两步之间锁过期被别人抢到，就会误删对方的锁。抢不到锁直接记为 `skipped` 而不排队，避免慢任务形成积压。没配 Redis 时不加锁直接执行，单实例部署本就不需要它。
@@ -360,6 +363,7 @@ sys_file_resource (文件资源元数据与上传人快照)
 | GET    | `/api/files/resources`                | `system:file:list`         | 分页查询文件资源，支持关键词、分类和存储驱动筛选    |
 | GET    | `/api/files/resources/:id`            | `system:file:read`         | 文件资源详情与当前引用数                            |
 | DELETE | `/api/files/resources/:id`            | `system:file:delete`       | 删除未被引用的物理文件并软删除元数据                |
+| GET    | `/api/system-monitor/overview`        | `system:monitor:read`      | 查询当前实例、依赖连通性、工作负载和短期趋势        |
 | GET    | `/api/menus/mine`                     | 仅需登录                   | 当前用户可见的菜单树，前端渲染侧边栏                |
 | GET    | `/api/menus`                          | `system:menu:list`         | 完整菜单树（管理端），含停用与隐藏节点              |
 | POST   | `/api/menus`                          | `system:menu:create`       | 新增菜单                                            |
