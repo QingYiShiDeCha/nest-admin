@@ -1,4 +1,8 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 
 import type {
   FileStorage,
@@ -17,10 +21,11 @@ export interface S3FileStorageOptions {
 }
 
 export interface S3ClientLike {
-  send(command: PutObjectCommand): Promise<unknown>;
+  send(command: PutObjectCommand | DeleteObjectCommand): Promise<unknown>;
 }
 
 export class S3FileStorage implements FileStorage {
+  readonly driver = 's3' as const;
   private readonly client: S3ClientLike;
 
   constructor(
@@ -59,6 +64,15 @@ export class S3FileStorage implements FileStorage {
       url: `${this.publicBaseUrl()}/${encodeKey(input.key)}`,
       storage: 's3',
     };
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.client.send(
+      new DeleteObjectCommand({
+        Bucket: this.options.bucket,
+        Key: key,
+      }),
+    );
   }
 
   private publicBaseUrl(): string {

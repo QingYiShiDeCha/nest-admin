@@ -15,5 +15,7 @@ export interface StoredFile {
 }
 
 export interface FileStorage {
+  readonly driver: FileStorageDriver;
   upload(input: StorageUploadInput): Promise<StoredFile>;
+  delete(key: string): Promise<void>;
 }

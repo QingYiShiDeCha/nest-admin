@@ -1,11 +1,11 @@
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 
 import { S3FileStorage, type S3ClientLike } from './s3-file.storage';
 
 class FakeS3Client implements S3ClientLike {
-  command: PutObjectCommand | undefined;
+  command: PutObjectCommand | DeleteObjectCommand | undefined;
 
-  send(command: PutObjectCommand): Promise<unknown> {
+  send(command: PutObjectCommand | DeleteObjectCommand): Promise<unknown> {
     this.command = command;
     return Promise.resolve({});
   }
@@ -62,5 +62,25 @@ describe('S3FileStorage', () => {
     });
 
     expect(result.url).toBe('http://127.0.0.1:9000/assets/a.txt');
+  });
+
+  it('使用 DeleteObject 删除对象', async () => {
+    const client = new FakeS3Client();
+    const storage = new S3FileStorage(
+      {
+        region: 'cn-test-1',
+        bucket: 'assets',
+        forcePathStyle: false,
+      },
+      client,
+    );
+
+    await storage.delete('2026/09/02/file.png');
+
+    expect(client.command).toBeInstanceOf(DeleteObjectCommand);
+    expect(client.command?.input).toEqual({
+      Bucket: 'assets',
+      Key: '2026/09/02/file.png',
+    });
   });
 });

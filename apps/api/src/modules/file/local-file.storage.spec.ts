@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -32,6 +32,12 @@ describe('LocalFileStorage', () => {
       url: '/uploads/2026/08/29/%E6%B5%8B%E8%AF%95%20file.txt',
       storage: 'local',
     });
+
+    await storage.delete(result.key);
+    await expect(
+      access(join(directory, '2026/08/29/测试 file.txt')),
+    ).rejects.toThrow();
+    await expect(storage.delete(result.key)).resolves.toBeUndefined();
   });
 
   it('拒绝越出存储根目录的 key', async () => {
@@ -44,5 +50,8 @@ describe('LocalFileStorage', () => {
         contentType: 'text/plain',
       }),
     ).rejects.toThrow('非法文件存储路径');
+    await expect(storage.delete('../outside.txt')).rejects.toThrow(
+      '非法文件存储路径',
+    );
   });
 });
