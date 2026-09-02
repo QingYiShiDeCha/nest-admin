@@ -58,6 +58,14 @@ export const PERMISSIONS = {
   LOGIN_LOG_LIST: 'system:login-log:list',
   LOGIN_LOG_READ: 'system:login-log:read',
 
+  SCHEDULED_TASK_LIST: 'system:scheduled-task:list',
+  SCHEDULED_TASK_READ: 'system:scheduled-task:read',
+  SCHEDULED_TASK_CREATE: 'system:scheduled-task:create',
+  SCHEDULED_TASK_UPDATE: 'system:scheduled-task:update',
+  SCHEDULED_TASK_DELETE: 'system:scheduled-task:delete',
+  SCHEDULED_TASK_RUN: 'system:scheduled-task:run',
+  SCHEDULED_TASK_LOG_LIST: 'system:scheduled-task:log:list',
+
   NOTICE_LIST: 'system:notice:list',
   NOTICE_READ: 'system:notice:read',
   NOTICE_CREATE: 'system:notice:create',
@@ -158,6 +166,41 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   {
     code: PERMISSIONS.LOGIN_LOG_READ,
     name: '查看登录日志详情',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.SCHEDULED_TASK_LIST,
+    name: '查询定时任务列表',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.SCHEDULED_TASK_READ,
+    name: '查看定时任务',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.SCHEDULED_TASK_CREATE,
+    name: '新增定时任务',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.SCHEDULED_TASK_UPDATE,
+    name: '更新定时任务',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.SCHEDULED_TASK_DELETE,
+    name: '删除定时任务',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.SCHEDULED_TASK_RUN,
+    name: '手动执行定时任务',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.SCHEDULED_TASK_LOG_LIST,
+    name: '查询定时任务日志',
     module: 'system',
   },
   { code: PERMISSIONS.NOTICE_LIST, name: '查询通知公告', module: 'system' },

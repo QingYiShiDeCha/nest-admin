@@ -19,6 +19,8 @@ import type {
   PostListItem,
   Role,
   RoleDetail,
+  ScheduledTask,
+  ScheduledTaskLog,
   SystemConfig,
   UserProfile,
   UserListItem,
@@ -30,6 +32,7 @@ import type {
   OperationLogRow,
   PostRow,
   RoleRow,
+  ScheduledTaskLogRow,
   SystemConfigRow,
   SafeUser,
   DepartmentTransferRow,
@@ -42,6 +45,7 @@ import type { OnlineUserSessionRow } from './modules/auth/refresh-token.service'
 import type { MenuTreeNode } from './modules/rbac/menu.service';
 import type { RoleDetail as BackendRoleDetail } from './modules/rbac/role.service';
 import type { PostListRecord } from './modules/rbac/post.service';
+import type { ScheduledTaskRecord } from './modules/scheduled-task/scheduled-task.service';
 import type {
   NoticeDetailRecord,
   NoticeListRecord,
@@ -142,6 +146,12 @@ type LoginLogContract = Assert<
 type OperationLogContract = Assert<
   Serialized<OperationLogRow> extends OperationLog ? true : false
 >;
+type ScheduledTaskContract = Assert<
+  Serialized<ScheduledTaskRecord> extends ScheduledTask ? true : false
+>;
+type ScheduledTaskLogContract = Assert<
+  Serialized<ScheduledTaskLogRow> extends ScheduledTaskLog ? true : false
+>;
 
 // ---- 在线用户 ----
 type OnlineUserSessionContract = Assert<
@@ -186,6 +196,8 @@ export type WireContractChecks = [
   MenuNodeContract,
   LoginLogContract,
   OperationLogContract,
+  ScheduledTaskContract,
+  ScheduledTaskLogContract,
   OnlineUserSessionContract,
   NoticeContract,
   NoticeListContract,

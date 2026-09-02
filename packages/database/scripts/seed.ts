@@ -217,6 +217,15 @@ const MENU_TREE: readonly MenuSeed[] = [
         sort: 60,
         keepAlive: true,
       },
+      {
+        name: '定时任务',
+        type: 'menu',
+        path: '/system/scheduled-task',
+        component: 'system/scheduled-task/index',
+        icon: 'RiTimerLine',
+        sort: 65,
+        keepAlive: true,
+      },
     ],
   },
   {

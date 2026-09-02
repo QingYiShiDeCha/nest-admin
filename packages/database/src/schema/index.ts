@@ -14,6 +14,7 @@ export * from './posts';
 export * from './refresh-tokens';
 export * from './relations';
 export * from './roles';
+export * from './scheduled-tasks';
 export * from './system-configs';
 export * from './users';
 export * from './user-posts';
