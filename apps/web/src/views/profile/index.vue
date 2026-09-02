@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import type { FileResource } from '@nest-admin/shared';
 import { App } from 'antdv-next';
 import type { FormInstance } from 'antdv-next';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { apiUploadFile } from '@/api/files';
 import { ApiError, httpPut } from '@/api/http';
 import { apiUpdateOwnAvatar, apiUpdateOwnProfile } from '@/api/users';
+import FileResourcePicker from '@/components/business/files/file-resource-picker/index.vue';
 import AppIcon from '@/components/core/base/app-icon/index.vue';
 import AppTag from '@/components/core/base/app-tag/index.vue';
 import { usePageRefresh } from '@/composables/use-page-refresh';
@@ -31,12 +32,17 @@ function errorText(error: unknown, fallback: string): string {
 
 // ---- 头像 ----
 
-const avatarInput = ref<HTMLInputElement | null>(null);
+const avatarPickerOpen = ref(false);
 const avatarSubmitting = ref(false);
-const avatarMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const avatarCategories = ['image'] as const;
+const avatarAccept = 'image/jpeg,image/png,image/gif,image/webp';
+const avatarMaxFileSize = 5 * 1024 * 1024;
+const selectedAvatarUrls = computed(() =>
+  auth.profile?.avatar ? [auth.profile.avatar] : [],
+);
 
 function openAvatarPicker(): void {
-  avatarInput.value?.click();
+  avatarPickerOpen.value = true;
 }
 
 async function saveAvatar(avatar: string | null): Promise<void> {
@@ -44,27 +50,12 @@ async function saveAvatar(avatar: string | null): Promise<void> {
   await auth.loadProfile();
 }
 
-async function handleAvatarChange(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement;
-  const [file] = Array.from(input.files ?? []);
-  input.value = '';
-
-  if (!file) return;
-
-  if (!avatarMimeTypes.includes(file.type)) {
-    void message.error('仅支持 JPG、PNG、GIF 和 WEBP 图片');
-    return;
-  }
-
-  if (file.size > 5 * 1024 * 1024) {
-    void message.error('头像大小不能超过 5 MB');
-    return;
-  }
-
+async function selectAvatar(resources: FileResource[]): Promise<void> {
+  const [resource] = resources;
+  if (!resource) return;
   avatarSubmitting.value = true;
   try {
-    const uploaded = await apiUploadFile(file);
-    await saveAvatar(uploaded.url);
+    await saveAvatar(resource.url);
     void message.success('头像已更新');
   } catch (error) {
     void message.error(errorText(error, '头像更新失败，请稍后重试'));
@@ -248,15 +239,8 @@ defineOptions({ name: 'ProfilePage' });
         </div>
 
         <div class="mt-5 flex flex-wrap justify-center gap-2">
-          <input
-            ref="avatarInput"
-            class="hidden"
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            @change="handleAvatarChange"
-          />
           <a-button :loading="avatarSubmitting" @click="openAvatarPicker">
-            <template #icon><AppIcon icon="i-ri:upload-2-line" /></template>
+            <template #icon><AppIcon icon="i-ri:image-edit-line" /></template>
             修改头像
           </a-button>
           <a-popconfirm
@@ -424,5 +408,17 @@ defineOptions({ name: 'ProfilePage' });
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <FileResourcePicker
+      v-model:open="avatarPickerOpen"
+      title="选择头像"
+      scope="mine"
+      mode="single"
+      :categories="avatarCategories"
+      :selected-urls="selectedAvatarUrls"
+      :accept="avatarAccept"
+      :max-file-size="avatarMaxFileSize"
+      @confirm="selectAvatar"
+    />
   </div>
 </template>
