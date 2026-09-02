@@ -1,4 +1,10 @@
-import type { OperationLog, OperationStatus, PaginatedResult } from '@nest-admin/shared';
+import type {
+  LoginLog,
+  LoginStatus,
+  OperationLog,
+  OperationStatus,
+  PaginatedResult,
+} from '@nest-admin/shared';
 import { httpGet, httpPost, withQuery } from '@/api/http';
 
 export interface LogQuery {
@@ -11,12 +17,32 @@ export interface LogQuery {
   endAt?: string;
 }
 
-export function apiLogPage(query: LogQuery & { page: number; pageSize: number }) {
-  return httpGet<PaginatedResult<OperationLog>>(withQuery('/operation-logs', { ...query }));
+export function apiLogPage(
+  query: LogQuery & { page: number; pageSize: number },
+) {
+  return httpGet<PaginatedResult<OperationLog>>(
+    withQuery('/operation-logs', { ...query }),
+  );
+}
+
+export interface LoginLogQuery {
+  username?: string;
+  status?: LoginStatus | '';
+  startAt?: string;
+  endAt?: string;
+}
+
+export function apiLoginLogPage(
+  query: LoginLogQuery & { page: number; pageSize: number },
+) {
+  return httpGet<PaginatedResult<LoginLog>>(
+    withQuery('/login-logs', { ...query }),
+  );
 }
 
 /** 清理结果：日志行数与连带过期的 refreshToken 数 */
 export interface CleanupResult {
+  loginLogs: number;
   operationLogs: number;
   refreshTokens: number;
 }

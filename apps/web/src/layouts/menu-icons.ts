@@ -108,6 +108,18 @@ export const MENU_ICON_OPTIONS = [
     keywords: 'file list log',
   },
   {
+    value: 'RiHistoryLine',
+    icon: 'i-ri:history-line',
+    label: '历史记录',
+    keywords: 'history log record',
+  },
+  {
+    value: 'RiLoginBoxLine',
+    icon: 'i-ri:login-box-line',
+    label: '登录',
+    keywords: 'login sign in access',
+  },
+  {
     value: 'RiFileTextLine',
     icon: 'i-ri:file-text-line',
     label: '文档',

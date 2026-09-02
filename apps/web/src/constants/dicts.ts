@@ -8,6 +8,7 @@ import type {
   STATUS,
   SYSTEM_CONFIG_VALUE_TYPE,
   DictionaryTone,
+  LoginStatus,
 } from '@nest-admin/shared';
 
 import { SEMANTIC_COLORS } from '@/constants/palette';
@@ -101,6 +102,14 @@ export const OPERATION_STATUS_META: Record<
   // 日志失败态是展示不是破坏性操作，用软红区分开
   success: { label: '成功', color: 'success' },
   failure: { label: '失败', color: SEMANTIC_COLORS.error },
+};
+
+export const LOGIN_STATUS_META: Record<
+  LoginStatus,
+  { label: string; tone: ThemeTone }
+> = {
+  success: { label: '成功', tone: 'success' },
+  failure: { label: '失败', tone: 'error' },
 };
 
 export const NOTICE_TYPE_META: Record<

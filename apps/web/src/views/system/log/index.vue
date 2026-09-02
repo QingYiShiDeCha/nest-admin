@@ -156,6 +156,7 @@ function prettyPrint(raw: string | null): string {
 
 const cleanupOpen = ref(false);
 const cleanupPreview = ref<{
+  loginLogs: number;
   operationLogs: number;
   refreshTokens: number;
 } | null>(null);
@@ -172,7 +173,7 @@ async function runCleanup(): Promise<void> {
   try {
     const result = await apiLogCleanup();
     void message.success(
-      `已清理 ${result.operationLogs} 条日志、${result.refreshTokens} 个过期令牌`,
+      `已清理 ${result.loginLogs} 条登录日志、${result.operationLogs} 条操作日志和 ${result.refreshTokens} 个过期令牌`,
     );
     cleanupOpen.value = false;
     await table.reload();
@@ -275,6 +276,8 @@ defineOptions({ name: 'LogPage' });
       <template v-if="cleanupPreview">
         <p>
           按当前保留期设置，将物理删除
+          <strong>{{ cleanupPreview.loginLogs }}</strong>
+          条登录日志、
           <strong>{{ cleanupPreview.operationLogs }}</strong>
           条操作日志，并连带清理
           <strong>{{ cleanupPreview.refreshTokens }}</strong>
