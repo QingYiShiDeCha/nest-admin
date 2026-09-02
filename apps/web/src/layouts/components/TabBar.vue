@@ -3,16 +3,38 @@ import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import AppIcon from '@/components/core/base/app-icon/index.vue';
+import { useSettingsStore } from '@/stores/settings';
 import { useTabsStore, type TabItem } from '@/stores/tabs';
 
 const route = useRoute();
 const router = useRouter();
 const tabs = useTabsStore();
+const settings = useSettingsStore();
 const draggedPath = ref<string>();
 const dragOverPath = ref<string>();
 
 function isActive(tab: TabItem): boolean {
   return tab.path === route.fullPath;
+}
+
+function tabClasses(tab: TabItem): string {
+  const active = isActive(tab);
+
+  if (settings.tabStyle === 'line') {
+    return active
+      ? 'border-0 border-b-2 border-solid border-primary rounded-none bg-transparent text-primary'
+      : 'border-0 border-b-2 border-solid border-transparent rounded-none bg-transparent a-color-text-secondary hover:text-primary hover:border-primary';
+  }
+
+  if (settings.tabStyle === 'pill') {
+    return active
+      ? 'border border-solid border-primary rounded-full text-primary a-bg-primary-bg'
+      : 'border border-solid a-border-border rounded-full a-bg-container a-color-text-secondary hover:text-primary hover:border-primary';
+  }
+
+  return active
+    ? 'border border-solid border-primary rounded text-primary a-bg-primary-bg'
+    : 'border border-solid a-border-border rounded a-bg-container a-color-text-secondary hover:text-primary hover:border-primary';
 }
 
 function open(tab: TabItem): void {
@@ -96,11 +118,9 @@ function handleMore({ key }: { key: string | number }): void {
       <button
         v-for="tab in tabs.tabs"
         :key="tab.path"
-        class="h-8 inline-flex items-center gap-1.5 px-3 border rounded text-sm whitespace-nowrap shrink-0 transition-[color,border-color,background-color,opacity]"
+        class="h-8 inline-flex items-center gap-1.5 px-3 text-sm whitespace-nowrap shrink-0 transition-[color,border-color,background-color,opacity]"
         :class="[
-          isActive(tab)
-            ? 'text-primary border-primary a-bg-primary-bg'
-            : 'a-bg-container a-color-text-secondary a-border-border hover:text-primary hover:border-primary',
+          tabClasses(tab),
           tab.affix ? 'cursor-pointer' : 'cursor-grab active:cursor-grabbing',
           draggedPath === tab.path ? 'opacity-50' : '',
           dragOverPath === tab.path ? '!border-primary' : '',

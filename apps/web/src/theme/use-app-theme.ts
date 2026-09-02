@@ -21,14 +21,13 @@ const CSS_VAR_KEY = 'css-var-nest-admin';
 function createComponentTokens(
   primaryColor: string,
   resolvedTheme: ResolvedTheme,
+  borderRadius: number,
 ): NonNullable<ThemeConfig['components']> {
   const isLight = resolvedTheme === 'light';
   const background = isLight
     ? LIGHT_THEME_COLORS.background
     : DARK_THEME_COLORS.background;
-  const border = isLight
-    ? LIGHT_THEME_COLORS.border
-    : DARK_THEME_COLORS.border;
+  const border = isLight ? LIGHT_THEME_COLORS.border : DARK_THEME_COLORS.border;
   const text = {
     default: isLight
       ? LIGHT_THEME_COLORS.foreground.default
@@ -56,7 +55,7 @@ function createComponentTokens(
       defaultActiveBg: background.active,
       defaultActiveColor: primaryColor,
       defaultActiveBorderColor: primaryColor,
-      borderRadius: 6,
+      borderRadius,
     },
     Input: {
       addonBg: background.level1,
@@ -75,7 +74,7 @@ function createComponentTokens(
         18,
         'transparent',
       )}`,
-      borderRadius: 6,
+      borderRadius,
     },
     Select: {
       selectorBg: background.container,
@@ -89,7 +88,7 @@ function createComponentTokens(
       hoverBorderColor: primaryColor,
       activeBorderColor: primaryColor,
       activeOutlineColor: mixColor(primaryColor, 18, 'transparent'),
-      borderRadius: 6,
+      borderRadius,
     },
     Modal: {
       headerBg: background.container,
@@ -99,7 +98,7 @@ function createComponentTokens(
       titleFontSize: 16,
       headerBorderBottom: 'none',
       footerBorderTop: 'none',
-      borderRadiusLG: 8,
+      borderRadiusLG: borderRadius + 2,
     },
     Notification: {
       progressBg: primaryColor,
@@ -109,7 +108,7 @@ function createComponentTokens(
       colorInfoBg: statusSurface.info,
       colorBgElevated: background.container,
       colorText: text.default,
-      borderRadiusLG: 8,
+      borderRadiusLG: borderRadius + 2,
     },
     Message: {
       contentBg: background.container,
@@ -124,7 +123,7 @@ function createComponentTokens(
       extraColor: text.secondary,
       colorBgContainer: background.container,
       colorBorderSecondary: border.card,
-      borderRadiusLG: 8,
+      borderRadiusLG: borderRadius + 2,
     },
     Table: {
       headerBg: background.level1,
@@ -201,6 +200,7 @@ function createComponentTokens(
 function createThemeConfig(
   primaryColor: string,
   resolvedTheme: ResolvedTheme,
+  borderRadius: number,
 ): ThemeConfig {
   return {
     algorithm:
@@ -217,8 +217,10 @@ function createThemeConfig(
       colorInfo: SEMANTIC_COLORS.info,
       fontSize: 15,
       controlHeight: 34,
-      borderRadius: 6,
-      borderRadiusLG: 8,
+      borderRadius,
+      borderRadiusLG: borderRadius + 2,
+      borderRadiusSM: Math.max(borderRadius - 2, 0),
+      borderRadiusXS: Math.max(borderRadius - 4, 0),
       ...(resolvedTheme === 'light'
         ? {
             colorBgLayout: LIGHT_THEME_COLORS.background.layout,
@@ -287,17 +289,25 @@ function createThemeConfig(
               DARK_THEME_COLORS.background.elementActive,
           }),
     },
-    components: createComponentTokens(primaryColor, resolvedTheme),
+    components: createComponentTokens(
+      primaryColor,
+      resolvedTheme,
+      borderRadius,
+    ),
   };
 }
 
 export function useAppTheme() {
   const settings = useSettingsStore();
-  const { primaryColor, resolvedTheme } = storeToRefs(settings);
+  const { borderRadius, primaryColor, resolvedTheme } = storeToRefs(settings);
 
   const configProps = computed<ConfigProviderProps>(() => ({
     locale: zh_CN,
-    theme: createThemeConfig(primaryColor.value, resolvedTheme.value),
+    theme: createThemeConfig(
+      primaryColor.value,
+      resolvedTheme.value,
+      borderRadius.value,
+    ),
     notification: {
       classes: {
         root: 'border border-solid a-border-border',

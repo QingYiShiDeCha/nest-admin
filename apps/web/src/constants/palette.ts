@@ -57,6 +57,7 @@ export const DARK_GRAY_COLORS = {
 export const LIGHT_THEME_COLORS = {
   foreground: {
     default: 'color-mix(in srgb, #323251 62%, #ffffff)',
+    watermark: 'rgba(50, 50, 81, 0.08)',
   },
   background: {
     layout: '#FAFBFC',
@@ -81,6 +82,9 @@ export const LIGHT_THEME_COLORS = {
 } as const;
 
 export const DARK_THEME_COLORS = {
+  foreground: {
+    watermark: 'rgba(227, 227, 232, 0.08)',
+  },
   background: {
     layout: '#070707',
     container: '#161618',

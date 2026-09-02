@@ -1,18 +1,24 @@
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { nextTick } from 'vue';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { MenuNode } from '@nest-admin/shared';
 import AdminSidebar from '@/layouts/components/AdminSidebar.vue';
 import { useSettingsStore } from '@/stores/settings';
 
+const mocks = vi.hoisted(() => ({
+  route: { path: '/dashboard' },
+  sidebarTree: [] as unknown[],
+}));
+
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ path: '/dashboard' }),
+  useRoute: () => mocks.route,
   useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock('@/stores/menu', () => ({
-  useMenuStore: () => ({ sidebarTree: [] }),
+  useMenuStore: () => ({ sidebarTree: mocks.sidebarTree }),
 }));
 
 vi.mock('antdv-next', () => ({
@@ -24,7 +30,8 @@ vi.mock('antdv-next', () => ({
   },
   Menu: {
     name: 'AMenu',
-    props: { theme: String },
+    props: { items: Array, openKeys: Array, theme: String },
+    emits: ['openChange', 'click'],
     template: '<nav data-testid="sidebar-menu" :data-theme="theme" />',
   },
   theme: {
@@ -33,6 +40,11 @@ vi.mock('antdv-next', () => ({
 }));
 
 describe('AdminSidebar menu background', () => {
+  beforeEach(() => {
+    mocks.route.path = '/dashboard';
+    mocks.sidebarTree = [];
+  });
+
   it('默认使用浅色菜单，并响应深色设置', async () => {
     const pinia = createPinia();
     setActivePinia(pinia);
@@ -80,5 +92,55 @@ describe('AdminSidebar menu background', () => {
       'background: rgb(25, 26, 35)',
     );
     expect(title.attributes('style')).toContain('color: rgb(217, 218, 219)');
+  });
+
+  it('响应菜单宽度设置，并在手风琴模式下只展开一个根菜单', async () => {
+    const createNode = (
+      id: number,
+      name: string,
+      path: string | null,
+      children: MenuNode[] = [],
+    ): MenuNode => ({
+      id,
+      parentId: null,
+      name,
+      type: path ? 'menu' : 'directory',
+      path,
+      component: path ? 'system/example/index' : null,
+      icon: null,
+      sort: id,
+      visible: true,
+      keepAlive: false,
+      status: 'active',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      children,
+    });
+    const firstChild = createNode(2, '用户管理', '/system/user');
+    const secondChild = createNode(4, '日志管理', '/system/log');
+    mocks.route.path = '/system/user';
+    mocks.sidebarTree = [
+      createNode(1, '系统管理', null, [firstChild]),
+      createNode(3, '系统监控', null, [secondChild]),
+    ];
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const settings = useSettingsStore(pinia);
+    settings.setMenuWidth(250);
+    settings.setBooleanLayoutSetting('sidebarAccordion', true);
+    const wrapper = mount(AdminSidebar, {
+      props: { collapsed: false },
+      global: { plugins: [pinia] },
+    });
+    const sider = wrapper.getComponent({ name: 'ALayoutSider' });
+    const menu = wrapper.getComponent({ name: 'AMenu' });
+
+    expect(sider.props('width')).toBe(250);
+    expect(menu.props('openKeys')).toEqual(['menu-1']);
+
+    menu.vm.$emit('openChange', ['menu-1', 'menu-3']);
+    await nextTick();
+
+    expect(menu.props('openKeys')).toEqual(['menu-3']);
   });
 });

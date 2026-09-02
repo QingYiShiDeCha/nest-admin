@@ -30,11 +30,17 @@ function mockSystemTheme(initialDark: boolean) {
     ),
   } as unknown as MediaQueryList;
 
-  vi.stubGlobal('matchMedia', vi.fn(() => mediaQuery));
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => mediaQuery),
+  );
 
   return {
     setDark(value: boolean) {
-      Object.defineProperty(mediaQuery, 'matches', { configurable: true, value });
+      Object.defineProperty(mediaQuery, 'matches', {
+        configurable: true,
+        value,
+      });
       listeners.forEach((listener) =>
         listener({ matches: value } as MediaQueryListEvent),
       );
@@ -89,6 +95,82 @@ describe('settings store', () => {
 
     expect(settings.menuBackground).toBe('dark');
     expect(settings.themeMode).toBe('light');
+  });
+
+  it('提供可持久化的布局功能开关', () => {
+    const settings = useSettingsStore();
+
+    expect(settings.showTabs).toBe(true);
+    expect(settings.sidebarAccordion).toBe(false);
+    expect(settings.showSidebarCollapseButton).toBe(true);
+    expect(settings.showQuickEntry).toBe(false);
+    expect(settings.showRefreshButton).toBe(true);
+    expect(settings.showBreadcrumb).toBe(true);
+    expect(settings.showTopProgress).toBe(true);
+    expect(settings.showWatermark).toBe(false);
+    expect(settings.mobileTableCardMode).toBe(true);
+    expect(settings.showCopyright).toBe(false);
+
+    settings.setBooleanLayoutSetting('showTabs', false);
+    settings.setBooleanLayoutSetting('sidebarAccordion', true);
+    settings.setBooleanLayoutSetting('showQuickEntry', true);
+    settings.setBooleanLayoutSetting('showWatermark', true);
+
+    expect(settings.showTabs).toBe(false);
+    expect(settings.sidebarAccordion).toBe(true);
+    expect(settings.showQuickEntry).toBe(true);
+    expect(settings.showWatermark).toBe(true);
+  });
+
+  it('导出完整配置快照并恢复默认值', () => {
+    const settings = useSettingsStore();
+
+    settings.setThemeMode('dark');
+    settings.setBooleanLayoutSetting('showWatermark', true);
+    settings.setBooleanLayoutSetting('showCopyright', true);
+    settings.setContainerWidth('fixed');
+    settings.setMenuWidth(260);
+
+    expect(settings.getSettingsSnapshot()).toMatchObject({
+      themeMode: 'dark',
+      showWatermark: true,
+      showCopyright: true,
+      containerWidth: 'fixed',
+      menuWidth: 260,
+    });
+
+    settings.resetSettings();
+
+    expect(settings.getSettingsSnapshot()).toMatchObject({
+      primaryColor: DEFAULT_PRIMARY,
+      themeMode: 'light',
+      showTopProgress: true,
+      showWatermark: false,
+      mobileTableCardMode: true,
+      showCopyright: false,
+      containerWidth: 'full',
+      menuWidth: 220,
+    });
+  });
+
+  it('约束菜单宽度和全局圆角，并切换标签与动画风格', () => {
+    const settings = useSettingsStore();
+
+    settings.setMenuWidth(173);
+    settings.setBorderRadius(-2);
+    settings.setTabStyle('pill');
+    settings.setPageTransition('fade');
+
+    expect(settings.menuWidth).toBe(180);
+    expect(settings.borderRadius).toBe(0);
+    expect(settings.tabStyle).toBe('pill');
+    expect(settings.pageTransition).toBe('fade');
+
+    settings.setMenuWidth(276);
+    settings.setBorderRadius(20);
+
+    expect(settings.menuWidth).toBe(280);
+    expect(settings.borderRadius).toBe(16);
   });
 
   it('跟随系统主题，并实时响应系统配色变化', () => {

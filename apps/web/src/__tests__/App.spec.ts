@@ -52,6 +52,8 @@ describe('App theme provider', () => {
       token: {
         fontSize: 15,
         controlHeight: 34,
+        borderRadius: 6,
+        borderRadiusLG: 8,
         colorLink: '#5D87FF',
         colorBgLayout: '#FAFBFC',
         colorBgContainer: '#FFFFFF',
@@ -144,6 +146,26 @@ describe('App theme provider', () => {
         Menu: {
           itemSelectedColor: '#B48DF3',
         },
+      },
+    });
+
+    settings.setBorderRadius(10);
+    await nextTick();
+
+    expect(provider.props('theme')).toMatchObject({
+      token: {
+        borderRadius: 10,
+        borderRadiusLG: 12,
+        borderRadiusSM: 8,
+        borderRadiusXS: 6,
+      },
+      components: {
+        Button: { borderRadius: 10 },
+        Input: { borderRadius: 10 },
+        Select: { borderRadius: 10 },
+        Modal: { borderRadiusLG: 12 },
+        Notification: { borderRadiusLG: 12 },
+        Card: { borderRadiusLG: 12 },
       },
     });
 

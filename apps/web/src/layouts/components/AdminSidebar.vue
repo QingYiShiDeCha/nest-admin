@@ -11,6 +11,7 @@ import { useSystemConfigStore } from '@/stores/system-config';
 import {
   findAncestorKeys,
   findByKey,
+  menuKeyOf,
   toMenuItems,
   type MenuItems,
 } from '../menu-tree';
@@ -49,6 +50,11 @@ const selectedKeys = computed(() => [route.path]);
 /** 侧边栏完全由后端菜单驱动，不额外写死入口 */
 const sidebarItems = computed<MenuItems>(() => toMenuItems(menu.sidebarTree));
 const hasMenus = computed(() => menu.sidebarTree.length > 0);
+const rootSubmenuKeys = computed(() =>
+  menu.sidebarTree
+    .filter((node) => node.children.length > 0)
+    .map((node) => menuKeyOf(node)),
+);
 
 /** 用户手动展开的目录，与当前路由的祖先目录共同保留 */
 const openKeys = ref<string[]>([]);
@@ -59,10 +65,33 @@ watch(
     const trail = findAncestorKeys(tree, path);
 
     if (trail.length > 0) {
-      openKeys.value = [...new Set([...openKeys.value, ...trail])];
+      openKeys.value = settings.sidebarAccordion
+        ? trail
+        : [...new Set([...openKeys.value, ...trail])];
     }
   },
   { immediate: true },
+);
+
+watch(
+  () => settings.sidebarAccordion,
+  (accordion) => {
+    if (!accordion) {
+      return;
+    }
+
+    const routeTrail = findAncestorKeys(menu.sidebarTree, route.path);
+    const activeRoot = routeTrail[0];
+    const fallbackRoot = [...openKeys.value]
+      .reverse()
+      .find((key) => rootSubmenuKeys.value.includes(key));
+
+    openKeys.value = activeRoot
+      ? routeTrail
+      : fallbackRoot
+        ? [fallbackRoot]
+        : [];
+  },
 );
 
 function handleMenuClick({ key }: { key: string | number }): void {
@@ -80,7 +109,19 @@ function handleMenuClick({ key }: { key: string | number }): void {
 }
 
 const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
-  openKeys.value = keys as string[];
+  const nextKeys = keys.map(String);
+
+  if (!settings.sidebarAccordion) {
+    openKeys.value = nextKeys;
+    return;
+  }
+
+  const latestOpenKey = nextKeys.find((key) => !openKeys.value.includes(key));
+
+  openKeys.value =
+    latestOpenKey && rootSubmenuKeys.value.includes(latestOpenKey)
+      ? [latestOpenKey]
+      : nextKeys;
 };
 </script>
 
@@ -90,7 +131,7 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
     class="admin-sidebar h-full shrink-0 [&_.ant-layout-sider-children]:h-full [&_.ant-layout-sider-children]:flex [&_.ant-layout-sider-children]:flex-col"
     collapsible
     :trigger="null"
-    :width="220"
+    :width="settings.menuWidth"
     :style="siderStyle"
   >
     <div
