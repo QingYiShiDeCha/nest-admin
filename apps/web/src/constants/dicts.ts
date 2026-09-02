@@ -9,6 +9,8 @@ import type {
   SYSTEM_CONFIG_VALUE_TYPE,
   DictionaryTone,
   LoginStatus,
+  ScheduledTaskExecutionStatus,
+  ScheduledTaskTriggerType,
 } from '@nest-admin/shared';
 
 import { SEMANTIC_COLORS } from '@/constants/palette';
@@ -111,6 +113,38 @@ export const LOGIN_STATUS_META: Record<
   success: { label: '成功', tone: 'success' },
   failure: { label: '失败', tone: 'error' },
 };
+
+export const SCHEDULED_TASK_EXECUTION_STATUS_META: Record<
+  ScheduledTaskExecutionStatus,
+  { label: string; tone: ThemeTone }
+> = {
+  running: { label: '执行中', tone: 'info' },
+  success: { label: '成功', tone: 'success' },
+  failure: { label: '失败', tone: 'error' },
+  skipped: { label: '已跳过', tone: 'warning' },
+};
+
+export const SCHEDULED_TASK_EXECUTION_STATUS_OPTIONS = Object.entries(
+  SCHEDULED_TASK_EXECUTION_STATUS_META,
+).map(([value, meta]) => ({
+  value: value as ScheduledTaskExecutionStatus,
+  label: meta.label,
+}));
+
+export const SCHEDULED_TASK_TRIGGER_TYPE_META: Record<
+  ScheduledTaskTriggerType,
+  { label: string; tone: ThemeTone }
+> = {
+  scheduled: { label: '定时', tone: 'primary' },
+  manual: { label: '手动', tone: 'default' },
+};
+
+export const SCHEDULED_TASK_TRIGGER_TYPE_OPTIONS = Object.entries(
+  SCHEDULED_TASK_TRIGGER_TYPE_META,
+).map(([value, meta]) => ({
+  value: value as ScheduledTaskTriggerType,
+  label: meta.label,
+}));
 
 export const NOTICE_TYPE_META: Record<
   NoticeType,

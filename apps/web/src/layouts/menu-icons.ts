@@ -414,6 +414,12 @@ export const MENU_ICON_OPTIONS = [
     label: '任务',
     keywords: 'task todo',
   },
+  {
+    value: 'RiTimerLine',
+    icon: 'i-ri:timer-line',
+    label: '定时任务',
+    keywords: 'timer cron schedule task',
+  },
 ] as const satisfies readonly MenuIconOption[];
 
 export type MenuIconName = (typeof MENU_ICON_OPTIONS)[number]['value'];
