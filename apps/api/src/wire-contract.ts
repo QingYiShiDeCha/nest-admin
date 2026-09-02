@@ -5,6 +5,7 @@ import type {
   DepartmentTransfer,
   DictionaryItem,
   DictionaryType,
+  FileResource,
   LoginResult,
   LoginLog,
   MenuNode,
@@ -38,6 +39,7 @@ import type {
   DepartmentTransferRow,
   DictionaryItemRow,
   DictionaryTypeRow,
+  FileResourceRow,
 } from '@nest-admin/database';
 import type { AuthUser } from './modules/auth/interfaces/auth-user.interface';
 import type { AuthResult } from './modules/auth/interfaces/jwt-payload.interface';
@@ -119,6 +121,13 @@ type DictionaryItemContract = Assert<
   Serialized<DictionaryItemRow> extends DictionaryItem ? true : false
 >;
 
+// ---- 文件资源 ----
+type FileResourceContract = Assert<
+  Serialized<FileResourceRow & { referenceCount: number }> extends FileResource
+    ? true
+    : false
+>;
+
 // ---- 岗位 ----
 type PostContract = Assert<Serialized<PostRow> extends Post ? true : false>;
 type PostListContract = Assert<
@@ -188,6 +197,7 @@ export type WireContractChecks = [
   DepartmentTransferContract,
   DictionaryTypeContract,
   DictionaryItemContract,
+  FileResourceContract,
   PostContract,
   PostListContract,
   RoleContract,

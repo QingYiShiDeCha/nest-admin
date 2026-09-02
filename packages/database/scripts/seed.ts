@@ -226,6 +226,15 @@ const MENU_TREE: readonly MenuSeed[] = [
         sort: 65,
         keepAlive: true,
       },
+      {
+        name: '文件资源',
+        type: 'menu',
+        path: '/system/file-resource',
+        component: 'system/file-resource/index',
+        icon: 'RiFolder2Line',
+        sort: 70,
+        keepAlive: true,
+      },
     ],
   },
   {

@@ -66,6 +66,10 @@ export const PERMISSIONS = {
   SCHEDULED_TASK_RUN: 'system:scheduled-task:run',
   SCHEDULED_TASK_LOG_LIST: 'system:scheduled-task:log:list',
 
+  FILE_LIST: 'system:file:list',
+  FILE_READ: 'system:file:read',
+  FILE_DELETE: 'system:file:delete',
+
   NOTICE_LIST: 'system:notice:list',
   NOTICE_READ: 'system:notice:read',
   NOTICE_CREATE: 'system:notice:create',
@@ -203,6 +207,9 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
     name: '查询定时任务日志',
     module: 'system',
   },
+  { code: PERMISSIONS.FILE_LIST, name: '查询文件资源', module: 'system' },
+  { code: PERMISSIONS.FILE_READ, name: '查看文件资源', module: 'system' },
+  { code: PERMISSIONS.FILE_DELETE, name: '删除文件资源', module: 'system' },
   { code: PERMISSIONS.NOTICE_LIST, name: '查询通知公告', module: 'system' },
   { code: PERMISSIONS.NOTICE_READ, name: '查看通知公告', module: 'system' },
   { code: PERMISSIONS.NOTICE_CREATE, name: '新增通知公告', module: 'system' },

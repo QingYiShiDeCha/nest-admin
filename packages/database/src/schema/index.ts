@@ -2,6 +2,7 @@ export * from './columns';
 export * from './departments';
 export * from './department-transfers';
 export * from './dictionaries';
+export * from './file-resources';
 export * from './grants';
 export * from './login-logs';
 export * from './menus';
