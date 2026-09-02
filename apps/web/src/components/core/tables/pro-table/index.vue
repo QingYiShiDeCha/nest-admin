@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends object">
-import type { MenuProps, TableColumnsType } from 'antdv-next';
+import { Empty, type MenuProps, type TableColumnsType } from 'antdv-next';
 import {
   computed,
   defineComponent,
@@ -67,6 +67,25 @@ const emit = defineEmits<{
   'update:expandedRowKeys': [keys: RowKey[]];
 }>();
 const settings = useSettingsStore();
+
+const emptyClasses = {
+  root: 'h-full min-h-60 flex flex-col items-center justify-center py-6',
+  image: '!h-20',
+  description: 'text-[15px] a-color-text-secondary',
+  footer: 'mt-4',
+};
+const emptyStyles = {
+  image: { height: '80px' },
+  description: { fontSize: '15px', lineHeight: '22px', marginTop: '10px' },
+};
+const tableLocale = {
+  emptyText: () =>
+    h(Empty, {
+      description: '暂无数据',
+      classes: emptyClasses,
+      styles: emptyStyles,
+    }),
+};
 
 // 挂载即首查；KeepAlive 下实例常驻，重复激活不会重复请求
 onMounted(() => {
@@ -312,12 +331,17 @@ const stretchChain =
   '[&_.ant-table-container]:flex-1 [&_.ant-table-container]:min-h-0 [&_.ant-table-container]:flex [&_.ant-table-container]:flex-col ' +
   '[&_.ant-table-header]:shrink-0 ' +
   '[&_.ant-table-body]:flex-1 [&_.ant-table-body]:min-h-0 [&_.ant-table-body]:!max-h-none [&_.ant-table-body]:!overflow-y-auto ' +
-  '[&_.ant-empty-normal_.ant-empty-image]:!h-16 [&_.ant-empty-description]:text-base ' +
   '[&_.ant-pagination]:shrink-0';
+
+const emptyStretchChain = computed(() =>
+  props.table.list.value.length === 0
+    ? '[&_.ant-table-body>table]:h-full [&_.ant-table-tbody]:h-full [&_.ant-table-placeholder]:h-full [&_.ant-table-placeholder>td]:h-full'
+    : '',
+);
 </script>
 
 <template>
-  <div :class="[rootClass, stretchChain]">
+  <div :class="[rootClass, stretchChain, emptyStretchChain]">
     <!-- 表格卡片 -->
     <div
       class="a-bg-container rounded-lg border border-solid a-border-border-secondary p-4 flex-1 min-h-0 overflow-hidden flex flex-col"
@@ -434,7 +458,12 @@ const stretchChain =
             </article>
           </div>
 
-          <a-empty v-else description="暂无数据" class="py-12" />
+          <a-empty
+            v-else
+            description="暂无数据"
+            :classes="emptyClasses"
+            :styles="emptyStyles"
+          />
         </a-spin>
 
         <a-pagination
@@ -458,6 +487,7 @@ const stretchChain =
           :scroll="{ y: 200 }"
           :expandable="expandableConfig"
           :expanded-row-keys="expandedRowKeys"
+          :locale="tableLocale"
           @update:expanded-row-keys="handleExpandedRowKeys"
         >
           <template #bodyCell="slotProps">

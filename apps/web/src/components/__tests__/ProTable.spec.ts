@@ -33,7 +33,7 @@ const componentStubs = vi.hoisted(() => ({
   },
   empty: {
     name: 'AEmpty',
-    props: { description: String },
+    props: { classes: Object, description: String, styles: Object },
     template: '<div data-testid="empty">{{ description }}</div>',
   },
   pagination: {
@@ -63,6 +63,7 @@ const componentStubs = vi.hoisted(() => ({
       columns: Array,
       dataSource: Array,
       loading: Boolean,
+      locale: Object,
       pagination: [Boolean, Object],
       rowKey: String,
       scroll: Object,
@@ -114,14 +115,14 @@ const TableForRow = ProTable as unknown as DefineComponent<{
   'onUpdate:expandedRowKeys'?: (keys: Array<string | number>) => void;
 }>;
 
-function mountTable(withBodyCell = false) {
+function mountTable(withBodyCell = false, rows: Row[] = [{ id: 1, name: 'admin' }]) {
   const pinia = createPinia();
   setActivePinia(pinia);
   const settings = useSettingsStore(pinia);
   const reload = vi.fn(async () => true);
   const table = {
     columns,
-    list: shallowRef<Row[]>([{ id: 1, name: 'admin' }]),
+    list: shallowRef<Row[]>(rows),
     loading: ref(false),
     pagination: computed<TablePaginationConfig>(() => ({
       current: 3,
@@ -187,14 +188,41 @@ describe('ProTable', () => {
         '[&_.ant-spin]:overflow-hidden',
         '[&_.ant-pagination]:shrink-0',
         '[&_.ant-table-body]:!overflow-y-auto',
-        '[&_.ant-empty-normal_.ant-empty-image]:!h-16',
-        '[&_.ant-empty-description]:text-base',
       ]),
     );
     expect(wrapper.classes()).not.toContain(
       '[&_.ant-spin-nested-loading]:flex-1',
     );
     expect(wrapper.classes()).not.toContain('[&_.ant-table-wrapper]:h-full');
+
+    const locale = renderedTable.props('locale') as {
+      emptyText: () => { props: Record<string, unknown> };
+    };
+    const empty = locale.emptyText();
+    expect(empty.props.description).toBe('暂无数据');
+    expect(empty.props.classes).toMatchObject({
+      root: 'h-full min-h-60 flex flex-col items-center justify-center py-6',
+      image: '!h-20',
+      description: 'text-[15px] a-color-text-secondary',
+    });
+    expect(empty.props.styles).toMatchObject({
+      image: { height: '80px' },
+      description: { fontSize: '15px', lineHeight: '22px' },
+    });
+  });
+
+  it('无数据时让占位行撑满表体，避免空状态停在上半段', async () => {
+    const { wrapper } = mountTable(false, []);
+    await nextTick();
+
+    expect(wrapper.classes()).toEqual(
+      expect.arrayContaining([
+        '[&_.ant-table-body>table]:h-full',
+        '[&_.ant-table-tbody]:h-full',
+        '[&_.ant-table-placeholder]:h-full',
+        '[&_.ant-table-placeholder>td]:h-full',
+      ]),
+    );
   });
 
   it('序号使用 rowOffset，刷新按钮复用 reload', async () => {
