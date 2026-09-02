@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 
 import type { Env } from '../../config/env.validation';
 import { UserModule } from '../user/user.module';
+import { LoginLogModule } from '../login-log/login-log.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RefreshTokenModule } from './refresh-token.module';
@@ -15,6 +16,7 @@ import { OnlineUserController } from './online-user.controller';
 @Module({
   imports: [
     UserModule,
+    LoginLogModule,
     RefreshTokenModule,
     PassportModule,
     // 这里注册的是 accessToken 的默认签名配置，refreshToken 在 service 里单独传 secret

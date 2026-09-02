@@ -1,4 +1,4 @@
-import { operationLogs, refreshTokens } from '@nest-admin/database';
+import { loginLogs, operationLogs, refreshTokens } from '@nest-admin/database';
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SchedulerRegistry } from '@nestjs/schedule';
@@ -19,6 +19,7 @@ const LOCK_KEY = 'cleanup:logs';
 const LOCK_TTL_MS = 10 * 60 * 1000;
 
 export interface CleanupResult {
+  loginLogs: number;
   operationLogs: number;
   refreshTokens: number;
 }
@@ -68,7 +69,7 @@ export class LogCleanupService implements OnModuleInit {
     }
 
     this.logger.log(
-      `定时清理完成：操作日志 ${result.operationLogs} 行，失效会话 ${result.refreshTokens} 行`,
+      `定时清理完成：登录日志 ${result.loginLogs} 行，操作日志 ${result.operationLogs} 行，失效会话 ${result.refreshTokens} 行`,
     );
   }
 
@@ -80,7 +81,7 @@ export class LogCleanupService implements OnModuleInit {
       this.cleanup(),
     );
 
-    return result ?? { operationLogs: 0, refreshTokens: 0 };
+    return result ?? { loginLogs: 0, operationLogs: 0, refreshTokens: 0 };
   }
 
   private async cleanup(): Promise<CleanupResult> {
@@ -88,6 +89,12 @@ export class LogCleanupService implements OnModuleInit {
     const cutoff = new Date(Date.now() - days * 86_400_000);
 
     return {
+      loginLogs: await this.deleteInBatches('登录日志', () =>
+        this.db
+          .delete(loginLogs)
+          .where(lt(loginLogs.createdAt, cutoff))
+          .limit(BATCH_SIZE),
+      ),
       operationLogs: await this.deleteInBatches('操作日志', () =>
         this.db
           .delete(operationLogs)
@@ -148,6 +155,11 @@ export class LogCleanupService implements OnModuleInit {
     const days = this.config.get('LOG_RETENTION_DAYS', { infer: true });
     const cutoff = new Date(Date.now() - days * 86_400_000);
 
+    const [loginLogRows] = await this.db
+      .select({ n: sql<number>`count(*)` })
+      .from(loginLogs)
+      .where(lt(loginLogs.createdAt, cutoff));
+
     const [logs] = await this.db
       .select({ n: sql<number>`count(*)` })
       .from(operationLogs)
@@ -167,6 +179,7 @@ export class LogCleanupService implements OnModuleInit {
       );
 
     return {
+      loginLogs: Number(loginLogRows?.n ?? 0),
       operationLogs: Number(logs?.n ?? 0),
       refreshTokens: Number(tokens?.n ?? 0),
     };

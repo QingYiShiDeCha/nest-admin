@@ -12,6 +12,7 @@ import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import { RequestContext } from '../../common/context/request-context.service';
 import type { Env } from '../../config/env.validation';
 import { UserService } from '../user/user.service';
+import { LoginLogService } from '../login-log/login-log.service';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
 import type { SessionVo } from './dto/session.vo';
@@ -42,6 +43,7 @@ export class AuthService {
     private readonly config: ConfigService<Env, true>,
     private readonly refreshTokens: RefreshTokenService,
     private readonly ctx: RequestContext,
+    private readonly loginLogs: LoginLogService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResult> {
@@ -51,31 +53,54 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<AuthResult> {
-    const credentials = await this.userService.findCredentialsByUsername(
-      dto.username,
-    );
+    let userId: number | null = null;
 
-    // 用户不存在和密码错误返回同一句提示，避免账号枚举
-    if (
-      !credentials ||
-      !(await this.userService.verifyPassword(
-        dto.password,
-        credentials.passwordHash,
-      ))
-    ) {
-      throw new UnauthorizedException('用户名或密码错误');
+    try {
+      const credentials = await this.userService.findCredentialsByUsername(
+        dto.username,
+      );
+      userId = credentials?.user.id ?? null;
+
+      // 用户不存在和密码错误返回同一句提示，避免账号枚举
+      if (
+        !credentials ||
+        !(await this.userService.verifyPassword(
+          dto.password,
+          credentials.passwordHash,
+        ))
+      ) {
+        throw new UnauthorizedException('用户名或密码错误');
+      }
+
+      const { user } = credentials;
+
+      if (user.status !== 'active') {
+        throw new UnauthorizedException('账号已被禁用');
+      }
+
+      await this.userService.touchLastLogin(user.id);
+      const result = { user, ...(await this.issueTokens(user)) };
+
+      await this.loginLogs.record({
+        userId: user.id,
+        username: user.username,
+        ...this.loginClient(),
+        status: 'success',
+        failureReason: null,
+      });
+      this.logger.log(`用户 ${user.username} 登录成功`);
+
+      return result;
+    } catch (error) {
+      await this.loginLogs.record({
+        userId,
+        username: dto.username,
+        ...this.loginClient(),
+        status: 'failure',
+        failureReason: this.loginFailureReason(error),
+      });
+      throw error;
     }
-
-    const { user } = credentials;
-
-    if (user.status !== 'active') {
-      throw new UnauthorizedException('账号已被禁用');
-    }
-
-    await this.userService.touchLastLogin(user.id);
-    this.logger.log(`用户 ${user.username} 登录成功`);
-
-    return { user, ...(await this.issueTokens(user)) };
   }
 
   /**
@@ -271,6 +296,22 @@ export class AuthService {
       accessToken: await this.signAccessToken(user, jti),
       refreshToken: await this.signRefreshToken(user, jti, expiresIn),
     };
+  }
+
+  private loginClient(): { ip: string | null; userAgent: string | null } {
+    const client = this.ctx.client();
+
+    return {
+      ip: client.ip,
+      userAgent: client.userAgent?.slice(0, 255) ?? null,
+    };
+  }
+
+  private loginFailureReason(error: unknown): string {
+    return (error instanceof Error ? error.message : String(error)).slice(
+      0,
+      500,
+    );
   }
 
   private signAccessToken(user: SafeUser, sid: string): Promise<string> {

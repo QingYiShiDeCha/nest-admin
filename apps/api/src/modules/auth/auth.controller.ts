@@ -14,7 +14,10 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { OperationLog } from '../operation-log/operation-log.decorator';
+import {
+  OperationLog,
+  SkipOperationLog,
+} from '../operation-log/operation-log.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -47,7 +50,7 @@ export class AuthController {
   @Public()
   @Throttle({ default: LOGIN_THROTTLE })
   @Post('login')
-  @OperationLog({ module: '认证', action: '登录' })
+  @SkipOperationLog()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: '账号密码登录',

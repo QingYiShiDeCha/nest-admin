@@ -11,6 +11,7 @@ import { hash } from 'bcryptjs';
 import type { SafeUser } from '@nest-admin/database';
 import { RequestContext } from '../../common/context/request-context.service';
 import { UserService } from '../user/user.service';
+import { LoginLogService } from '../login-log/login-log.service';
 import { AuthService } from './auth.service';
 import { RefreshTokenService } from './refresh-token.service';
 import type { JwtPayload } from './interfaces/jwt-payload.interface';
@@ -68,6 +69,7 @@ describe('AuthService', () => {
       | 'revokeOthers'
     >
   >;
+  let loginLogs: { record: jest.Mock };
   let requestContext: {
     client: jest.Mock;
     setUser: jest.Mock;
@@ -103,6 +105,9 @@ describe('AuthService', () => {
       client: jest.fn(() => ({ ip: '127.0.0.1', userAgent: 'jest' })),
       setUser: jest.fn(),
     };
+    loginLogs = {
+      record: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [
@@ -119,6 +124,7 @@ describe('AuthService', () => {
           useValue: { get: (key: string) => CONFIG[key] },
         },
         { provide: RefreshTokenService, useValue: refreshTokens },
+        { provide: LoginLogService, useValue: loginLogs },
         {
           provide: RequestContext,
           useValue: requestContext,
@@ -144,6 +150,14 @@ describe('AuthService', () => {
 
     expect(result.user).toEqual(USER);
     expect(userService.touchLastLogin).toHaveBeenCalledWith(USER.id);
+    expect(loginLogs.record).toHaveBeenCalledWith({
+      userId: USER.id,
+      username: USER.username,
+      ip: '127.0.0.1',
+      userAgent: 'jest',
+      status: 'success',
+      failureReason: null,
+    });
 
     const payload = await jwtService.verifyAsync<JwtPayload>(
       result.accessToken,
@@ -172,6 +186,14 @@ describe('AuthService', () => {
     await expect(
       service.login({ username: 'admin', password: 'wrong-password-1' }),
     ).rejects.toThrow(new UnauthorizedException('用户名或密码错误'));
+    expect(loginLogs.record).toHaveBeenCalledWith({
+      userId: USER.id,
+      username: USER.username,
+      ip: '127.0.0.1',
+      userAgent: 'jest',
+      status: 'failure',
+      failureReason: '用户名或密码错误',
+    });
   });
 
   it('账号被禁用时不允许登录', async () => {
@@ -184,6 +206,14 @@ describe('AuthService', () => {
     await expect(
       service.login({ username: 'admin', password: PASSWORD }),
     ).rejects.toThrow(new UnauthorizedException('账号已被禁用'));
+    expect(loginLogs.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: USER.id,
+        username: USER.username,
+        status: 'failure',
+        failureReason: '账号已被禁用',
+      }),
+    );
   });
 
   it('refresh 能换出新 token 对', async () => {

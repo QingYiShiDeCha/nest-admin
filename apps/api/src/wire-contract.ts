@@ -6,6 +6,7 @@ import type {
   DictionaryItem,
   DictionaryType,
   LoginResult,
+  LoginLog,
   MenuNode,
   MenuRecord,
   Notice,
@@ -24,6 +25,7 @@ import type {
 } from '@nest-admin/shared';
 import type {
   MenuRow,
+  LoginLogRow,
   NoticeRow,
   OperationLogRow,
   PostRow,
@@ -133,7 +135,10 @@ type MenuNodeContract = Assert<
   Serialized<MenuTreeNode> extends MenuNode ? true : false
 >;
 
-// ---- 操作日志 ----
+// ---- 系统日志 ----
+type LoginLogContract = Assert<
+  Serialized<LoginLogRow> extends LoginLog ? true : false
+>;
 type OperationLogContract = Assert<
   Serialized<OperationLogRow> extends OperationLog ? true : false
 >;
@@ -179,6 +184,7 @@ export type WireContractChecks = [
   RoleDetailContract,
   MenuRecordContract,
   MenuNodeContract,
+  LoginLogContract,
   OperationLogContract,
   OnlineUserSessionContract,
   NoticeContract,
