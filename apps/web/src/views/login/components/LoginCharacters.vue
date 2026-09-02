@@ -250,7 +250,8 @@ function getCharacterTransform(
     translateY = index % 2 === 0 ? -4 : -1;
     rotation += 1.5;
   } else if (props.activeField === 'username') {
-    translateY = index % 2 === 0 ? -3 : 0;
+    const usernameLift = [-18, -11, -15, -9] as const;
+    translateY = usernameLift[index] ?? -12;
     rotation += index % 2 === 0 ? 1.5 : -1.5;
   }
 
