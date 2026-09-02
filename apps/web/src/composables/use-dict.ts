@@ -2,6 +2,7 @@ import type { DictionaryOption } from '@nest-admin/shared';
 import { readonly, ref } from 'vue';
 
 import { apiDictionaryOptions } from '@/api/dictionaries';
+import { usePageRefresh } from '@/composables/use-page-refresh';
 
 export function useDict(code: string) {
   const items = ref<DictionaryOption[]>([]);
@@ -28,6 +29,7 @@ export function useDict(code: string) {
   }
 
   void reload();
+  usePageRefresh(reload);
 
   return {
     items: readonly(items),

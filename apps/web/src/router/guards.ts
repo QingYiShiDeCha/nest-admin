@@ -1,5 +1,9 @@
 import type { Router } from 'vue-router';
 
+import {
+  finishGlobalProgress,
+  startGlobalProgress,
+} from '@/composables/use-global-progress';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
 import { useSystemConfigStore } from '@/stores/system-config';
@@ -7,8 +11,11 @@ import { useTabsStore } from '@/stores/tabs';
 import { getAccessToken } from '@/utils/auth-token';
 import { resetDynamicRoutes, syncDynamicRoutes } from './dynamic-routes';
 
+const ROUTE_PROGRESS_TASK = 'route-navigation';
+
 export function setupGuards(router: Router): void {
   router.beforeEach(async (to) => {
+    startGlobalProgress(ROUTE_PROGRESS_TASK);
     const auth = useAuthStore();
 
     // 公开页放行。注意登录页也在其中，否则会和下面的重定向形成死循环
@@ -68,6 +75,11 @@ export function setupGuards(router: Router): void {
   });
 
   router.afterEach((to) => {
+    finishGlobalProgress(ROUTE_PROGRESS_TASK);
     document.title = `${to.meta.title} · ${useSystemConfigStore().systemName}`;
+  });
+
+  router.onError(() => {
+    finishGlobalProgress(ROUTE_PROGRESS_TASK);
   });
 }

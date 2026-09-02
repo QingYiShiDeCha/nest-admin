@@ -3,6 +3,7 @@ import type { TableColumnsType, TablePaginationConfig } from 'antdv-next';
 import { computed, reactive, ref, shallowRef, watch } from 'vue';
 import type { ComputedRef, Ref, ShallowRef } from 'vue';
 
+import { usePageRefresh } from '@/composables/use-page-refresh';
 import { useSystemConfigStore } from '@/stores/system-config';
 
 export interface PageQuery {
@@ -207,6 +208,8 @@ export function useTable<T, F extends object = Record<string, unknown>>(
       if (hasLoaded) void reload();
     },
   );
+
+  usePageRefresh(reload);
 
   /** 表格序号列只需要偏移量，不暴露内部页码状态 */
   const rowOffset =

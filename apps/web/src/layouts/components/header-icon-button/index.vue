@@ -11,7 +11,7 @@ defineProps<{
   <button
     v-bind="$attrs"
     type="button"
-    class="w-9 h-9 inline-grid place-items-center shrink-0 border-none rounded-md bg-transparent text-xl a-color-text cursor-pointer transition-colors duration-200 hover:a-bg-fill-secondary"
+    class="w-9 h-9 inline-grid place-items-center shrink-0 border-none rounded-md bg-transparent text-xl a-color-text cursor-pointer transition-colors duration-200 hover:a-bg-fill-secondary disabled:cursor-wait disabled:opacity-60"
     :title="title"
     :aria-label="ariaLabel ?? title"
   >

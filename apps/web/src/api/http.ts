@@ -4,6 +4,10 @@ import { createServerTokenAuthentication } from 'alova/client';
 import adapterFetch from 'alova/fetch';
 import VueHook from 'alova/vue';
 
+import {
+  finishGlobalProgress,
+  startGlobalProgress,
+} from '@/composables/use-global-progress';
 import { emitUnauthorized } from '@/utils/auth-events';
 import {
   clearTokens,
@@ -78,6 +82,36 @@ const { onAuthRequired, onResponseRefreshToken } =
     },
   });
 
+const assignAuthToken = onAuthRequired();
+const requestProgressTasks = new WeakMap<Method, symbol>();
+
+async function beforeRequest(method: Method): Promise<void> {
+  let progressTask = requestProgressTasks.get(method);
+
+  if (!progressTask) {
+    progressTask = Symbol('request-progress');
+    requestProgressTasks.set(method, progressTask);
+    startGlobalProgress(progressTask);
+  }
+
+  try {
+    await assignAuthToken(method);
+  } catch (error) {
+    requestProgressTasks.delete(method);
+    finishGlobalProgress(progressTask);
+    throw error;
+  }
+}
+
+function completeRequest(method: Method): void {
+  const progressTask = requestProgressTasks.get(method);
+
+  if (progressTask) {
+    requestProgressTasks.delete(method);
+    finishGlobalProgress(progressTask);
+  }
+}
+
 export const alova = createAlova({
   // 少了它所有请求都会打到站点根路径（/users 而不是 /api/users）。
   // 开发时 vite 代理只转发 /api 前缀，缺失会直接命中前端页面而不是后端
@@ -91,7 +125,7 @@ export const alova = createAlova({
    * 真需要缓存的列表页由页面自己决定开。
    */
   cacheFor: { GET: 0 },
-  beforeRequest: onAuthRequired(),
+  beforeRequest,
   responded: onResponseRefreshToken({
     /**
      * 后端成功是 { code: 0, message, data }，失败一律带对应 HTTP 状态码
@@ -130,6 +164,7 @@ export const alova = createAlova({
 
       throw new ApiError(0, '网络异常，请稍后重试');
     },
+    onComplete: completeRequest,
   }),
 });
 

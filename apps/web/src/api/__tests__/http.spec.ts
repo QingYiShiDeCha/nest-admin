@@ -5,6 +5,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiError, httpGet, httpPost } from '../http';
+import {
+  resetGlobalProgress,
+  useGlobalProgress,
+} from '@/composables/use-global-progress';
 import { clearTokens, getTokens, saveTokens } from '@/utils/auth-token';
 
 type FetchMock = ReturnType<typeof vi.fn>;
@@ -28,7 +32,8 @@ const jsonResponse = (status: number, body: unknown) =>
     headers: { 'Content-Type': 'application/json' },
   });
 
-const ok = (data: unknown) => jsonResponse(200, { code: 0, message: 'success', data });
+const ok = (data: unknown) =>
+  jsonResponse(200, { code: 0, message: 'success', data });
 const fail = (status: number, message: string) =>
   jsonResponse(status, { code: status, message, data: null });
 
@@ -49,6 +54,7 @@ function callInfo(args: unknown[]): { url: string; headers: Headers } {
 let fetchMock: FetchMock;
 
 beforeEach(() => {
+  resetGlobalProgress();
   store.clear();
   fetchMock = vi.fn();
   // 每个用例前重新挂桩：afterEach 的 unstubAllGlobals 会把上一轮的桩全部撤掉，
@@ -58,11 +64,29 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetGlobalProgress();
   clearTokens();
   vi.unstubAllGlobals();
 });
 
 describe('http 客户端', () => {
+  it('请求开始和完成时维护全局进度任务', async () => {
+    const progress = useGlobalProgress();
+    let resolveResponse!: (response: Response) => void;
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveResponse = resolve;
+      }),
+    );
+
+    const request = httpGet('/slow').then((data) => data);
+    await vi.waitFor(() => expect(progress.activeCount.value).toBe(1));
+
+    resolveResponse(ok({ done: true }));
+    await expect(request).resolves.toEqual({ done: true });
+    expect(progress.activeCount.value).toBe(0);
+  });
+
   it('成功响应解出 data，并带上 Authorization 头', async () => {
     saveTokens(TOKENS);
     fetchMock.mockResolvedValueOnce(ok({ hello: 'world' }));
@@ -81,7 +105,9 @@ describe('http 客户端', () => {
     saveTokens(TOKENS);
     fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
-    await expect(httpPost('/roles/1/menus', { ids: [] })).resolves.toBeUndefined();
+    await expect(
+      httpPost('/roles/1/menus', { ids: [] }),
+    ).resolves.toBeUndefined();
   });
 
   it('业务失败（403/409 等）抛 ApiError 且不触发刷新', async () => {

@@ -55,6 +55,7 @@ declare module 'vue' {
     ASkeleton: typeof import('antdv-next')['Skeleton']
     ASpace: typeof import('antdv-next')['Space']
     ASpin: typeof import('antdv-next')['Spin']
+    AStatistic: typeof import('antdv-next')['Statistic']
     ASwitch: typeof import('antdv-next')['Switch']
     ATable: typeof import('antdv-next')['Table']
     ATag: typeof import('antdv-next')['Tag']
@@ -62,6 +63,7 @@ declare module 'vue' {
     ATooltip: typeof import('antdv-next')['Tooltip']
     ATree: typeof import('antdv-next')['Tree']
     ATreeSelect: typeof import('antdv-next')['TreeSelect']
+    AWatermark: typeof import('antdv-next')['Watermark']
     BarChart: typeof import('./src/components/core/charts/bar-chart/index.vue')['default']
     BaseChart: typeof import('./src/components/core/charts/base-chart/index.vue')['default']
     HeatmapChart: typeof import('./src/components/core/charts/heatmap-chart/index.vue')['default']
@@ -73,6 +75,7 @@ declare module 'vue' {
     ProTable: typeof import('./src/components/core/tables/pro-table/index.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TopProgress: typeof import('./src/components/core/feedback/top-progress/index.vue')['default']
     UserSelect: typeof import('./src/components/core/selectors/user-select/index.vue')['default']
   }
 }
@@ -122,6 +125,7 @@ declare global {
   const ASkeleton: typeof import('antdv-next')['Skeleton']
   const ASpace: typeof import('antdv-next')['Space']
   const ASpin: typeof import('antdv-next')['Spin']
+  const AStatistic: typeof import('antdv-next')['Statistic']
   const ASwitch: typeof import('antdv-next')['Switch']
   const ATable: typeof import('antdv-next')['Table']
   const ATag: typeof import('antdv-next')['Tag']
@@ -129,6 +133,7 @@ declare global {
   const ATooltip: typeof import('antdv-next')['Tooltip']
   const ATree: typeof import('antdv-next')['Tree']
   const ATreeSelect: typeof import('antdv-next')['TreeSelect']
+  const AWatermark: typeof import('antdv-next')['Watermark']
   const BarChart: typeof import('./src/components/core/charts/bar-chart/index.vue')['default']
   const BaseChart: typeof import('./src/components/core/charts/base-chart/index.vue')['default']
   const HeatmapChart: typeof import('./src/components/core/charts/heatmap-chart/index.vue')['default']
@@ -140,5 +145,6 @@ declare global {
   const ProTable: typeof import('./src/components/core/tables/pro-table/index.vue')['default']
   const RouterLink: typeof import('vue-router')['RouterLink']
   const RouterView: typeof import('vue-router')['RouterView']
+  const TopProgress: typeof import('./src/components/core/feedback/top-progress/index.vue')['default']
   const UserSelect: typeof import('./src/components/core/selectors/user-select/index.vue')['default']
 }

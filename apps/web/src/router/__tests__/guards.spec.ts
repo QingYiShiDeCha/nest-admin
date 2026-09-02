@@ -1,7 +1,11 @@
 import { defineComponent } from 'vue';
 import { createMemoryHistory, createRouter, type Router } from 'vue-router';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  resetGlobalProgress,
+  useGlobalProgress,
+} from '@/composables/use-global-progress';
 import { setupGuards } from '@/router/guards';
 
 const mocks = vi.hoisted(() => ({
@@ -66,6 +70,7 @@ function createTestRouter(): Router {
 
 describe('router guards', () => {
   beforeEach(() => {
+    resetGlobalProgress();
     vi.clearAllMocks();
     mocks.auth.profile = { id: 1 };
     mocks.menu.loaded = false;
@@ -74,6 +79,32 @@ describe('router guards', () => {
       mocks.menu.loaded = true;
       return mocks.menu.tree;
     });
+  });
+
+  afterEach(() => {
+    resetGlobalProgress();
+  });
+
+  it('路由守卫执行期间维护全局进度任务', async () => {
+    let resolveMenu!: (value: unknown[]) => void;
+    mocks.menu.load.mockImplementation(
+      () =>
+        new Promise<unknown[]>((resolve) => {
+          resolveMenu = resolve;
+        }),
+    );
+    const router = createTestRouter();
+    const progress = useGlobalProgress();
+    setupGuards(router);
+
+    const navigation = router.push('/dashboard');
+    await vi.waitFor(() => expect(progress.activeCount.value).toBe(1));
+
+    mocks.menu.loaded = true;
+    resolveMenu([]);
+    await navigation;
+
+    expect(progress.activeCount.value).toBe(0);
   });
 
   it('profile 已加载但菜单未加载时仍注册路由并重新匹配原地址', async () => {

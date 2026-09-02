@@ -6,12 +6,10 @@ import { useRouter } from 'vue-router';
 
 import { apiUploadFile } from '@/api/files';
 import { ApiError, httpPut } from '@/api/http';
-import {
-  apiUpdateOwnAvatar,
-  apiUpdateOwnProfile,
-} from '@/api/users';
+import { apiUpdateOwnAvatar, apiUpdateOwnProfile } from '@/api/users';
 import AppIcon from '@/components/core/base/app-icon/index.vue';
 import AppTag from '@/components/core/base/app-tag/index.vue';
+import { usePageRefresh } from '@/composables/use-page-refresh';
 import { useAuthStore } from '@/stores/auth';
 import { formatDateTime } from '@/utils/format';
 import { resolveImageUrl } from '@/utils/image-url';
@@ -19,6 +17,7 @@ import { resolveImageUrl } from '@/utils/image-url';
 const { message } = App.useApp();
 const router = useRouter();
 const auth = useAuthStore();
+usePageRefresh(() => auth.loadProfile());
 
 const avatarSrc = computed(() => resolveImageUrl(auth.profile?.avatar));
 const displayName = computed(
@@ -231,24 +230,18 @@ defineOptions({ name: 'ProfilePage' });
           </template>
         </a-avatar>
 
-        <div class="mt-4 text-xl font-semibold a-color-text">{{
-          displayName
-        }}</div>
+        <div class="mt-4 text-xl font-semibold a-color-text">
+          {{ displayName }}
+        </div>
         <div class="mt-1 text-sm a-color-text-secondary">
           {{ auth.username }}
         </div>
 
         <div class="mt-3 flex flex-wrap justify-center gap-1.5">
-          <AppTag
-            :tone="accountStatus === 'active' ? 'success' : 'warning'"
-          >
+          <AppTag :tone="accountStatus === 'active' ? 'success' : 'warning'">
             {{ accountStatus === 'active' ? '账号启用' : '账号停用' }}
           </AppTag>
-          <AppTag
-            v-for="role in auth.roles"
-            :key="role"
-            tone="primary"
-          >
+          <AppTag v-for="role in auth.roles" :key="role" tone="primary">
             {{ role }}
           </AppTag>
           <AppTag v-if="auth.roles.length === 0">未分配角色</AppTag>
@@ -278,7 +271,9 @@ defineOptions({ name: 'ProfilePage' });
           </a-popconfirm>
         </div>
 
-        <div class="mt-6 w-full border-t border-solid a-border-border-secondary">
+        <div
+          class="mt-6 w-full border-t border-solid a-border-border-secondary"
+        >
           <dl class="m-0 grid grid-cols-1 gap-4 pt-5 text-left text-sm">
             <div>
               <dt class="a-color-text-tertiary">最后登录</dt>

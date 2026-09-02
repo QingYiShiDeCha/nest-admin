@@ -17,6 +17,7 @@ import AppTag from '@/components/core/base/app-tag/index.vue';
 import ProSearch from '@/components/core/tables/pro-search/index.vue';
 import type { FilterField } from '@/components/core/tables/pro-search/types';
 import ProTable from '@/components/core/tables/pro-table/index.vue';
+import { usePageRefresh } from '@/composables/use-page-refresh';
 import { useTable } from '@/composables/use-table';
 import {
   NOTICE_PRIORITY_META,
@@ -27,6 +28,7 @@ import { formatDateTime } from '@/utils/format';
 
 const { message } = App.useApp();
 const notifications = useNotificationsStore();
+usePageRefresh(() => notifications.refreshUnreadCount());
 
 const current = ref<NoticeMessage | null>(null);
 const drawerOpen = ref(false);

@@ -14,10 +14,12 @@ import AdminBreadcrumb from './AdminBreadcrumb.vue';
 import HeaderIconButton from './header-icon-button/index.vue';
 import LayoutSettingsDrawer from './LayoutSettingsDrawer.vue';
 import NotificationPopover from './notification-popover/index.vue';
+import QuickEntryPopover from './quick-entry-popover/index.vue';
 import type { MenuItems } from '../menu-tree';
 
 defineProps<{
   sidebarCollapsed: boolean;
+  refreshing: boolean;
 }>();
 
 defineEmits<{
@@ -73,6 +75,7 @@ async function handleUserMenuClick({
   >
     <div class="flex items-center gap-3 min-w-0">
       <HeaderIconButton
+        v-if="settings.showSidebarCollapseButton"
         class="-ml-2"
         :title="sidebarCollapsed ? '展开菜单' : '收起菜单'"
         @click="$emit('toggleSidebar')"
@@ -81,18 +84,33 @@ async function handleUserMenuClick({
       </HeaderIconButton>
 
       <HeaderIconButton
+        v-if="settings.showRefreshButton"
         class="header-refresh-trigger"
         title="刷新"
+        :disabled="refreshing"
+        :aria-busy="refreshing"
         @click="$emit('refreshContent')"
       >
-        <AppIcon icon="i-ri:refresh-line" class="header-refresh-icon" />
+        <AppIcon
+          icon="i-ri:refresh-line"
+          class="header-refresh-icon"
+          :class="{ '!animate-spin': refreshing }"
+        />
       </HeaderIconButton>
 
-      <AdminBreadcrumb />
+      <AdminBreadcrumb v-if="settings.showBreadcrumb" />
     </div>
 
     <div class="flex items-center gap-4">
       <div class="icon-area flex items-center gap-2">
+        <QuickEntryPopover v-if="settings.showQuickEntry">
+          <template #trigger>
+            <HeaderIconButton title="快捷入口">
+              <AppIcon icon="i-ri:apps-2-line" />
+            </HeaderIconButton>
+          </template>
+        </QuickEntryPopover>
+
         <NotificationPopover>
           <template #trigger="{ unreadCount }">
             <HeaderIconButton

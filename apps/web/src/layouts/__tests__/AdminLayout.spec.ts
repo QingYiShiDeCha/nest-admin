@@ -1,7 +1,8 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, h } from 'vue';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { usePageRefresh } from '@/composables/use-page-refresh';
 import AdminLayout from '@/layouts/AdminLayout.vue';
 
 const mocks = vi.hoisted(() => ({
@@ -14,6 +15,15 @@ const mocks = vi.hoisted(() => ({
     meta: { cacheName: 'DashboardPage', title: '首页' },
     path: '/dashboard',
   },
+  pageTransition: 'slide-up',
+  showBreadcrumb: true,
+  showQuickEntry: false,
+  showRefreshButton: true,
+  showSidebarCollapseButton: true,
+  showTabs: true,
+  showCopyright: false,
+  showWatermark: false,
+  containerWidth: 'full',
 }));
 
 vi.mock('vue-router', () => ({
@@ -33,11 +43,18 @@ vi.mock('antdv-next', () => {
   });
 
   return {
+    App: {
+      useApp: () => ({
+        message: { error: vi.fn(), success: vi.fn() },
+      }),
+    },
     Badge: stub('ABadge', 'badge'),
+    Button: stub('AButton', 'button'),
     Breadcrumb: stub('ABreadcrumb', 'breadcrumb'),
     Avatar: stub('AAvatar', 'avatar'),
     Dropdown: stub('ADropdown', 'dropdown'),
     Drawer: stub('ADrawer', 'drawer'),
+    InputNumber: stub('AInputNumber', 'input-number'),
     Layout: stub('ALayout', 'layout'),
     LayoutContent: stub('ALayoutContent', 'content'),
     LayoutHeader: stub('ALayoutHeader', 'header'),
@@ -53,9 +70,17 @@ vi.mock('antdv-next', () => {
     },
     Menu: stub('AMenu', 'menu'),
     Popover: stub('APopover', 'popover'),
+    Popconfirm: stub('APopconfirm', 'popconfirm'),
     Segmented: stub('ASegmented', 'segmented'),
+    Select: stub('ASelect', 'select'),
     Switch: stub('ASwitch', 'switch'),
     Tag: stub('ATag', 'tag'),
+    Watermark: {
+      name: 'AWatermark',
+      inheritAttrs: false,
+      props: { content: Array, font: Object },
+      template: '<div data-testid="watermark" v-bind="$attrs"><slot /></div>',
+    },
     theme: {
       useToken: () => ({
         token: {
@@ -82,6 +107,14 @@ vi.mock('@/layouts/components/notification-popover/index.vue', () => ({
   },
 }));
 
+vi.mock('@/layouts/components/quick-entry-popover/index.vue', () => ({
+  default: {
+    name: 'QuickEntryPopover',
+    template:
+      '<div data-testid="quick-entry-popover"><slot name="trigger" /></div>',
+  },
+}));
+
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     isSuperAdmin: false,
@@ -96,9 +129,28 @@ vi.mock('@/stores/menu', () => ({
 }));
 
 vi.mock('@/stores/settings', () => ({
+  BORDER_RADIUS_MAX: 16,
+  BORDER_RADIUS_MIN: 0,
+  MENU_WIDTH_MAX: 280,
+  MENU_WIDTH_MIN: 180,
   useSettingsStore: () => ({
+    borderRadius: 6,
+    containerWidth: mocks.containerWidth,
     menuBackground: 'light',
+    menuWidth: 220,
+    pageTransition: mocks.pageTransition,
     primaryColor: '#1677ff',
+    showBreadcrumb: mocks.showBreadcrumb,
+    showCopyright: mocks.showCopyright,
+    showQuickEntry: mocks.showQuickEntry,
+    showRefreshButton: mocks.showRefreshButton,
+    showSidebarCollapseButton: mocks.showSidebarCollapseButton,
+    showTabs: mocks.showTabs,
+    showTopProgress: true,
+    showWatermark: mocks.showWatermark,
+    mobileTableCardMode: true,
+    sidebarAccordion: false,
+    tabStyle: 'card',
     themeMode: 'light',
     resolvedTheme: 'light',
     setPrimaryColor: vi.fn(),
@@ -116,6 +168,18 @@ vi.mock('@/stores/tabs', () => ({
 }));
 
 describe('AdminLayout scroll ownership', () => {
+  beforeEach(() => {
+    mocks.pageTransition = 'slide-up';
+    mocks.showBreadcrumb = true;
+    mocks.showQuickEntry = false;
+    mocks.showRefreshButton = true;
+    mocks.showSidebarCollapseButton = true;
+    mocks.showTabs = true;
+    mocks.showCopyright = false;
+    mocks.showWatermark = false;
+    mocks.containerWidth = 'full';
+  });
+
   it('所有登录用户都显示个人消息通知入口', () => {
     const wrapper = mount(AdminLayout);
     const notificationTrigger = wrapper.get('button[title="消息通知"]');
@@ -166,12 +230,14 @@ describe('AdminLayout scroll ownership', () => {
     );
   });
 
-  it('刷新按钮只重新挂载内容区域', async () => {
+  it('刷新按钮重载当前页面数据且不重新挂载页面', async () => {
     mocks.pageMounts = 0;
+    const reload = vi.fn(async () => true);
     const PageComponent = defineComponent({
       name: 'DashboardPage',
       setup: () => {
         mocks.pageMounts += 1;
+        usePageRefresh(reload);
         return () => h('div', { 'data-testid': 'page' }, '页面内容');
       },
     });
@@ -198,8 +264,9 @@ describe('AdminLayout scroll ownership', () => {
     await flushPromises();
 
     expect(mocks.go).not.toHaveBeenCalled();
-    expect(mocks.pageMounts).toBe(2);
-    expect(wrapper.get('[data-testid="page"]').element).not.toBe(pageElement);
+    expect(reload).toHaveBeenCalledOnce();
+    expect(mocks.pageMounts).toBe(1);
+    expect(wrapper.get('[data-testid="page"]').element).toBe(pageElement);
     expect(wrapper.get('[data-testid="sider"]').element).toBe(siderElement);
     expect(wrapper.get('[data-testid="header"]').element).toBe(headerElement);
   });
@@ -257,6 +324,45 @@ describe('AdminLayout scroll ownership', () => {
     );
   });
 
+  it('按设置隐藏标签栏和 Header 功能入口', () => {
+    mocks.showBreadcrumb = false;
+    mocks.showQuickEntry = true;
+    mocks.showRefreshButton = false;
+    mocks.showSidebarCollapseButton = false;
+    mocks.showTabs = false;
+    const wrapper = mount(AdminLayout);
+
+    expect(wrapper.find('[data-testid="tab-bar"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="content"]').classes()).toContain('pt-3');
+    expect(wrapper.find('[data-testid="breadcrumb"]').exists()).toBe(false);
+    expect(wrapper.find('button[title="刷新"]').exists()).toBe(false);
+    expect(wrapper.find('button[title="收起菜单"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="quick-entry-popover"]').exists()).toBe(
+      true,
+    );
+    expect(wrapper.find('button[title="快捷入口"]').exists()).toBe(true);
+  });
+
+  it('在内容区应用水印、固定容器和版权信息', () => {
+    mocks.containerWidth = 'fixed';
+    mocks.showCopyright = true;
+    mocks.showWatermark = true;
+    const wrapper = mount(AdminLayout);
+    const watermark = wrapper.getComponent({ name: 'AWatermark' });
+    const content = wrapper.get('[data-testid="content"]');
+
+    expect(watermark.props('content')).toEqual(['Nest Admin', 'admin']);
+    expect(watermark.classes()).toEqual(
+      expect.arrayContaining(['flex-1', 'min-h-0']),
+    );
+    expect(content.classes()).toEqual(
+      expect.arrayContaining(['w-full', 'max-w-[1440px]', 'mx-auto']),
+    );
+    expect(wrapper.get('footer').text()).toContain(
+      `© ${new Date().getFullYear()} Nest Admin. All rights reserved.`,
+    );
+  });
+
   it('用轻量过渡动画切换缓存页面', () => {
     const wrapper = mount(AdminLayout, {
       global: {
@@ -271,11 +377,29 @@ describe('AdminLayout scroll ownership', () => {
     const transition = wrapper.getComponent({ name: 'Transition' });
 
     expect(transition.props()).toMatchObject({
+      css: true,
       mode: 'out-in',
       enterActiveClass: 'transition duration-200 ease-out',
       enterFromClass: 'opacity-0 translate-y-1',
       leaveActiveClass: 'transition duration-150 ease-in',
       leaveToClass: 'opacity-0 -translate-y-1',
     });
+  });
+
+  it('支持关闭页面切换动画', () => {
+    mocks.pageTransition = 'none';
+    const wrapper = mount(AdminLayout, {
+      global: {
+        stubs: {
+          RouterView: {
+            template:
+              '<div data-testid="router-view"><slot :Component="null" /></div>',
+          },
+        },
+      },
+    });
+    const transition = wrapper.getComponent({ name: 'Transition' });
+
+    expect(transition.props('css')).toBe(false);
   });
 });
