@@ -1,6 +1,6 @@
 # nest-admin
 
-基于 NestJS 11、Vue 3、Drizzle ORM 和 MySQL 8 的全栈后台管理系统，采用 pnpm monorepo 组织。项目已经覆盖认证与会话安全、RBAC、用户/角色/菜单/组织架构/岗位管理、部门数据权限、数据字典、通知公告、操作日志、在线用户、文件上传、主题切换和通用表格/图表组件，可直接作为管理后台的开发基础。
+基于 NestJS 11、Vue 3、Drizzle ORM 和 MySQL 8 的全栈后台管理系统，采用 pnpm monorepo 组织。项目已经覆盖认证与会话安全、RBAC、用户/角色/菜单/组织架构/岗位管理、部门数据权限、数据字典、通知公告、操作日志、在线用户、文件资源管理、主题切换和通用表格/图表组件，可直接作为管理后台的开发基础。
 
 ## 已实现功能
 
@@ -11,7 +11,7 @@
 - **通知与消息**：公告草稿、发布、撤回和阅读统计，支持全员、部门、角色、指定用户发送；Header 展示未读角标和最近消息，SSE + Redis Pub/Sub 实时同步多实例事件，断线自动回退轮询。
 - **界面基础设施**：浅色/深色/跟随系统主题、可切换主色和菜单风格、KeepAlive 页签、内容区独立刷新、Remix Icon 图标体系。
 - **数据展示**：封装折线图、柱状图、饼图/环形图和热力图，统一处理主题、自适应尺寸、空状态和动画。
-- **文件与头像**：本地或 S3 兼容存储，个人中心支持上传头像，图片地址统一适配 API 前缀。
+- **文件资源**：本地或 S3 兼容存储，上传资源自动登记元数据和上传人；管理页支持分类筛选、预览、复制地址、引用检查与物理删除。
 - **定时任务**：后端预注册任务白名单、Cron/时区配置、启停、异步手动触发、执行日志、Redis 多实例防重和配置对账。
 
 ## 技术栈
@@ -152,7 +152,7 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 ## 文件上传
 
-`POST /api/files/upload` 接收 `multipart/form-data`，文件字段名固定为 `file`，默认需要登录但不要求额外权限码。成功后返回存储 key、访问 URL、原始文件名、MIME、大小和实际使用的存储驱动。
+`POST /api/files/upload` 接收 `multipart/form-data`，文件字段名固定为 `file`，默认需要登录但不要求额外权限码。成功后除了写入存储，还会在 `sys_file_resource` 登记对象 key、访问 URL、原始文件名、MIME、分类、大小、存储驱动和上传人快照。
 
 存储由 `UPLOAD_DRIVER` 切换：
 
@@ -160,6 +160,8 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 - `s3`：使用 AWS SDK v3 的 `PutObject`，同时支持 AWS S3、MinIO 和提供 S3 兼容接口的 OSS。AWS S3 可不配 endpoint；兼容服务填写 `UPLOAD_S3_ENDPOINT`。凭证留空时走 AWS SDK 默认凭证链。上传请求不会主动设置 `public-read` ACL，公开读取应由 Bucket Policy、对象存储控制台或 CDN 配置负责。
 
 上传使用内存缓冲，`UPLOAD_MAX_FILE_SIZE_MB` 是单文件硬上限，默认 10 MB、最高 100 MB。`UPLOAD_ALLOWED_MIME_TYPES` 是逗号分隔白名单，支持 `image/*` 和 `*/*` 通配符。存储 key 的扩展名由 MIME 映射生成，不采用客户端文件名里的扩展名，避免上传伪装成普通文本的 HTML 后在同域执行。若对象通过私有域名、CDN 或自定义 Bucket 域名访问，配置 `UPLOAD_S3_PUBLIC_BASE_URL`；否则服务会根据 endpoint、bucket 和 region 生成对象 URL。
+
+资源中心只管理本版本开始成功登记的上传记录，不会扫描本地目录或枚举 S3 Bucket 导入历史对象。删除前会检查用户头像引用；仍被引用时返回 409。允许删除时先调用存储驱动删除物理对象，再软删除元数据；local 删除限制在上传根目录内，S3 使用 `DeleteObject`。
 
 ## 约定
 
@@ -269,6 +271,7 @@ sys_user ──< sys_user_role >── sys_role ──< sys_role_permission >─
     └──< sys_user_post >── sys_post
     └──< sys_notice_recipient >── sys_notice ──< sys_notice_target
 sys_system_config (独立业务参数表)
+sys_file_resource (文件资源元数据与上传人快照)
 ```
 
 | 表                    | 作用                            | 关键约束                                                         |
@@ -278,6 +281,7 @@ sys_system_config (独立业务参数表)
 | `sys_dept_transfer_log` | 部门迁移历史                  | append-only；保存迁移前后父级、原因与操作人名称快照              |
 | `sys_post`            | 岗位主数据                      | `code` 唯一；停用后不可新增用户分配                              |
 | `sys_system_config`   | 非敏感业务参数                  | 参数键唯一；按声明类型校验；内置参数不可改键或删除                |
+| `sys_file_resource`   | 文件资源元数据                  | 对象键唯一；记录分类、存储驱动、上传人快照与软删除状态            |
 | `sys_role`            | 角色                            | `code` 唯一；`data_scope` 数据权限范围；`is_system` 内置角色保护 |
 | `sys_permission`      | 权限码，如 `system:user:delete` | `code` 唯一；`module` 用于分配界面分组                           |
 | `sys_menu`            | 前端路由菜单树                  | `parent_id` 自引用，`type` 为 directory / menu / external        |
@@ -353,6 +357,9 @@ sys_system_config (独立业务参数表)
 | GET    | `/api/operation-logs/cleanup/preview` | `system:log:clean`         | 预览本次清理会删掉多少行                            |
 | POST   | `/api/operation-logs/cleanup`         | `system:log:clean`         | 立即执行一次清理                                    |
 | POST   | `/api/files/upload`                   | 仅需登录                   | 上传单个文件，multipart 字段名为 `file`             |
+| GET    | `/api/files/resources`                | `system:file:list`         | 分页查询文件资源，支持关键词、分类和存储驱动筛选    |
+| GET    | `/api/files/resources/:id`            | `system:file:read`         | 文件资源详情与当前引用数                            |
+| DELETE | `/api/files/resources/:id`            | `system:file:delete`       | 删除未被引用的物理文件并软删除元数据                |
 | GET    | `/api/menus/mine`                     | 仅需登录                   | 当前用户可见的菜单树，前端渲染侧边栏                |
 | GET    | `/api/menus`                          | `system:menu:list`         | 完整菜单树（管理端），含停用与隐藏节点              |
 | POST   | `/api/menus`                          | `system:menu:create`       | 新增菜单                                            |
