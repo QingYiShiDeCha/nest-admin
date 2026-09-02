@@ -1,11 +1,13 @@
 import type { TableColumnsType, TablePaginationConfig } from 'antdv-next';
 import { mount } from '@vue/test-utils';
-import { computed, nextTick, ref, shallowRef } from 'vue';
+import { createPinia, setActivePinia } from 'pinia';
+import { computed, h, nextTick, ref, shallowRef } from 'vue';
 import type { DefineComponent } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 
 import ProTable from '@/components/core/tables/pro-table/index.vue';
 import type { UseTableReturn } from '@/composables/use-table';
+import { useSettingsStore } from '@/stores/settings';
 
 interface Row {
   id: number;
@@ -29,9 +31,31 @@ const componentStubs = vi.hoisted(() => ({
     },
     template: '<div data-testid="dropdown"><slot /></div>',
   },
+  empty: {
+    name: 'AEmpty',
+    props: { description: String },
+    template: '<div data-testid="empty">{{ description }}</div>',
+  },
+  pagination: {
+    name: 'APagination',
+    props: {
+      current: Number,
+      pageSize: Number,
+      simple: Boolean,
+      showQuickJumper: Boolean,
+      showSizeChanger: Boolean,
+      total: Number,
+    },
+    template: '<div data-testid="mobile-pagination" />',
+  },
   popover: {
     name: 'APopover',
     template: '<div><slot /><slot name="content" /></div>',
+  },
+  spin: {
+    name: 'ASpin',
+    props: { spinning: Boolean },
+    template: '<div data-testid="spin"><slot /></div>',
   },
   table: {
     name: 'ATable',
@@ -56,12 +80,20 @@ vi.mock('antdv-next', () => ({
   Checkbox: componentStubs.checkbox,
   CheckboxGroup: componentStubs.checkboxGroup,
   Dropdown: componentStubs.dropdown,
+  Empty: componentStubs.empty,
+  Pagination: componentStubs.pagination,
   Popover: componentStubs.popover,
+  Spin: componentStubs.spin,
   Table: componentStubs.table,
 }));
 
 const columns: TableColumnsType<Row> = [
-  { title: '名称', dataIndex: 'name', key: 'name' },
+  {
+    title: '名称',
+    dataIndex: 'name',
+    key: 'name',
+    render: (value) => h('strong', `用户：${String(value)}`),
+  },
 ];
 
 type PresentableRowTable = Pick<
@@ -83,6 +115,9 @@ const TableForRow = ProTable as unknown as DefineComponent<{
 }>;
 
 function mountTable(withBodyCell = false) {
+  const pinia = createPinia();
+  setActivePinia(pinia);
+  const settings = useSettingsStore(pinia);
   const reload = vi.fn(async () => true);
   const table = {
     columns,
@@ -98,6 +133,7 @@ function mountTable(withBodyCell = false) {
   } satisfies PresentableRowTable;
   const wrapper = mount(TableForRow, {
     props: { table, rowKey: 'id' },
+    global: { plugins: [pinia] },
     slots: withBodyCell
       ? {
           bodyCell: ({ record }: { record: Row }) => `自定义：${record.name}`,
@@ -105,7 +141,7 @@ function mountTable(withBodyCell = false) {
       : undefined,
   });
 
-  return { reload, table, wrapper };
+  return { reload, settings, table, wrapper };
 }
 
 describe('ProTable', () => {
@@ -224,6 +260,33 @@ describe('ProTable', () => {
     );
   });
 
+  it('移动端卡片复用 columns 渲染并保留独立分页', async () => {
+    const { settings, wrapper } = mountTable();
+    await nextTick();
+
+    const cards = wrapper.get('[data-testid="mobile-table-cards"]');
+    const mobilePagination = wrapper.getComponent(componentStubs.pagination);
+
+    expect(cards.classes()).toContain('md:hidden');
+    expect(cards.text()).toContain('名称');
+    expect(cards.get('strong').text()).toBe('用户：admin');
+    expect(mobilePagination.props()).toMatchObject({
+      current: 3,
+      pageSize: 10,
+      simple: true,
+      showQuickJumper: false,
+      showSizeChanger: false,
+      total: 21,
+    });
+
+    settings.setBooleanLayoutSetting('mobileTableCardMode', false);
+    await nextTick();
+
+    expect(wrapper.find('[data-testid="mobile-table-cards"]').exists()).toBe(
+      false,
+    );
+  });
+
   it('支持无分页树数据并转发展开行双向绑定', async () => {
     const reload = vi.fn(async () => undefined);
     const onExpandedRowKeys = vi.fn();
@@ -233,6 +296,8 @@ describe('ProTable', () => {
       loading: ref(false),
       reload,
     } satisfies PresentableRowTable;
+    const pinia = createPinia();
+    setActivePinia(pinia);
     const wrapper = mount(TableForRow, {
       props: {
         table,
@@ -241,6 +306,7 @@ describe('ProTable', () => {
         expandedRowKeys: [1],
         'onUpdate:expandedRowKeys': onExpandedRowKeys,
       },
+      global: { plugins: [pinia] },
     });
     await nextTick();
 

@@ -1,8 +1,17 @@
 <script setup lang="ts" generic="T extends object">
 import type { MenuProps, TableColumnsType } from 'antdv-next';
-import { computed, h, onMounted, ref } from 'vue';
+import {
+  computed,
+  defineComponent,
+  h,
+  onMounted,
+  ref,
+  type PropType,
+  type VNodeChild,
+} from 'vue';
 
 import type { UseTableReturn } from '@/composables/use-table';
+import { useSettingsStore } from '@/stores/settings';
 
 type PresentableTable<T extends object> = Pick<
   UseTableReturn<T>,
@@ -57,6 +66,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:expandedRowKeys': [keys: RowKey[]];
 }>();
+const settings = useSettingsStore();
 
 // 挂载即首查；KeepAlive 下实例常驻，重复激活不会重复请求
 onMounted(() => {
@@ -127,6 +137,110 @@ const visibleColumns = computed<TableColumnsType<T>>(() => {
   );
 });
 
+type GenericColumn = Record<string, unknown>;
+type MobileCustomRender = (options: {
+  text: unknown;
+  value: unknown;
+  record: object;
+  index: number;
+  column: GenericColumn;
+}) => VNodeChild;
+type MobileRender = (
+  value: unknown,
+  record: object,
+  index: number,
+) => VNodeChild;
+
+function flattenColumns(columns: TableColumnsType<T>): GenericColumn[] {
+  return columns.flatMap((column) => {
+    const genericColumn = column as unknown as GenericColumn;
+    const children = genericColumn.children;
+
+    return Array.isArray(children)
+      ? flattenColumns(children as TableColumnsType<T>)
+      : [genericColumn];
+  });
+}
+
+const mobileColumns = computed(() =>
+  flattenColumns(visibleColumns.value).filter(
+    (column) => columnKey(column) !== '__index',
+  ),
+);
+
+function cellValue(record: object, dataIndex: unknown): unknown {
+  const path = Array.isArray(dataIndex) ? dataIndex : [dataIndex];
+
+  return path.reduce<unknown>((value, key) => {
+    if (
+      value === null ||
+      typeof value !== 'object' ||
+      (typeof key !== 'string' && typeof key !== 'number')
+    ) {
+      return undefined;
+    }
+
+    return (value as Record<string | number, unknown>)[key];
+  }, record);
+}
+
+function mobileColumnTitle(column: GenericColumn): string {
+  const title = column.title;
+
+  return typeof title === 'string' || typeof title === 'number'
+    ? String(title)
+    : columnKey(column);
+}
+
+function mobileRowKey(record: T, index: number): RowKey {
+  const value = (record as Record<string, unknown>)[props.rowKey];
+  return typeof value === 'string' || typeof value === 'number' ? value : index;
+}
+
+const MobileCellRenderer = defineComponent({
+  name: 'MobileTableCellRenderer',
+  props: {
+    column: {
+      type: Object as PropType<GenericColumn>,
+      required: true,
+    },
+    record: {
+      type: Object as PropType<object>,
+      required: true,
+    },
+    index: {
+      type: Number,
+      required: true,
+    },
+  },
+  setup(cellProps) {
+    return () => {
+      const value = cellValue(cellProps.record, cellProps.column.dataIndex);
+      const render = cellProps.column.render as MobileRender | undefined;
+      const customRender = cellProps.column.customRender as
+        MobileCustomRender | undefined;
+
+      if (render) {
+        return render(value, cellProps.record, cellProps.index);
+      }
+
+      if (customRender) {
+        return customRender({
+          text: value,
+          value,
+          record: cellProps.record,
+          index: cellProps.index,
+          column: cellProps.column,
+        });
+      }
+
+      return value === undefined || value === null || value === ''
+        ? '-'
+        : String(value);
+    };
+  },
+});
+
 const resolvedPagination = computed(() => {
   if (!props.pagination || !props.table.pagination) {
     return false;
@@ -138,6 +252,19 @@ const resolvedPagination = computed(() => {
     showQuickJumper: true,
     pageSizeOptions: ['10', '20', '50', '100'],
     pageSize: props.table.pagination.value.pageSize ?? 20,
+  };
+});
+
+const mobilePagination = computed(() => {
+  if (!resolvedPagination.value) {
+    return false;
+  }
+
+  return {
+    ...resolvedPagination.value,
+    simple: true,
+    showQuickJumper: false,
+    showSizeChanger: false,
   };
 });
 
@@ -263,22 +390,81 @@ const stretchChain =
         </div>
       </div>
 
-      <a-table
-        :row-key="rowKey"
-        :columns="visibleColumns"
-        :data-source="table.list.value"
-        :loading="table.loading.value"
-        :pagination="resolvedPagination"
-        :size="tableSize"
-        :scroll="{ y: 200 }"
-        :expandable="expandableConfig"
-        :expanded-row-keys="expandedRowKeys"
-        @update:expanded-row-keys="handleExpandedRowKeys"
+      <div
+        v-if="settings.mobileTableCardMode"
+        data-testid="mobile-table-cards"
+        class="md:hidden flex flex-col flex-1 min-h-0"
       >
-        <template #bodyCell="slotProps">
-          <slot name="bodyCell" v-bind="slotProps" />
-        </template>
-      </a-table>
+        <a-spin
+          :spinning="table.loading.value"
+          class="flex-1 min-h-0 overflow-y-auto"
+        >
+          <div v-if="table.list.value.length > 0" class="flex flex-col gap-3">
+            <article
+              v-for="(record, index) in table.list.value"
+              :key="mobileRowKey(record, index)"
+              class="border border-solid rounded-lg px-3 a-border-border-secondary a-bg-container"
+            >
+              <div
+                v-for="column in mobileColumns"
+                :key="columnKey(column)"
+                class="min-h-10 flex items-start gap-3 border-b border-solid py-2 last:border-b-0 [border-color:var(--ant-color-split)]"
+              >
+                <span
+                  class="w-24 shrink-0 text-xs font-medium leading-6 a-color-text-secondary"
+                >
+                  {{ mobileColumnTitle(column) }}
+                </span>
+                <div class="min-w-0 flex-1 text-sm leading-6 a-color-text">
+                  <slot
+                    name="bodyCell"
+                    :column="column"
+                    :record="record"
+                    :text="cellValue(record, column.dataIndex)"
+                    :index="index"
+                  >
+                    <MobileCellRenderer
+                      :column="column"
+                      :record="record"
+                      :index="index"
+                    />
+                  </slot>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <a-empty v-else description="暂无数据" class="py-12" />
+        </a-spin>
+
+        <a-pagination
+          v-if="mobilePagination"
+          v-bind="mobilePagination"
+          class="mt-3 flex justify-center shrink-0"
+        />
+      </div>
+
+      <div
+        class="flex-col flex-1 min-h-0"
+        :class="settings.mobileTableCardMode ? 'hidden md:flex' : 'flex'"
+      >
+        <a-table
+          :row-key="rowKey"
+          :columns="visibleColumns"
+          :data-source="table.list.value"
+          :loading="table.loading.value"
+          :pagination="resolvedPagination"
+          :size="tableSize"
+          :scroll="{ y: 200 }"
+          :expandable="expandableConfig"
+          :expanded-row-keys="expandedRowKeys"
+          @update:expanded-row-keys="handleExpandedRowKeys"
+        >
+          <template #bodyCell="slotProps">
+            <slot name="bodyCell" v-bind="slotProps" />
+          </template>
+        </a-table>
+      </div>
     </div>
   </div>
 </template>
