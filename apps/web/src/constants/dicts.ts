@@ -8,6 +8,8 @@ import type {
   STATUS,
   SYSTEM_CONFIG_VALUE_TYPE,
   DictionaryTone,
+  FileCategory,
+  FileStorageDriver,
   LoginStatus,
   ScheduledTaskExecutionStatus,
   ScheduledTaskTriggerType,
@@ -113,6 +115,40 @@ export const LOGIN_STATUS_META: Record<
   success: { label: '成功', tone: 'success' },
   failure: { label: '失败', tone: 'error' },
 };
+
+export const FILE_CATEGORY_META: Record<
+  FileCategory,
+  { label: string; tone: ThemeTone }
+> = {
+  image: { label: '图片', tone: 'primary' },
+  video: { label: '视频', tone: 'info' },
+  audio: { label: '音频', tone: 'success' },
+  document: { label: '文档', tone: 'warning' },
+  archive: { label: '压缩包', tone: 'error' },
+  other: { label: '其他', tone: 'default' },
+};
+
+export const FILE_CATEGORY_OPTIONS = Object.entries(FILE_CATEGORY_META).map(
+  ([value, meta]) => ({
+    value: value as FileCategory,
+    label: meta.label,
+  }),
+);
+
+export const FILE_STORAGE_META: Record<
+  FileStorageDriver,
+  { label: string; tone: ThemeTone }
+> = {
+  local: { label: '本地', tone: 'default' },
+  s3: { label: 'S3', tone: 'primary' },
+};
+
+export const FILE_STORAGE_OPTIONS = Object.entries(FILE_STORAGE_META).map(
+  ([value, meta]) => ({
+    value: value as FileStorageDriver,
+    label: meta.label,
+  }),
+);
 
 export const SCHEDULED_TASK_EXECUTION_STATUS_META: Record<
   ScheduledTaskExecutionStatus,
