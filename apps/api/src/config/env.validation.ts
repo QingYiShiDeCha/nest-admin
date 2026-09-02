@@ -60,9 +60,9 @@ const baseEnvSchema = z.object({
    */
   /** 操作日志保留天数，超过则被定时任务物理删除 */
   LOG_RETENTION_DAYS: z.coerce.number().int().min(1).default(90),
-  /** 清理任务的 cron 表达式，默认每天凌晨 3 点 */
+  /** 内置清理计划首次创建时的 cron 初值 */
   LOG_CLEANUP_CRON: z.string().default('0 3 * * *'),
-  /** 关掉定时清理。日志量小或想完全交给运维处理时使用 */
+  /** 内置清理计划首次创建时的启用状态 */
   LOG_CLEANUP_ENABLED: booleanFromString.default(true),
 
   UPLOAD_DRIVER: z.enum(['local', 's3']).default('local'),

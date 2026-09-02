@@ -1,9 +1,7 @@
 import { loginLogs, operationLogs, refreshTokens } from '@nest-admin/database';
-import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SchedulerRegistry } from '@nestjs/schedule';
 import { and, isNotNull, lt, or, sql } from 'drizzle-orm';
-import { CronJob } from 'cron';
 
 import type { Env } from '../../config/env.validation';
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
@@ -25,53 +23,14 @@ export interface CleanupResult {
 }
 
 @Injectable()
-export class LogCleanupService implements OnModuleInit {
+export class LogCleanupService {
   private readonly logger = new Logger(LogCleanupService.name);
 
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     private readonly config: ConfigService<Env, true>,
-    private readonly scheduler: SchedulerRegistry,
     private readonly lock: RedisLockService,
   ) {}
-
-  /**
-   * cron 表达式来自环境变量，所以用 SchedulerRegistry 动态注册，
-   * 而不是 @Cron() 装饰器——装饰器的参数在类定义时求值，那会儿读不到配置。
-   */
-  onModuleInit(): void {
-    if (!this.config.get('LOG_CLEANUP_ENABLED', { infer: true })) {
-      this.logger.log('日志定时清理已关闭');
-      return;
-    }
-
-    const expression = this.config.get('LOG_CLEANUP_CRON', { infer: true });
-    const job = new CronJob(expression, () => {
-      void this.runScheduled();
-    });
-
-    this.scheduler.addCronJob('log-cleanup', job);
-    job.start();
-
-    this.logger.log(
-      `日志清理已排程：${expression}，保留 ${this.config.get('LOG_RETENTION_DAYS', { infer: true })} 天`,
-    );
-  }
-
-  /** 定时入口。多实例下靠 Redis 锁保证同一时刻只有一个实例真的在删 */
-  private async runScheduled(): Promise<void> {
-    const result = await this.lock.runExclusive(LOCK_KEY, LOCK_TTL_MS, () =>
-      this.cleanup(),
-    );
-
-    if (!result) {
-      return;
-    }
-
-    this.logger.log(
-      `定时清理完成：登录日志 ${result.loginLogs} 行，操作日志 ${result.operationLogs} 行，失效会话 ${result.refreshTokens} 行`,
-    );
-  }
 
   /**
    * 手动触发也走同一把锁，避免和定时任务撞在一起同时删。
