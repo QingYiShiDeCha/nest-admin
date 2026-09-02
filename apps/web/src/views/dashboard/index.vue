@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+} from 'vue';
 
 import AppIcon from '@/components/core/base/app-icon/index.vue';
 import {
@@ -8,10 +14,12 @@ import {
   PieChart,
   type HeatmapChartDatum,
 } from '@/components/core/charts';
+import { usePageRefresh } from '@/composables/use-page-refresh';
 import { SEMANTIC_COLORS } from '@/constants/palette';
 import { useSettingsStore } from '@/stores/settings';
 
 const settings = useSettingsStore();
+const chartAnimationVersion = ref(0);
 
 /**
  * 图表消费的主题色，来源与 App.vue 的 token 相同（palette 单一来源）。
@@ -26,12 +34,25 @@ const themeVars = computed(() => ({
 }));
 
 /** 顶部四张统计卡 */
-const statCards = [
+interface StatCard {
+  icon: string;
+  tint: string;
+  label: string;
+  value: number;
+  precision: number;
+  suffix?: string;
+  formatter?: (value: number | string) => string;
+  trend: string;
+  up: boolean;
+}
+
+const statCards: StatCard[] = [
   {
     icon: 'i-ri:user-3-line',
     tint: 'blue',
     label: '总访客数',
-    value: '48,260',
+    value: 48_260,
+    precision: 0,
     trend: '1.18%',
     up: true,
   },
@@ -39,7 +60,9 @@ const statCards = [
     icon: 'i-ri:message-3-line',
     tint: 'cyan',
     label: '总会话数',
-    value: '156K',
+    value: 156,
+    precision: 0,
+    suffix: 'K',
     trend: '3.04%',
     up: true,
   },
@@ -47,7 +70,9 @@ const statCards = [
     icon: 'i-ri:pulse-line',
     tint: 'green',
     label: '跳出率',
-    value: '38.2%',
+    value: 38.2,
+    precision: 1,
+    suffix: '%',
     trend: '1.12%',
     up: false,
   },
@@ -55,11 +80,78 @@ const statCards = [
     icon: 'i-ri:time-line',
     tint: 'orange',
     label: '平均会话时长',
-    value: '4分12秒',
+    value: 252,
+    precision: 0,
+    formatter: formatDuration,
     trend: '0.84%',
     up: true,
   },
 ];
+
+const statisticClasses = {
+  content: '!text-2xl !font-semibold !leading-[1.4] a-color-text',
+};
+const animatedStatValues = ref(statCards.map(() => 0));
+let statAnimationFrame: number | undefined;
+let finishStatAnimation: (() => void) | undefined;
+
+function formatDuration(value: number | string): string {
+  const seconds = Math.max(0, Math.round(Number(value)));
+  return `${Math.floor(seconds / 60)}分${seconds % 60}秒`;
+}
+
+function stopStatAnimation(): void {
+  if (statAnimationFrame !== undefined) {
+    cancelAnimationFrame(statAnimationFrame);
+    statAnimationFrame = undefined;
+  }
+  finishStatAnimation?.();
+  finishStatAnimation = undefined;
+}
+
+function animateStatCards(): Promise<void> {
+  stopStatAnimation();
+  animatedStatValues.value = statCards.map(() => 0);
+
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    animatedStatValues.value = statCards.map((card) => card.value);
+    return Promise.resolve();
+  }
+
+  const startedAt = performance.now();
+  const duration = 1_000;
+
+  return new Promise((resolve) => {
+    finishStatAnimation = resolve;
+
+    const update = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      animatedStatValues.value = statCards.map((card) => card.value * eased);
+
+      if (progress < 1) {
+        statAnimationFrame = requestAnimationFrame(update);
+        return;
+      }
+
+      statAnimationFrame = undefined;
+      finishStatAnimation = undefined;
+      resolve();
+    };
+
+    statAnimationFrame = requestAnimationFrame(update);
+  });
+}
+
+async function replayDashboardAnimations(): Promise<void> {
+  chartAnimationVersion.value += 1;
+  await nextTick();
+  await animateStatCards();
+}
+
+usePageRefresh(replayDashboardAnimations);
+onMounted(() => void animateStatCards());
+onBeforeUnmount(stopStatAnimation);
 
 /** 终端会话占比：分段比例与底部分类统计一致，中心是总量 */
 const deviceSegments = [
@@ -122,7 +214,7 @@ defineOptions({ name: 'DashboardPage' });
         <!-- 统计卡行 -->
         <div class="dash-stats">
           <div
-            v-for="card in statCards"
+            v-for="(card, index) in statCards"
             :key="card.label"
             class="panel stat-card"
           >
@@ -131,7 +223,14 @@ defineOptions({ name: 'DashboardPage' });
             </div>
             <div class="stat-meta">
               <div class="stat-label">{{ card.label }}</div>
-              <div class="stat-value">{{ card.value }}</div>
+              <a-statistic
+                class="stat-value"
+                :value="animatedStatValues[index]"
+                :precision="card.precision"
+                :suffix="card.suffix"
+                :formatter="card.formatter"
+                :classes="statisticClasses"
+              />
               <div class="stat-trend" :class="card.up ? 'up' : 'down'">
                 {{ card.up ? '↑' : '↓' }} {{ card.trend }} 本年
               </div>
@@ -146,6 +245,7 @@ defineOptions({ name: 'DashboardPage' });
               <a class="card-link">查看详情</a>
             </template>
             <PieChart
+              :key="`device-${chartAnimationVersion}`"
               class="h-60 w-full"
               :data="deviceChartData"
               :center-value="deviceTotal.toLocaleString()"
@@ -172,6 +272,7 @@ defineOptions({ name: 'DashboardPage' });
               <a class="card-link">查看详情</a>
             </template>
             <BarChart
+              :key="`audience-${chartAnimationVersion}`"
               class="min-h-60 w-full flex-1"
               :categories="monthLabels"
               :series="audienceSeries"
@@ -295,6 +396,7 @@ defineOptions({ name: 'DashboardPage' });
 
         <a-card title="一周活跃时段" class="dash-card">
           <HeatmapChart
+            :key="`activity-${chartAnimationVersion}`"
             class="h-60 w-full"
             :x-labels="weekdayLabels"
             :y-labels="heatLabels"
