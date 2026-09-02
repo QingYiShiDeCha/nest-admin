@@ -55,6 +55,9 @@ export const PERMISSIONS = {
   /** 手动触发日志清理 */
   LOG_CLEAN: 'system:log:clean',
 
+  LOGIN_LOG_LIST: 'system:login-log:list',
+  LOGIN_LOG_READ: 'system:login-log:read',
+
   NOTICE_LIST: 'system:notice:list',
   NOTICE_READ: 'system:notice:read',
   NOTICE_CREATE: 'system:notice:create',
@@ -147,6 +150,16 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   { code: PERMISSIONS.LOG_LIST, name: '查询操作日志', module: 'system' },
   { code: PERMISSIONS.LOG_READ, name: '查看日志详情', module: 'system' },
   { code: PERMISSIONS.LOG_CLEAN, name: '手动清理日志', module: 'system' },
+  {
+    code: PERMISSIONS.LOGIN_LOG_LIST,
+    name: '查询登录日志',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.LOGIN_LOG_READ,
+    name: '查看登录日志详情',
+    module: 'system',
+  },
   { code: PERMISSIONS.NOTICE_LIST, name: '查询通知公告', module: 'system' },
   { code: PERMISSIONS.NOTICE_READ, name: '查看通知公告', module: 'system' },
   { code: PERMISSIONS.NOTICE_CREATE, name: '新增通知公告', module: 'system' },

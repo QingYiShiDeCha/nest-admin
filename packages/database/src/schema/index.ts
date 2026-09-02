@@ -3,6 +3,7 @@ export * from './departments';
 export * from './department-transfers';
 export * from './dictionaries';
 export * from './grants';
+export * from './login-logs';
 export * from './menus';
 export * from './notice-recipients';
 export * from './notice-targets';
