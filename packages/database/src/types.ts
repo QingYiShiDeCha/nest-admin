@@ -1,3 +1,4 @@
+import type { Logger as DrizzleQueryLogger } from 'drizzle-orm';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
 import type { Pool } from 'mysql2/promise';
 
@@ -15,8 +16,11 @@ export interface DatabaseClientOptions {
   password: string;
   database: string;
   connectionLimit?: number;
-  /** 打开后会把每条 SQL 打到 stdout，仅建议开发环境用 */
-  logger?: boolean;
+  /**
+   * `true` 用 Drizzle 自带的 logger 把每条 SQL 打到 stdout，仅建议开发环境用。
+   * 传实现了 `logQuery` 的对象可自定义输出（api 侧借此标注 SQL 由哪个请求触发）。
+   */
+  logger?: boolean | DrizzleQueryLogger;
 }
 
 export interface DatabaseClient {

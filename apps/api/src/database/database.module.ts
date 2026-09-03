@@ -10,7 +10,9 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ClsService } from 'nestjs-cls';
 
+import type { AppClsStore } from '../common/context/request-context.service';
 import type { Env } from '../config/env.validation';
 import {
   DATABASE_CLIENT,
@@ -18,6 +20,7 @@ import {
   MYSQL_POOL,
   type MysqlPool,
 } from './database.constants';
+import { DrizzleQueryLoggerService } from './query-logger';
 
 @Global()
 @Module({
@@ -25,8 +28,11 @@ import {
   providers: [
     {
       provide: DATABASE_CLIENT,
-      inject: [ConfigService],
-      useFactory: (config: ConfigService<Env, true>): DatabaseClient =>
+      inject: [ConfigService, ClsService],
+      useFactory: (
+        config: ConfigService<Env, true>,
+        cls: ClsService<AppClsStore>,
+      ): DatabaseClient =>
         createDatabaseClient({
           host: config.get('DB_HOST', { infer: true }),
           port: config.get('DB_PORT', { infer: true }),
@@ -34,7 +40,11 @@ import {
           password: config.get('DB_PASSWORD', { infer: true }),
           database: config.get('DB_NAME', { infer: true }),
           connectionLimit: config.get('DB_POOL_LIMIT', { infer: true }),
-          logger: config.get('NODE_ENV', { infer: true }) === 'development',
+          // 开发环境打 SQL 并标注触发它的接口；生产环境完全关闭
+          logger:
+            config.get('NODE_ENV', { infer: true }) === 'development'
+              ? new DrizzleQueryLoggerService(cls)
+              : false,
         }),
     },
     {

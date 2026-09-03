@@ -7,6 +7,9 @@ export interface AppClsStore extends ClsStore {
   username?: string;
   ip?: string;
   userAgent?: string;
+  /** 请求方法与路径，由 ClsMiddleware 在建立上下文时写入，供 SQL 日志标注来源 */
+  method?: string;
+  path?: string;
 }
 
 /**
@@ -53,6 +56,19 @@ export class RequestContext {
   /** 签发会话记录时要带的客户端信息 */
   client(): { ip: string | null; userAgent: string | null } {
     return { ip: this.ip, userAgent: this.userAgent };
+  }
+
+  /**
+   * 当前请求的 `METHOD /path` 标签，供日志标注 SQL 由哪个接口触发。
+   * 定时任务、seed 等非 HTTP 入口没有上下文，返回 null。
+   */
+  get requestLabel(): string | null {
+    const method = this.read('method');
+    const path = this.read('path');
+
+    if (!method || !path) return null;
+
+    return `${method} ${path}`;
   }
 
   /** 插入时的审计字段 */

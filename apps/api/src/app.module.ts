@@ -5,6 +5,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, seconds } from '@nestjs/throttler';
+import type { Request } from 'express';
 import { ClsModule } from 'nestjs-cls';
 
 import { AppController } from './app.controller';
@@ -42,8 +43,18 @@ import { RedisModule } from './redis/redis.module';
       validate: validateEnv,
     }),
     // 中间件负责建立 AsyncLocalStorage 上下文（此时还没认证，拿不到用户）；
-    // 真正写入内容的是 RequestContextInterceptor，它在守卫之后执行。
-    ClsModule.forRoot({ global: true, middleware: { mount: true } }),
+    // 真正写入用户信息的是 RequestContextInterceptor，它在守卫之后执行。
+    // 方法与路径在这里就写好：守卫内部的查询（如 JWT 校验查会话）也要能被 SQL 日志标注来源。
+    ClsModule.forRoot({
+      global: true,
+      middleware: {
+        mount: true,
+        setup: (cls, req: Request) => {
+          cls.set('method', req.method);
+          cls.set('path', req.originalUrl ?? req.url);
+        },
+      },
+    }),
     RedisModule,
     ScheduleModule.forRoot(),
     RequestContextModule,
