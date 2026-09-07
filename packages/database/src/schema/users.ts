@@ -29,6 +29,12 @@ export const users = mysqlTable(
     phone: varchar('phone', { length: 20 }),
     avatar: varchar('avatar', { length: 255 }),
     status: mysqlEnum('status', STATUS).notNull().default('active'),
+    /**
+     * 登录失败累计达到阈值后的锁定截止时间。
+     * null 或早于当前时间即未锁定；计数本身走 Redis，这里只保存
+     * 「权威锁定态」用于跨实例一致性与管理员可见。
+     */
+    lockedUntil: timestamp('locked_until'),
     lastLoginAt: timestamp('last_login_at'),
     ...auditColumns(),
   },
@@ -36,6 +42,7 @@ export const users = mysqlTable(
     uniqueIndex('uk_sys_user_username').on(table.username),
     index('idx_sys_user_status').on(table.status),
     index('idx_sys_user_dept_id').on(table.deptId),
+    index('idx_sys_user_locked_until').on(table.lockedUntil),
   ],
 );
 

@@ -28,6 +28,3 @@ export const permissions = mysqlTable(
     index('idx_sys_permission_module').on(table.module),
   ],
 );
-
-export type PermissionRow = typeof permissions.$inferSelect;
-export type NewPermissionRow = typeof permissions.$inferInsert;
