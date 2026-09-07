@@ -14,6 +14,7 @@ import {
   apiUserRoleIds,
   apiUserSetRoles,
   apiUserSetPosts,
+  apiUserUnlock,
   apiUserUpdate,
   type UserQuery,
 } from '@/api/users';
@@ -113,11 +114,16 @@ const table = useTable<UserListItem, UserQuery>({
       key: 'status',
       width: 90,
       render: (_value, record) =>
-        h(
-          Tag,
-          { color: STATUS_META[record.status].color },
-          () => STATUS_META[record.status].label,
-        ),
+        h(Space, { size: 4 }, () => [
+          h(
+            Tag,
+            { color: STATUS_META[record.status].color },
+            () => STATUS_META[record.status].label,
+          ),
+          isLocked(record)
+            ? h(AppTag, { tone: 'warning' }, () => '已锁定')
+            : null,
+        ]),
     },
     {
       title: '最后登录',
@@ -179,6 +185,24 @@ const table = useTable<UserListItem, UserQuery>({
                         Button,
                         { type: 'link', size: 'small', danger: true },
                         () => '强制下线',
+                      ),
+                  },
+                )
+              : null,
+            can(PERMISSIONS.USER_UNLOCK) && isLocked(record)
+              ? h(
+                  Popconfirm,
+                  {
+                    title: '确认解锁该用户？',
+                    description: '清除登录失败计数与锁定标记',
+                    onConfirm: () => unlock(record),
+                  },
+                  {
+                    default: () =>
+                      h(
+                        Button,
+                        { type: 'link', size: 'small' },
+                        () => '解锁',
                       ),
                   },
                 )
@@ -335,6 +359,14 @@ function isSelf(record: UserListItem): boolean {
   return record.id === auth.profile?.id;
 }
 
+/** 账号是否处于登录锁定态（lockedUntil 未过期即锁定中） */
+function isLocked(record: UserListItem): boolean {
+  return (
+    record.lockedUntil !== null &&
+    new Date(record.lockedUntil).getTime() > Date.now()
+  );
+}
+
 async function openAssignRoles(record: UserListItem): Promise<void> {
   roleTarget.value = record;
   roleModalOpen.value = true;
@@ -413,6 +445,12 @@ async function forceLogout(record: UserListItem): Promise<void> {
   void message.success(
     `已下线 ${record.username} 的 ${revokedSessions} 个会话`,
   );
+}
+
+async function unlock(record: UserListItem): Promise<void> {
+  await apiUserUnlock(record.id);
+  void message.success(`已解锁用户 ${record.username}`);
+  await table.reload();
 }
 
 defineOptions({ name: 'UserPage' });

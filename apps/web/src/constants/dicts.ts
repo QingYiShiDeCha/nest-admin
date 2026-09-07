@@ -114,6 +114,7 @@ export const LOGIN_STATUS_META: Record<
 > = {
   success: { label: '成功', tone: 'success' },
   failure: { label: '失败', tone: 'error' },
+  locked: { label: '已锁定', tone: 'warning' },
 };
 
 export const FILE_CATEGORY_META: Record<

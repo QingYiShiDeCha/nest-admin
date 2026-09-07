@@ -89,3 +89,8 @@ export function apiUserForceLogout(
 ): Promise<{ revokedSessions: number }> {
   return httpPost<{ revokedSessions: number }>(`/users/${id}/force-logout`);
 }
+
+/** 管理员解锁因登录失败被锁定的账号 */
+export function apiUserUnlock(id: number): Promise<void> {
+  return httpPost<void>(`/users/${id}/unlock`);
+}

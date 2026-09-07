@@ -28,6 +28,7 @@ const user = (overrides: Partial<UserListItem> = {}): UserListItem => ({
   phone: null,
   avatar: null,
   status: 'active',
+  lockedUntil: null,
   lastLoginAt: null,
   createdAt: '2026-08-30T00:00:00.000Z',
   updatedAt: '2026-08-30T00:00:00.000Z',

@@ -86,6 +86,7 @@ const filterFields: FilterField<LoginLogQuery>[] = [
     options: [
       { label: '成功', value: 'success' },
       { label: '失败', value: 'failure' },
+      { label: '已锁定', value: 'locked' },
     ],
   },
   { label: '时间范围', key: 'range', type: 'custom' },
