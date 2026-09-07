@@ -21,6 +21,8 @@ export const PERMISSIONS = {
   USER_SESSION_LIST: 'system:user:session:list',
   /** 强制用户下线：吊销其全部或指定 refreshToken */
   USER_FORCE_LOGOUT: 'system:user:force-logout',
+  /** 解锁因登录失败被锁定的账号，缓解被恶意锁定时的自救 */
+  USER_UNLOCK: 'system:user:unlock',
 
   DEPT_LIST: 'system:dept:list',
   DEPT_READ: 'system:dept:read',
@@ -130,6 +132,11 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   {
     code: PERMISSIONS.USER_FORCE_LOGOUT,
     name: '强制用户下线',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.USER_UNLOCK,
+    name: '解锁被锁定的用户',
     module: 'system',
   },
   { code: PERMISSIONS.DEPT_LIST, name: '查询部门树', module: 'system' },

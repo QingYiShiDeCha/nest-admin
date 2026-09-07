@@ -20,6 +20,8 @@ export interface BasicUser {
   phone: string | null;
   avatar: string | null;
   status: 'active' | 'disabled';
+  /** 账号因登录失败累计达到阈值后的锁定截止时间，null 或已过期即未锁定 */
+  lockedUntil: string | null;
   lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
