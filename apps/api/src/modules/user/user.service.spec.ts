@@ -12,6 +12,7 @@ const user: SafeUser = {
   phone: null,
   avatar: null,
   status: 'active',
+  lockedUntil: null,
   lastLoginAt: null,
   createdBy: null,
   updatedBy: null,
@@ -34,6 +35,8 @@ describe('UserService.updateOwnProfile', () => {
     {} as never,
     {} as never,
     {} as never,
+    { assertSatisfied: jest.fn() } as never,
+    { clearLock: jest.fn() } as never,
   );
   const findById = jest.spyOn(service, 'findById').mockResolvedValue(user);
 

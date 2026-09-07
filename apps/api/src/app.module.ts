@@ -11,6 +11,8 @@ import { ClsModule } from 'nestjs-cls';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { RequestContextModule } from './common/context/request-context.module';
+import { LoginLockoutModule } from './common/login-lockout/login-lockout.module';
+import { PasswordPolicyModule } from './common/password/password.module';
 import { AppThrottlerGuard } from './common/guards/throttler.guard';
 import { RequestContextInterceptor } from './common/interceptors/request-context.interceptor';
 import { validateEnv, type Env } from './config/env.validation';
@@ -58,6 +60,8 @@ import { RedisModule } from './redis/redis.module';
     RedisModule,
     ScheduleModule.forRoot(),
     RequestContextModule,
+    PasswordPolicyModule,
+    LoginLockoutModule,
     // 只声明一个默认限流器，登录这类需要收紧的接口用 @Throttle 就地覆盖。
     // 声明多个具名限流器会让它们同时作用于所有路由，反而要到处 @SkipThrottle。
     ThrottlerModule.forRootAsync({

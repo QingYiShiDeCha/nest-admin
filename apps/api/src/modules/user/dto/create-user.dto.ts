@@ -13,7 +13,11 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-import { STATUS, type Status } from '@nest-admin/shared';
+import {
+  PASSWORD_MIN_LENGTH_RANGE,
+  STATUS,
+  type Status,
+} from '@nest-admin/shared';
 
 export class CreateUserDto {
   @ApiPropertyOptional({ description: '所属部门 id' })
@@ -32,13 +36,12 @@ export class CreateUserDto {
   username: string;
 
   @ApiProperty({
-    description: '密码，至少 8 位且需含字母和数字',
+    description: '密码，需满足系统参数配置的密码策略',
     example: 'admin123456',
   })
   @IsString()
-  @Length(8, 64, { message: '密码长度需在 8-64 之间' })
-  @Matches(/^(?=.*[A-Za-z])(?=.*\d).+$/, {
-    message: '密码必须同时包含字母和数字',
+  @Length(PASSWORD_MIN_LENGTH_RANGE.min, PASSWORD_MIN_LENGTH_RANGE.max, {
+    message: `密码长度需在 ${PASSWORD_MIN_LENGTH_RANGE.min}-${PASSWORD_MIN_LENGTH_RANGE.max} 之间`,
   })
   password: string;
 

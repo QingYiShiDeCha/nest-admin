@@ -104,6 +104,19 @@ export class UserController {
     return this.userService.forceLogout(id);
   }
 
+  @Post(':id/unlock')
+  @Permissions(PERMISSIONS.USER_UNLOCK)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @OperationLog({ module: '用户管理', action: '解锁用户' })
+  @ApiOperation({
+    summary: '解锁因登录失败被锁定的账号',
+    description:
+      '清除登录失败计数与锁定标记，未锁定的账号调用同样成功，便于前端无状态直接调用。',
+  })
+  unlock(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    return this.userService.unlock(id);
+  }
+
   @Get(':id')
   @Permissions(PERMISSIONS.USER_READ)
   @ApiOperation({ summary: '查询用户详情' })

@@ -10,6 +10,10 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 
 import { RequestContext } from '../../common/context/request-context.service';
+import {
+  LoginLockedException,
+  LoginLockoutService,
+} from '../../common/login-lockout/login-lockout.service';
 import type { Env } from '../../config/env.validation';
 import { UserService } from '../user/user.service';
 import { LoginLogService } from '../login-log/login-log.service';
@@ -44,6 +48,7 @@ export class AuthService {
     private readonly refreshTokens: RefreshTokenService,
     private readonly ctx: RequestContext,
     private readonly loginLogs: LoginLogService,
+    private readonly loginLockout: LoginLockoutService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResult> {
@@ -54,12 +59,26 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<AuthResult> {
     let userId: number | null = null;
+    // 被锁定拦截时携带剩余秒数，catch 块据此写 locked 日志
+    let lockedRemaining = 0;
 
     try {
       const credentials = await this.userService.findCredentialsByUsername(
         dto.username,
       );
       userId = credentials?.user.id ?? null;
+
+      // 锁定检查放在凭据校验之前：锁定期内即使密码正确也拒绝，
+      // 避免攻击者在锁定窗口里继续试探。未知用户名也查 Redis 锁键，
+      // 与已知用户返回同一句锁定提示，避免账号枚举。
+      const lockout = await this.loginLockout.checkLocked(
+        dto.username,
+        credentials?.user ?? null,
+      );
+      if (lockout.locked) {
+        lockedRemaining = lockout.remainingSeconds;
+        throw new LoginLockedException(lockout.remainingSeconds);
+      }
 
       // 用户不存在和密码错误返回同一句提示，避免账号枚举
       if (
@@ -69,7 +88,15 @@ export class AuthService {
           credentials.passwordHash,
         ))
       ) {
-        throw new UnauthorizedException('用户名或密码错误');
+        const result = await this.loginLockout.recordFailure(
+          dto.username,
+          userId,
+        );
+        throw new UnauthorizedException(
+          result.locked
+            ? `密码错误次数过多，账号已锁定 ${result.remainingSeconds} 秒`
+            : '用户名或密码错误',
+        );
       }
 
       const { user } = credentials;
@@ -79,6 +106,8 @@ export class AuthService {
       }
 
       await this.userService.touchLastLogin(user.id);
+      // 登录成功清空失败计数与锁键；过期但残留的 locked_until 也一并清除
+      await this.loginLockout.clearOnSuccess(user.username, user.id);
       const result = { user, ...(await this.issueTokens(user)) };
 
       await this.loginLogs.record({
@@ -92,12 +121,15 @@ export class AuthService {
 
       return result;
     } catch (error) {
+      const isLocked = error instanceof LoginLockedException;
       await this.loginLogs.record({
         userId,
         username: dto.username,
         ...this.loginClient(),
-        status: 'failure',
-        failureReason: this.loginFailureReason(error),
+        status: isLocked ? 'locked' : 'failure',
+        failureReason: isLocked
+          ? `账号已锁定，剩余 ${lockedRemaining} 秒`
+          : this.loginFailureReason(error),
       });
       throw error;
     }

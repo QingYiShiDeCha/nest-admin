@@ -10,6 +10,10 @@ import { hash } from 'bcryptjs';
 
 import type { SafeUser } from '@nest-admin/database';
 import { RequestContext } from '../../common/context/request-context.service';
+import {
+  LoginLockedException,
+  LoginLockoutService,
+} from '../../common/login-lockout/login-lockout.service';
 import { UserService } from '../user/user.service';
 import { LoginLogService } from '../login-log/login-log.service';
 import { AuthService } from './auth.service';
@@ -36,6 +40,7 @@ const USER: SafeUser = {
   phone: null,
   avatar: null,
   status: 'active',
+  lockedUntil: null,
   lastLoginAt: null,
   createdBy: null,
   updatedBy: null,
@@ -70,6 +75,11 @@ describe('AuthService', () => {
     >
   >;
   let loginLogs: { record: jest.Mock };
+  let loginLockout: {
+    checkLocked: jest.Mock;
+    recordFailure: jest.Mock;
+    clearOnSuccess: jest.Mock;
+  };
   let requestContext: {
     client: jest.Mock;
     setUser: jest.Mock;
@@ -108,6 +118,15 @@ describe('AuthService', () => {
     loginLogs = {
       record: jest.fn().mockResolvedValue(undefined),
     };
+    loginLockout = {
+      checkLocked: jest
+        .fn()
+        .mockResolvedValue({ locked: false, remainingSeconds: 0 }),
+      recordFailure: jest
+        .fn()
+        .mockResolvedValue({ locked: false, remainingSeconds: 0 }),
+      clearOnSuccess: jest.fn().mockResolvedValue(undefined),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [
@@ -125,6 +144,7 @@ describe('AuthService', () => {
         },
         { provide: RefreshTokenService, useValue: refreshTokens },
         { provide: LoginLogService, useValue: loginLogs },
+        { provide: LoginLockoutService, useValue: loginLockout },
         {
           provide: RequestContext,
           useValue: requestContext,
@@ -213,6 +233,62 @@ describe('AuthService', () => {
         status: 'failure',
         failureReason: '账号已被禁用',
       }),
+    );
+  });
+
+  it('锁定中的账号在凭据校验前被拦截并记 locked 日志', async () => {
+    userService.findCredentialsByUsername.mockResolvedValue({
+      user: { ...USER, lockedUntil: new Date(Date.now() + 60_000) },
+      passwordHash,
+    });
+    loginLockout.checkLocked.mockResolvedValue({
+      locked: true,
+      remainingSeconds: 60,
+    });
+
+    await expect(
+      service.login({ username: 'admin', password: PASSWORD }),
+    ).rejects.toThrow(LoginLockedException);
+    // 密码正确与否都不该放行，凭据校验不应发生
+    expect(userService.verifyPassword).not.toHaveBeenCalled();
+    expect(loginLogs.record).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'locked', userId: USER.id }),
+    );
+  });
+
+  it('本次失败达到阈值时提示账号锁定', async () => {
+    userService.findCredentialsByUsername.mockResolvedValue({
+      user: USER,
+      passwordHash,
+    });
+    userService.verifyPassword.mockResolvedValue(false);
+    loginLockout.recordFailure.mockResolvedValue({
+      locked: true,
+      remainingSeconds: 900,
+    });
+
+    await expect(
+      service.login({ username: 'admin', password: 'wrong-password-1' }),
+    ).rejects.toThrow(
+      new UnauthorizedException('密码错误次数过多，账号已锁定 900 秒'),
+    );
+    expect(loginLogs.record).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failure' }),
+    );
+  });
+
+  it('登录成功后清空失败计数', async () => {
+    userService.findCredentialsByUsername.mockResolvedValue({
+      user: USER,
+      passwordHash,
+    });
+    userService.verifyPassword.mockResolvedValue(true);
+
+    await service.login({ username: 'admin', password: PASSWORD });
+
+    expect(loginLockout.clearOnSuccess).toHaveBeenCalledWith(
+      USER.username,
+      USER.id,
     );
   });
 

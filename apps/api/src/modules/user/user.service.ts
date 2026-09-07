@@ -31,6 +31,8 @@ import {
 } from 'drizzle-orm';
 
 import { RequestContext } from '../../common/context/request-context.service';
+import { LoginLockoutService } from '../../common/login-lockout/login-lockout.service';
+import { PasswordPolicyService } from '../../common/password/password-policy.service';
 import { RefreshTokenService } from '../auth/refresh-token.service';
 import {
   DataScopeService,
@@ -56,6 +58,7 @@ const safeColumns = {
   phone: users.phone,
   avatar: users.avatar,
   status: users.status,
+  lockedUntil: users.lockedUntil,
   lastLoginAt: users.lastLoginAt,
   createdBy: users.createdBy,
   updatedBy: users.updatedBy,
@@ -85,12 +88,15 @@ export class UserService {
     private readonly departments: DepartmentService,
     private readonly dataScopes: DataScopeService,
     private readonly rbacCache: RbacCacheService,
+    private readonly passwordPolicy: PasswordPolicyService,
+    private readonly loginLockout: LoginLockoutService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<SafeUser> {
     if (dto.deptId !== undefined && dto.deptId !== null) {
       await this.departments.assertDepartmentsUsable([dto.deptId]);
     }
+    await this.passwordPolicy.assertSatisfied(dto.password);
 
     // 唯一索引覆盖已软删除的行，所以这里查全量而不是只查未删除的，
     // 否则会先告诉调用方「可用」，再在插入时撞上 ER_DUP_ENTRY
@@ -275,6 +281,8 @@ export class UserService {
       throw new UnauthorizedException('当前密码不正确');
     }
 
+    await this.passwordPolicy.assertSatisfied(dto.newPassword);
+
     await this.db
       .update(users)
       .set({
@@ -322,6 +330,12 @@ export class UserService {
     await this.findById(id);
 
     return { revokedSessions: await this.refreshTokens.revokeAllForUser(id) };
+  }
+
+  /** 管理员手动解锁因登录失败被锁定的账号 */
+  async unlock(id: number): Promise<void> {
+    const user = await this.findById(id);
+    await this.loginLockout.clearLock(user.username, user.id);
   }
 
   /** 软删除。用数据库端的 CURRENT_TIMESTAMP，与 created_at/updated_at 同源避免时钟偏差 */

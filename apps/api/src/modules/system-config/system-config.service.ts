@@ -7,7 +7,12 @@ import type {
 import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_SYSTEM_NAME,
+  LOGIN_LOCKOUT_DURATION_SECONDS_RANGE,
+  LOGIN_LOCKOUT_MAX_FAILURES_RANGE,
+  LOGIN_LOCKOUT_WINDOW_SECONDS_RANGE,
   MAX_PAGE_SIZE,
+  PASSWORD_MIN_LENGTH_RANGE,
+  PASSWORD_REQUIRE_KEYS,
   SYSTEM_CONFIG_KEYS,
 } from '@nest-admin/shared';
 import {
@@ -176,6 +181,45 @@ export class SystemConfigService {
       : undefined;
   }
 
+  /**
+   * 按批读取启用参数。单条值非法时跳过而不是让整批失败——
+   * 调用方（如密码策略）对缺失键回落默认值，坏一个键不该拖垮业务入口。
+   */
+  async getEnabledValues(
+    keys: readonly string[],
+  ): Promise<Record<string, SystemConfigResolvedValue>> {
+    if (keys.length === 0) return {};
+
+    const records = await this.db
+      .select({
+        key: systemConfigs.key,
+        value: systemConfigs.value,
+        valueType: systemConfigs.valueType,
+      })
+      .from(systemConfigs)
+      .where(
+        aliveConfig(
+          eq(systemConfigs.status, 'active'),
+          inArray(systemConfigs.key, [...keys]),
+        ),
+      );
+
+    const result: Record<string, SystemConfigResolvedValue> = {};
+
+    for (const record of records) {
+      try {
+        result[record.key] = resolveSystemConfigValue(
+          record.value,
+          record.valueType,
+        );
+      } catch {
+        continue;
+      }
+    }
+
+    return result;
+  }
+
   async getRuntimeConfig(): Promise<RuntimeSystemConfig> {
     const records = await this.db
       .select({
@@ -259,6 +303,86 @@ export function validateKnownSystemConfigValue(
         `默认分页条数必须是 1 到 ${MAX_PAGE_SIZE} 之间的整数`,
       );
     }
+    return;
+  }
+
+  if (key === SYSTEM_CONFIG_KEYS.PASSWORD_MIN_LENGTH) {
+    if (valueType !== 'number') {
+      throw new BadRequestException('密码最小长度的值类型必须是 number');
+    }
+
+    const minLength = Number(value);
+    if (
+      !Number.isInteger(minLength) ||
+      minLength < PASSWORD_MIN_LENGTH_RANGE.min ||
+      minLength > PASSWORD_MIN_LENGTH_RANGE.max
+    ) {
+      throw new BadRequestException(
+        `密码最小长度必须是 ${PASSWORD_MIN_LENGTH_RANGE.min} 到 ${PASSWORD_MIN_LENGTH_RANGE.max} 之间的整数`,
+      );
+    }
+    return;
+  }
+
+  if ((PASSWORD_REQUIRE_KEYS as readonly string[]).includes(key)) {
+    if (valueType !== 'boolean') {
+      throw new BadRequestException('密码复杂度开关的值类型必须是 boolean');
+    }
+    return;
+  }
+
+  if (key === SYSTEM_CONFIG_KEYS.LOGIN_LOCKOUT_MAX_FAILURES) {
+    if (valueType !== 'number') {
+      throw new BadRequestException('登录失败锁定阈值的值类型必须是 number');
+    }
+
+    const maxFailures = Number(value);
+    if (
+      !Number.isInteger(maxFailures) ||
+      maxFailures < LOGIN_LOCKOUT_MAX_FAILURES_RANGE.min ||
+      maxFailures > LOGIN_LOCKOUT_MAX_FAILURES_RANGE.max
+    ) {
+      throw new BadRequestException(
+        `登录失败锁定阈值必须是 ${LOGIN_LOCKOUT_MAX_FAILURES_RANGE.min} 到 ${LOGIN_LOCKOUT_MAX_FAILURES_RANGE.max} 之间的整数`,
+      );
+    }
+    return;
+  }
+
+  if (key === SYSTEM_CONFIG_KEYS.LOGIN_LOCKOUT_WINDOW_SECONDS) {
+    if (valueType !== 'number') {
+      throw new BadRequestException('登录失败计数窗口的值类型必须是 number');
+    }
+
+    const windowSeconds = Number(value);
+    if (
+      !Number.isInteger(windowSeconds) ||
+      windowSeconds < LOGIN_LOCKOUT_WINDOW_SECONDS_RANGE.min ||
+      windowSeconds > LOGIN_LOCKOUT_WINDOW_SECONDS_RANGE.max
+    ) {
+      throw new BadRequestException(
+        `登录失败计数窗口必须是 ${LOGIN_LOCKOUT_WINDOW_SECONDS_RANGE.min} 到 ${LOGIN_LOCKOUT_WINDOW_SECONDS_RANGE.max} 之间的整数`,
+      );
+    }
+    return;
+  }
+
+  if (key === SYSTEM_CONFIG_KEYS.LOGIN_LOCKOUT_DURATION_SECONDS) {
+    if (valueType !== 'number') {
+      throw new BadRequestException('账号锁定时长的值类型必须是 number');
+    }
+
+    const durationSeconds = Number(value);
+    if (
+      !Number.isInteger(durationSeconds) ||
+      durationSeconds < LOGIN_LOCKOUT_DURATION_SECONDS_RANGE.min ||
+      durationSeconds > LOGIN_LOCKOUT_DURATION_SECONDS_RANGE.max
+    ) {
+      throw new BadRequestException(
+        `账号锁定时长必须是 ${LOGIN_LOCKOUT_DURATION_SECONDS_RANGE.min} 到 ${LOGIN_LOCKOUT_DURATION_SECONDS_RANGE.max} 之间的整数`,
+      );
+    }
+    return;
   }
 }
 
