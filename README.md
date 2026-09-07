@@ -4,7 +4,7 @@
 
 ## 已实现功能
 
-- **认证与会话**：access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效。
+- **认证与会话**：access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效；密码复杂度策略参数化，登录失败按账号计数锁定，管理员可解锁。
 - **RBAC**：用户、角色、权限码、菜单树、部门数据范围和按钮级权限控制，支持 Redis 授权/数据范围缓存及主动失效，内置超管防自锁规则。
 - **系统管理**：用户、组织架构、岗位、角色、菜单、参数配置、数据字典、通知公告、操作日志、在线用户、系统监控等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
 - **数据字典**：字典类型与字典项 CRUD、状态和排序管理，业务侧通过 `useDict(code)` 复用启用选项，Redis 版本票据保证写后主动失效。
@@ -186,7 +186,9 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 **岗位与用户关系**。`sys_post` 保存岗位主数据，`sys_user_post` 支持一个用户拥有多个岗位。停用岗位不能新增分配，但已有关系可保留或解除；岗位仍有有效用户时拒绝删除。用户岗位接口同样受当前管理员的数据范围约束，不能通过猜测用户 ID 越权分配。
 
-**系统参数不是环境变量**。`sys_system_config` 只保存可由管理员维护的非敏感业务参数，支持文本、数字、布尔和 JSON 四种值类型；JWT 密钥、数据库密码、Redis 地址等部署机密仍只允许放在 `.env`。参数值在写入时按声明类型校验，内置参数允许改值但不允许改键或删除，自定义参数软删除后参数键也不可复用。业务模块可注入 `SystemConfigService` 并通过 `getEnabledValue(key)` 读取已经解析类型的启用参数。
+**系统参数不是环境变量**。`sys_system_config` 只保存可由管理员维护的非敏感业务参数，支持文本、数字、布尔和 JSON 四种值类型；JWT 密钥、数据库密码、Redis 地址等部署机密仍只允许放在 `.env`。参数值在写入时按声明类型校验，内置参数允许改值但不允许改键或删除，自定义参数软删除后参数键也不可复用。业务模块可注入 `SystemConfigService` 并通过 `getEnabledValue(key)` 读取已经解析类型的启用参数，`getEnabledValues(keys)` 支持按批读取，单个值非法时跳过、由调用方回落默认值。
+
+**密码策略由内置参数驱动**。密码最小长度与大小写字母、数字、特殊字符的包含要求都是内置参数，创建用户与修改密码入口经 `PasswordPolicyService` 统一校验，改完参数即时生效；键缺省、停用或值非法时逐项回落默认策略（8 位、小写字母加数字），参数被改坏不会拖垮改密入口。
 
 **动态字典不替代核心枚举**。`sys_dict_type` 与 `sys_dict_item` 用于业务人员可配置的显示选项，类型编码和同类型业务值在软删除后都不可复用。`STATUS`、`MENU_TYPE`、`DATA_SCOPE` 等参与权限、路由或状态机判断的核心枚举继续由 `@nest-admin/shared` 静态维护，不能在管理页改写。业务读取接口只返回启用类型下的启用项，并按 `sort/id` 升序；前端通过 `useDict(code)` 消费。
 
@@ -253,6 +255,8 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 **计数存哪由 `REDIS_URL` 决定**。配了就用 Redis，多实例共享同一份计数；不配（或留空）则回退到进程内存，此时每个实例各算各的、实际配额按实例数翻倍。启动日志会明确打印当前用的是哪一种——线上最怕的是以为配了 Redis 其实回退了，所以这行日志是必需的而不是装饰。
 
 **Redis 故障时选择放行（fail-open）。** 换成 Redis 之后，限流从「进程内一个 Map」变成了外部依赖。如果 Redis 抖动就让所有请求 500，等于为了防暴力破解给系统加了个新的单点，代价明显不成比例。`AppThrottlerGuard.handleRequest` 捕获存储异常后放行并打 error 日志，但只吞存储错误——`ThrottlerException` 是「确实超限」的正常结果，必须原样上抛。
+
+**账号维度锁定与 IP 限流互补**。IP 限流防同一来源暴力试探，但挡不住换 IP 针对单一账号穷举，所以登录失败另有按账号的计数锁定：滑动窗口内失败达阈值即锁定（阈值、窗口、时长均为内置参数，改完即时生效），锁定检查先于凭据校验执行，锁定期内密码正确也拒绝。计数与锁键走 Redis 且 fail-open，但达阈值时会把 `locked_until` 落库作为权威锁定态，Redis 故障后既有锁仍然成立。针对「错误密码锁死真实账号」的拒绝服务风险做了三层兜底：锁定时长有上限到时自动解锁、管理员可经 `POST /users/:id/unlock` 手动解锁、被锁定拦截的尝试在登录日志中记为独立的 `locked` 状态便于告警统计。
 
 **权限变更不要求重新登录**。`JwtStrategy` 每个请求仍回库校验用户和会话，角色与权限查询由 Redis 缓存承担。角色授权、角色状态、数据范围和用户角色关系的写接口在数据库提交后主动切换缓存版本；Redis 不可用时回退数据库，因此不会因为缓存故障阻断认证。
 
@@ -336,6 +340,7 @@ sys_file_resource (文件资源元数据与上传人快照)
 | GET    | `/api/users/:id/sessions`             | `system:user:session:list` | 查看指定用户的在线设备                              |
 | DELETE | `/api/users/:id/sessions/:sessionId`  | `system:user:force-logout` | 下线该用户的某台设备                                |
 | POST   | `/api/users/:id/force-logout`         | `system:user:force-logout` | 强制该用户下线，吊销其全部会话                      |
+| POST   | `/api/users/:id/unlock`               | `system:user:unlock`       | 解锁因登录失败被锁定的账号，清除计数与锁定标记      |
 | GET    | `/api/online-users`                   | `system:user:session:list` | 分页查询全部有效登录设备，支持用户与 IP 筛选        |
 | PUT    | `/api/users/me/password`              | 仅需登录                   | 修改自己的密码，需校验旧密码                        |
 | GET    | `/api/users/:id/roles`                | `system:user:assign-role`  | 用户已分配的角色 id，供分配界面回显                 |
