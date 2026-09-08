@@ -14,11 +14,12 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
+import { PasswordPolicyService } from '../../common/password/password-policy.service';
 import {
   OperationLog,
   SkipOperationLog,
 } from '../operation-log/operation-log.decorator';
-import { Public } from '../../common/decorators/public.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -33,7 +34,10 @@ import type {
 @ApiTags('认证')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly passwordPolicy: PasswordPolicyService,
+  ) {}
 
   @Public()
   @Throttle({ default: LOGIN_THROTTLE })
@@ -128,9 +132,16 @@ export class AuthController {
   @ApiOperation({
     summary: '获取当前登录用户信息，含角色码与权限码',
     description:
-      '前端登录后调用一次，用 permissions 做按钮级控制。isSuperAdmin 为 true 时后端跳过权限比对，前端也应视为拥有全部权限。',
+      '前端登录后调用一次，用 permissions 做按钮级控制。isSuperAdmin 为 true 时后端跳过权限比对，前端也应视为拥有全部权限。passwordChangeRequired 为 true 时前端应拦截进改密页。',
   })
-  profile(@CurrentUser() user: AuthUser): AuthUser {
-    return user;
+  async profile(
+    @CurrentUser() user: AuthUser,
+  ): Promise<AuthUser & { passwordChangeRequired: boolean }> {
+    return {
+      ...user,
+      passwordChangeRequired: await this.passwordPolicy.isChangeRequired(
+        user.passwordChangedAt,
+      ),
+    };
   }
 }

@@ -93,7 +93,11 @@ type BasicUserContract = Assert<
   Serialized<SafeUser> extends BasicUser ? true : false
 >;
 type UserProfileContract = Assert<
-  Serialized<AuthUser> extends UserProfile ? true : false
+  // passwordChangeRequired 由 /auth/profile 端点按密码策略即时计算追加，
+  // 不是 AuthUser 的固有字段，故在此剔除
+  Serialized<AuthUser> extends Omit<UserProfile, 'passwordChangeRequired'>
+    ? true
+    : false
 >;
 type LoginResultContract = Assert<
   Serialized<AuthResult> extends LoginResult ? true : false

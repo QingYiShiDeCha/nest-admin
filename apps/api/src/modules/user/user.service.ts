@@ -59,6 +59,7 @@ const safeColumns = {
   avatar: users.avatar,
   status: users.status,
   lockedUntil: users.lockedUntil,
+  passwordChangedAt: users.passwordChangedAt,
   lastLoginAt: users.lastLoginAt,
   createdBy: users.createdBy,
   updatedBy: users.updatedBy,
@@ -117,6 +118,8 @@ export class UserService {
     const [result] = await this.db.insert(users).values({
       ...dto,
       password: await this.hashPassword(dto.password),
+      // 管理员创建时设置的密码视同「已设置」，不触发首次登录强制改密
+      passwordChangedAt: sql`CURRENT_TIMESTAMP`,
       ...this.ctx.auditOnCreate(),
     });
 
@@ -287,6 +290,7 @@ export class UserService {
       .update(users)
       .set({
         password: await this.hashPassword(dto.newPassword),
+        passwordChangedAt: sql`CURRENT_TIMESTAMP`,
         ...this.ctx.auditOnUpdate(),
       })
       .where(alive(eq(users.id, id)));

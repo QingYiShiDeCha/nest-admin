@@ -1,5 +1,7 @@
 import type { SecurityPasswordPolicy } from '@nest-admin/shared';
 import {
+  PASSWORD_MAX_AGE_DAYS_DEFAULT,
+  PASSWORD_MAX_AGE_DAYS_RANGE,
   PASSWORD_MIN_LENGTH_RANGE,
   PASSWORD_POLICY_CONFIG_KEYS,
   PASSWORD_POLICY_DEFAULTS,
@@ -57,6 +59,39 @@ export class PasswordPolicyService {
         `密码不满足安全策略：${problems.join('；')}`,
       );
     }
+  }
+
+  /**
+   * 登录/profile 的强制改密判定：初始密码（从未设置过修改时间）始终要求改，
+   * 与有效期是否开启无关；否则按 `max_age_days` 比较，0 表示不过期。
+   */
+  async isChangeRequired(passwordChangedAt: Date | null): Promise<boolean> {
+    if (passwordChangedAt === null) return true;
+
+    const maxAgeDays = await this.readMaxAgeDays();
+    if (maxAgeDays === 0) return false;
+
+    const ageMs = Date.now() - passwordChangedAt.getTime();
+
+    return ageMs > maxAgeDays * 86_400_000;
+  }
+
+  private async readMaxAgeDays(): Promise<number> {
+    const values = await this.configService.getEnabledValues([
+      SYSTEM_CONFIG_KEYS.PASSWORD_MAX_AGE_DAYS,
+    ]);
+    const raw = values[SYSTEM_CONFIG_KEYS.PASSWORD_MAX_AGE_DAYS];
+
+    if (
+      typeof raw === 'number' &&
+      Number.isInteger(raw) &&
+      raw >= PASSWORD_MAX_AGE_DAYS_RANGE.min &&
+      raw <= PASSWORD_MAX_AGE_DAYS_RANGE.max
+    ) {
+      return raw;
+    }
+
+    return PASSWORD_MAX_AGE_DAYS_DEFAULT;
   }
 }
 

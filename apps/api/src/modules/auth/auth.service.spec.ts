@@ -14,6 +14,7 @@ import {
   LoginLockedException,
   LoginLockoutService,
 } from '../../common/login-lockout/login-lockout.service';
+import { PasswordPolicyService } from '../../common/password/password-policy.service';
 import { UserService } from '../user/user.service';
 import { LoginLogService } from '../login-log/login-log.service';
 import { AuthService } from './auth.service';
@@ -41,6 +42,7 @@ const USER: SafeUser = {
   avatar: null,
   status: 'active',
   lockedUntil: null,
+  passwordChangedAt: new Date('2026-09-01T00:00:00Z'),
   lastLoginAt: null,
   createdBy: null,
   updatedBy: null,
@@ -79,6 +81,10 @@ describe('AuthService', () => {
     checkLocked: jest.Mock;
     recordFailure: jest.Mock;
     clearOnSuccess: jest.Mock;
+  };
+  let passwordPolicy: {
+    assertSatisfied: jest.Mock;
+    isChangeRequired: jest.Mock;
   };
   let requestContext: {
     client: jest.Mock;
@@ -127,6 +133,10 @@ describe('AuthService', () => {
         .mockResolvedValue({ locked: false, remainingSeconds: 0 }),
       clearOnSuccess: jest.fn().mockResolvedValue(undefined),
     };
+    passwordPolicy = {
+      assertSatisfied: jest.fn().mockResolvedValue(undefined),
+      isChangeRequired: jest.fn().mockResolvedValue(false),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       imports: [
@@ -145,6 +155,7 @@ describe('AuthService', () => {
         { provide: RefreshTokenService, useValue: refreshTokens },
         { provide: LoginLogService, useValue: loginLogs },
         { provide: LoginLockoutService, useValue: loginLockout },
+        { provide: PasswordPolicyService, useValue: passwordPolicy },
         {
           provide: RequestContext,
           useValue: requestContext,
@@ -290,6 +301,37 @@ describe('AuthService', () => {
       USER.username,
       USER.id,
     );
+  });
+
+  it('初始密码或过期密码时登录结果带强制改密标记', async () => {
+    userService.findCredentialsByUsername.mockResolvedValue({
+      user: { ...USER, passwordChangedAt: null },
+      passwordHash,
+    });
+    userService.verifyPassword.mockResolvedValue(true);
+    passwordPolicy.isChangeRequired.mockResolvedValue(true);
+
+    const result = await service.login({
+      username: 'admin',
+      password: PASSWORD,
+    });
+
+    expect(result.passwordChangeRequired).toBe(true);
+  });
+
+  it('正常密码时登录结果不带强制改密标记', async () => {
+    userService.findCredentialsByUsername.mockResolvedValue({
+      user: USER,
+      passwordHash,
+    });
+    userService.verifyPassword.mockResolvedValue(true);
+
+    const result = await service.login({
+      username: 'admin',
+      password: PASSWORD,
+    });
+
+    expect(result.passwordChangeRequired).toBe(false);
   });
 
   it('refresh 能换出新 token 对', async () => {

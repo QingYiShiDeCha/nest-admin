@@ -14,6 +14,7 @@ import {
   LoginLockedException,
   LoginLockoutService,
 } from '../../common/login-lockout/login-lockout.service';
+import { PasswordPolicyService } from '../../common/password/password-policy.service';
 import type { Env } from '../../config/env.validation';
 import { UserService } from '../user/user.service';
 import { LoginLogService } from '../login-log/login-log.service';
@@ -49,12 +50,17 @@ export class AuthService {
     private readonly ctx: RequestContext,
     private readonly loginLogs: LoginLogService,
     private readonly loginLockout: LoginLockoutService,
+    private readonly passwordPolicy: PasswordPolicyService,
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResult> {
     const user = await this.userService.create(dto);
 
-    return { user, ...(await this.issueTokens(user)) };
+    return {
+      user,
+      ...(await this.issueTokens(user)),
+      passwordChangeRequired: false,
+    };
   }
 
   async login(dto: LoginDto): Promise<AuthResult> {
@@ -108,7 +114,14 @@ export class AuthService {
       await this.userService.touchLastLogin(user.id);
       // 登录成功清空失败计数与锁键；过期但残留的 locked_until 也一并清除
       await this.loginLockout.clearOnSuccess(user.username, user.id);
-      const result = { user, ...(await this.issueTokens(user)) };
+      const result = {
+        user,
+        ...(await this.issueTokens(user)),
+        // 柔性中间态：登录照常成功，前端据此拦截进改密页
+        passwordChangeRequired: await this.passwordPolicy.isChangeRequired(
+          user.passwordChangedAt,
+        ),
+      };
 
       await this.loginLogs.record({
         userId: user.id,

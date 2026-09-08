@@ -106,3 +106,46 @@ describe('PasswordPolicyService.assertSatisfied', () => {
     );
   });
 });
+
+describe('PasswordPolicyService.isChangeRequired', () => {
+  it('初始密码（null）无论有效期是否开启都要求修改', async () => {
+    const disabled = createService({
+      [SYSTEM_CONFIG_KEYS.PASSWORD_MAX_AGE_DAYS]: 0,
+    });
+    const enabled = createService({
+      [SYSTEM_CONFIG_KEYS.PASSWORD_MAX_AGE_DAYS]: 90,
+    });
+
+    await expect(disabled.isChangeRequired(null)).resolves.toBe(true);
+    await expect(enabled.isChangeRequired(null)).resolves.toBe(true);
+  });
+
+  it('有效期为 0（默认，不过期）时不要求修改', async () => {
+    const service = createService({});
+
+    await expect(
+      service.isChangeRequired(new Date('2020-01-01T00:00:00Z')),
+    ).resolves.toBe(false);
+  });
+
+  it('超过有效期要求修改，未超期不要求', async () => {
+    const service = createService({
+      [SYSTEM_CONFIG_KEYS.PASSWORD_MAX_AGE_DAYS]: 90,
+    });
+    const expired = new Date(Date.now() - 91 * 86_400_000);
+    const fresh = new Date(Date.now() - 89 * 86_400_000);
+
+    await expect(service.isChangeRequired(expired)).resolves.toBe(true);
+    await expect(service.isChangeRequired(fresh)).resolves.toBe(false);
+  });
+
+  it('非法有效期参数回落 0（不过期）', async () => {
+    const service = createService({
+      [SYSTEM_CONFIG_KEYS.PASSWORD_MAX_AGE_DAYS]: -5,
+    });
+
+    await expect(
+      service.isChangeRequired(new Date('2020-01-01T00:00:00Z')),
+    ).resolves.toBe(false);
+  });
+});

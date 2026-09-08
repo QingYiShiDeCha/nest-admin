@@ -27,4 +27,6 @@ export interface AuthTokens {
 
 export interface AuthResult extends AuthTokens {
   user: SafeUser;
+  /** 密码为初始密码或已过有效期，前端应拦截进改密页 */
+  passwordChangeRequired: boolean;
 }

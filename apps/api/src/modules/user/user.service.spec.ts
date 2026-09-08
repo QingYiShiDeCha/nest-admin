@@ -13,6 +13,7 @@ const user: SafeUser = {
   avatar: null,
   status: 'active',
   lockedUntil: null,
+  passwordChangedAt: new Date('2026-09-01T00:00:00Z'),
   lastLoginAt: null,
   createdBy: null,
   updatedBy: null,

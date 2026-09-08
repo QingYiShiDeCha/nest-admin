@@ -11,6 +11,7 @@ import {
   LOGIN_LOCKOUT_MAX_FAILURES_RANGE,
   LOGIN_LOCKOUT_WINDOW_SECONDS_RANGE,
   MAX_PAGE_SIZE,
+  PASSWORD_MAX_AGE_DAYS_RANGE,
   PASSWORD_MIN_LENGTH_RANGE,
   PASSWORD_REQUIRE_KEYS,
   SYSTEM_CONFIG_KEYS,
@@ -319,6 +320,24 @@ export function validateKnownSystemConfigValue(
     ) {
       throw new BadRequestException(
         `密码最小长度必须是 ${PASSWORD_MIN_LENGTH_RANGE.min} 到 ${PASSWORD_MIN_LENGTH_RANGE.max} 之间的整数`,
+      );
+    }
+    return;
+  }
+
+  if (key === SYSTEM_CONFIG_KEYS.PASSWORD_MAX_AGE_DAYS) {
+    if (valueType !== 'number') {
+      throw new BadRequestException('密码有效期的值类型必须是 number');
+    }
+
+    const maxAgeDays = Number(value);
+    if (
+      !Number.isInteger(maxAgeDays) ||
+      maxAgeDays < PASSWORD_MAX_AGE_DAYS_RANGE.min ||
+      maxAgeDays > PASSWORD_MAX_AGE_DAYS_RANGE.max
+    ) {
+      throw new BadRequestException(
+        `密码有效期必须是 ${PASSWORD_MAX_AGE_DAYS_RANGE.min} 到 ${PASSWORD_MAX_AGE_DAYS_RANGE.max} 之间的整数，0 表示不过期`,
       );
     }
     return;
