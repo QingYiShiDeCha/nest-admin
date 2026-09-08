@@ -39,6 +39,11 @@ export interface UserProfile extends BasicUser {
   isSuperAdmin: boolean;
   /** 所属会话标识，用于设备列表标「当前设备」 */
   sessionId: string | null;
+  /**
+   * 密码是否要求强制修改：初始密码（从未设置过修改时间）或已过有效期。
+   * 由服务端按参数即时计算，前端据此拦截进改密页。
+   */
+  passwordChangeRequired: boolean;
 }
 
 /** 当前用户可自行维护的基础资料；null 表示清空对应字段。 */
@@ -57,4 +62,6 @@ export interface LoginResult {
   accessToken: string;
   refreshToken: string;
   user: BasicUser;
+  /** true 时前端拦截进改密页，改密完成后重新登录 */
+  passwordChangeRequired: boolean;
 }

@@ -20,6 +20,8 @@ export const SYSTEM_CONFIG_KEYS = {
 
   /** 密码最小长度 */
   PASSWORD_MIN_LENGTH: 'security.password.min_length',
+  /** 密码最大有效期（天），0 表示不过期 */
+  PASSWORD_MAX_AGE_DAYS: 'security.password.max_age_days',
   /** 密码必须包含大写字母 */
   PASSWORD_REQUIRE_UPPER: 'security.password.require_upper',
   /** 密码必须包含小写字母 */
@@ -42,6 +44,12 @@ export type SystemConfigKey =
 
 /** 密码最小长度的可配置区间，硬边界——DTO 与参数校验共用 */
 export const PASSWORD_MIN_LENGTH_RANGE = { min: 6, max: 64 } as const;
+
+/** 密码有效期（天）的可配置区间，0 在语义上表示不过期 */
+export const PASSWORD_MAX_AGE_DAYS_RANGE = { min: 0, max: 3650 } as const;
+
+/** 参数缺省或停用时的密码有效期：0 天即不启用过期检查 */
+export const PASSWORD_MAX_AGE_DAYS_DEFAULT = 0;
 
 /** 参数缺省或停用时的密码策略，与历史行为一致：8 位以上、字母加数字 */
 export const PASSWORD_POLICY_DEFAULTS: SecurityPasswordPolicy = {
