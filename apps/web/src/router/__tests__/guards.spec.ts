@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
     hasPermission: vi.fn(() => true),
     loadProfile: vi.fn(),
     reset: vi.fn(),
+    passwordChangeRequired: false,
   },
   menu: {
     loaded: false,
@@ -59,6 +60,12 @@ function createTestRouter(): Router {
         children: [],
       },
       {
+        path: '/profile',
+        name: 'profile',
+        component: EmptyView,
+        meta: { title: '个人中心' },
+      },
+      {
         path: '/:pathMatch(.*)*',
         name: 'not-found',
         component: EmptyView,
@@ -73,6 +80,7 @@ describe('router guards', () => {
     resetGlobalProgress();
     vi.clearAllMocks();
     mocks.auth.profile = { id: 1 };
+    mocks.auth.passwordChangeRequired = false;
     mocks.menu.loaded = false;
     mocks.menu.tree = [];
     mocks.menu.load.mockImplementation(async () => {
@@ -128,5 +136,25 @@ describe('router guards', () => {
     expect(mocks.menu.load).toHaveBeenCalledOnce();
     expect(mocks.syncDynamicRoutes).toHaveBeenCalled();
     expect(router.currentRoute.value.name).toBe('dynamic-menu-1');
+  });
+
+  it('密码需要强制修改时把其他页面拦截到个人中心', async () => {
+    mocks.auth.passwordChangeRequired = true;
+    const router = createTestRouter();
+    setupGuards(router);
+
+    await router.push('/dashboard');
+
+    expect(router.currentRoute.value.path).toBe('/profile');
+  });
+
+  it('密码需要强制修改时仍允许停留在个人中心改密', async () => {
+    mocks.auth.passwordChangeRequired = true;
+    const router = createTestRouter();
+    setupGuards(router);
+
+    await router.push('/profile');
+
+    expect(router.currentRoute.value.path).toBe('/profile');
   });
 });

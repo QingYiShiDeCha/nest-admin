@@ -65,6 +65,12 @@ export function setupGuards(router: Router): void {
       return { path: to.path, query: to.query, hash: to.hash, replace: true };
     }
 
+    // 密码为初始密码或已过有效期：除个人中心（改密入口）外一律拦截。
+    // 放在动态路由注册之后——/profile 是动态菜单路由，注册前跳过去会 404
+    if (auth.passwordChangeRequired && to.path !== '/profile') {
+      return { path: '/profile', query: { force: '1' } };
+    }
+
     // 权限不足跳 403 而不是登录页：跳登录会让用户以为登录态失效，
     // 反复登录仍然进不去，是很糟的体验
     if (to.meta.permission && !auth.hasPermission(to.meta.permission)) {

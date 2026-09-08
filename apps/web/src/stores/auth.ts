@@ -23,6 +23,13 @@ export const useAuthStore = defineStore(
     const roles = computed(() => profile.value?.roles ?? []);
     const isSuperAdmin = computed(() => profile.value?.isSuperAdmin ?? false);
     const username = computed(() => profile.value?.username ?? '');
+    /**
+     * 密码为初始密码或已过有效期。守卫据此把用户拦在个人中心改密页，
+     * 直到改密（会强制重新登录）或后台调整策略。
+     */
+    const passwordChangeRequired = computed(
+      () => profile.value?.passwordChangeRequired ?? false,
+    );
 
     /**
      * 是否拥有某个权限码。
@@ -96,6 +103,7 @@ export const useAuthStore = defineStore(
       roles,
       isSuperAdmin,
       username,
+      passwordChangeRequired,
       hasPermission,
       hasAnyPermission,
       login,

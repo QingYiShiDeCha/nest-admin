@@ -209,6 +209,14 @@ defineOptions({ name: 'ProfilePage' });
   <div
     class="grid min-h-0 grid-cols-1 items-start gap-4 lg:grid-cols-[280px_minmax(0,1fr)]"
   >
+    <a-alert
+      v-if="auth.passwordChangeRequired"
+      class="lg:col-span-2"
+      type="warning"
+      show-icon
+      message="当前账号使用初始密码或密码已过有效期，请尽快修改密码"
+      description="修改密码后需要重新登录；在完成修改前无法访问其他页面。"
+    />
     <a-card>
       <div class="flex flex-col items-center text-center">
         <a-avatar :size="96" :src="avatarSrc" alt="用户头像">
@@ -396,7 +404,7 @@ defineOptions({ name: 'ProfilePage' });
         <a-form-item label="新密码" name="newPassword">
           <a-input-password
             v-model:value="passwordForm.newPassword"
-            placeholder="至少 8 位，含字母和数字"
+            placeholder="需满足系统密码策略"
             autocomplete="new-password"
           />
         </a-form-item>
