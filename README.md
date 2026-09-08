@@ -190,6 +190,8 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 **密码策略由内置参数驱动**。密码最小长度与大小写字母、数字、特殊字符的包含要求都是内置参数，创建用户与修改密码入口经 `PasswordPolicyService` 统一校验，改完参数即时生效；键缺省、停用或值非法时逐项回落默认策略（8 位、小写字母加数字），参数被改坏不会拖垮改密入口。
 
+**密码有效期是柔性中间态**。`sys_user.password_changed_at` 为 null 表示从未设置过修改时间（初始密码），无论有效期是否开启都要求改密；`security.password.max_age_days` 大于 0 时，超过有效期的密码同样要求修改。登录与 `/auth/profile` 返回 `passwordChangeRequired` 标记，前端路由守卫据此把用户拦在个人中心改密页，改密（会强制重新登录）后自然解除。存量用户在迁移中回填为迁移时刻，避免上线瞬间全员被强制改密；seed 用默认密码哈希比对识别仍使用初始密码的 admin 并单独置 null。有效期默认 0（不过期），升级无感。
+
 **动态字典不替代核心枚举**。`sys_dict_type` 与 `sys_dict_item` 用于业务人员可配置的显示选项，类型编码和同类型业务值在软删除后都不可复用。`STATUS`、`MENU_TYPE`、`DATA_SCOPE` 等参与权限、路由或状态机判断的核心枚举继续由 `@nest-admin/shared` 静态维护，不能在管理页改写。业务读取接口只返回启用类型下的启用项，并按 `sort/id` 升序；前端通过 `useDict(code)` 消费。
 
 **字典缓存使用版本票据**。读取 `/api/dictionaries/:code` 时缓存键包含字典编码版本，字典类型或字典项写入后只递增版本，不扫描旧键。并发中的旧查询最多回写旧版本键，不会污染新结果；Redis 未配置或故障时直接回源 MySQL，`DICT_CACHE_TTL_SECONDS` 默认 300 秒。
@@ -323,7 +325,7 @@ sys_file_resource (文件资源元数据与上传人快照)
 | ------ | ------------------------------------- | -------------------------- | --------------------------------------------------- |
 | GET    | `/api/health`                         | 公开                       | 健康检查，数据库不通时返回 `degraded`               |
 | POST   | `/api/auth/register`                  | 公开                       | 注册并直接返回 token                                |
-| POST   | `/api/auth/login`                     | 公开                       | 账号密码登录                                        |
+| POST   | `/api/auth/login`                     | 公开                       | 账号密码登录；响应含 `passwordChangeRequired` 标记  |
 | POST   | `/api/auth/refresh`                   | 公开                       | 用 refreshToken 换新 token 对（会轮换旧的）         |
 | POST   | `/api/auth/logout`                    | 公开                       | 登出，物理删除本次提交的当前有效会话                |
 | GET    | `/api/auth/sessions`                  | 仅需登录                   | 我的登录设备列表，当前设备排最前                    |
