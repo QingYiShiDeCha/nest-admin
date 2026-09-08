@@ -1,7 +1,7 @@
-<script setup lang="ts">
-import { App, Button, Popconfirm, Space, Tag } from 'antdv-next';
+<script setup lang="tsx">
+import { App, Button, Popconfirm, Space } from 'antdv-next';
 import type { FormInstance } from 'antdv-next';
-import { computed, h, reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
 import { PERMISSIONS } from '@nest-admin/shared';
 
@@ -24,6 +24,7 @@ import {
   apiRoleUpdate,
   type RoleQuery,
 } from '@/api/roles';
+import AppTag from '@/components/core/base/app-tag/index.vue';
 import ProSearch from '@/components/core/tables/pro-search/index.vue';
 import type { FilterField } from '@/components/core/tables/pro-search/types';
 import ProTable from '@/components/core/tables/pro-table/index.vue';
@@ -47,17 +48,12 @@ const table = useTable<Role, RoleQuery>({
       title: '角色码',
       dataIndex: 'code',
       key: 'code',
-      render: (_value, record) =>
-        h(
-          Space,
-          { size: 4 },
-          {
-            default: () => [
-              record.code,
-              record.isSystem ? h(Tag, { color: 'gold' }, () => '内置') : null,
-            ],
-          },
-        ),
+      render: (_value, record) => (
+        <Space size={4}>
+          {record.code}
+          {record.isSystem ? <AppTag tone="warning">内置</AppTag> : null}
+        </Space>
+      ),
     },
     { title: '名称', dataIndex: 'name' },
     {
@@ -71,12 +67,11 @@ const table = useTable<Role, RoleQuery>({
       title: '状态',
       key: 'status',
       width: 90,
-      render: (_value, record) =>
-        h(
-          Tag,
-          { color: STATUS_META[record.status].color },
-          () => STATUS_META[record.status].label,
-        ),
+      render: (_value, record) => (
+        <AppTag tone={STATUS_META[record.status].color}>
+          {STATUS_META[record.status].label}
+        </AppTag>
+      ),
     },
     { title: '备注', dataIndex: 'remark', ellipsis: true },
     {
@@ -89,51 +84,31 @@ const table = useTable<Role, RoleQuery>({
       title: '操作',
       key: 'action',
       width: 200,
-      render: (_value, record) =>
-        h(Space, null, {
-          default: () => [
-            can(PERMISSIONS.ROLE_UPDATE)
-              ? h(
-                  Button,
-                  {
-                    type: 'link',
-                    size: 'small',
-                    onClick: () => openEdit(record),
-                  },
-                  () => '编辑',
-                )
-              : null,
-            can(PERMISSIONS.ROLE_ASSIGN)
-              ? h(
-                  Button,
-                  {
-                    type: 'link',
-                    size: 'small',
-                    onClick: () => openGrant(record),
-                  },
-                  () => '授权',
-                )
-              : null,
-            can(PERMISSIONS.ROLE_DELETE) && !record.isSystem
-              ? h(
-                  Popconfirm,
-                  {
-                    title: '确认删除该角色？',
-                    description: '删除后已关联的用户将失去该角色',
-                    onConfirm: () => remove(record),
-                  },
-                  {
-                    default: () =>
-                      h(
-                        Button,
-                        { type: 'link', size: 'small', danger: true },
-                        () => '删除',
-                      ),
-                  },
-                )
-              : null,
-          ],
-        }),
+      render: (_value, record) => (
+        <Space>
+          {can(PERMISSIONS.ROLE_UPDATE) ? (
+            <Button type="link" size="small" onClick={() => openEdit(record)}>
+              编辑
+            </Button>
+          ) : null}
+          {can(PERMISSIONS.ROLE_ASSIGN) ? (
+            <Button type="link" size="small" onClick={() => openGrant(record)}>
+              授权
+            </Button>
+          ) : null}
+          {can(PERMISSIONS.ROLE_DELETE) && !record.isSystem ? (
+            <Popconfirm
+              title="确认删除该角色？"
+              description="删除后已关联的用户将失去该角色"
+              onConfirm={() => remove(record)}
+            >
+              <Button type="link" size="small" danger>
+                删除
+              </Button>
+            </Popconfirm>
+          ) : null}
+        </Space>
+      ),
     },
   ],
   fetcher: (query) => apiRolePage(query),

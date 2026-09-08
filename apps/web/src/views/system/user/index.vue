@@ -1,7 +1,7 @@
-<script setup lang="ts">
-import { App, Button, Popconfirm, Space, Tag } from 'antdv-next';
+<script setup lang="tsx">
+import { App, Button, Popconfirm, Space } from 'antdv-next';
 import type { FormInstance } from 'antdv-next';
-import { computed, h, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 import { PERMISSIONS } from '@nest-admin/shared';
 
@@ -98,13 +98,15 @@ const table = useTable<UserListItem, UserQuery>({
       key: 'postNames',
       width: 190,
       render: (_value, record) =>
-        record.postNames.length === 0
-          ? '未分配'
-          : h(Space, { size: [0, 4], wrap: true }, () =>
-              record.postNames.map((name) =>
-                h(AppTag, { key: name }, () => name),
-              ),
-            ),
+        record.postNames.length === 0 ? (
+          '未分配'
+        ) : (
+          <Space size={[0, 4]} wrap>
+            {record.postNames.map((name) => (
+              <AppTag key={name}>{name}</AppTag>
+            ))}
+          </Space>
+        ),
     },
     { title: '邮箱', dataIndex: 'email' },
     { title: '手机号', dataIndex: 'phone' },
@@ -113,17 +115,14 @@ const table = useTable<UserListItem, UserQuery>({
       dataIndex: 'status',
       key: 'status',
       width: 90,
-      render: (_value, record) =>
-        h(Space, { size: 4 }, () => [
-          h(
-            Tag,
-            { color: STATUS_META[record.status].color },
-            () => STATUS_META[record.status].label,
-          ),
-          isLocked(record)
-            ? h(AppTag, { tone: 'warning' }, () => '已锁定')
-            : null,
-        ]),
+      render: (_value, record) => (
+        <Space size={4}>
+          <AppTag tone={STATUS_META[record.status].color}>
+            {STATUS_META[record.status].label}
+          </AppTag>
+          {isLocked(record) ? <AppTag tone="warning">已锁定</AppTag> : null}
+        </Space>
+      ),
     },
     {
       title: '最后登录',
@@ -135,98 +134,66 @@ const table = useTable<UserListItem, UserQuery>({
       title: '操作',
       key: 'action',
       width: 380,
-      render: (_value, record) =>
-        h(Space, null, {
-          default: () => [
-            can(PERMISSIONS.USER_UPDATE)
-              ? h(
-                  Button,
-                  {
-                    type: 'link',
-                    size: 'small',
-                    onClick: () => openEdit(record),
-                  },
-                  () => '编辑',
-                )
-              : null,
-            can(PERMISSIONS.USER_ASSIGN_ROLE) && !isSelf(record)
-              ? h(
-                  Button,
-                  {
-                    type: 'link',
-                    size: 'small',
-                    onClick: () => openAssignRoles(record),
-                  },
-                  () => '分配角色',
-                )
-              : null,
-            can(PERMISSIONS.USER_ASSIGN_POST)
-              ? h(
-                  Button,
-                  {
-                    type: 'link',
-                    size: 'small',
-                    onClick: () => openAssignPosts(record),
-                  },
-                  () => '分配岗位',
-                )
-              : null,
-            can(PERMISSIONS.USER_FORCE_LOGOUT)
-              ? h(
-                  Popconfirm,
-                  {
-                    title: '确认强制下线该用户？',
-                    description: '将吊销其全部登录会话',
-                    onConfirm: () => forceLogout(record),
-                  },
-                  {
-                    default: () =>
-                      h(
-                        Button,
-                        { type: 'link', size: 'small', danger: true },
-                        () => '强制下线',
-                      ),
-                  },
-                )
-              : null,
-            can(PERMISSIONS.USER_UNLOCK) && isLocked(record)
-              ? h(
-                  Popconfirm,
-                  {
-                    title: '确认解锁该用户？',
-                    description: '清除登录失败计数与锁定标记',
-                    onConfirm: () => unlock(record),
-                  },
-                  {
-                    default: () =>
-                      h(
-                        Button,
-                        { type: 'link', size: 'small' },
-                        () => '解锁',
-                      ),
-                  },
-                )
-              : null,
-            can(PERMISSIONS.USER_DELETE) && !isSelf(record)
-              ? h(
-                  Popconfirm,
-                  {
-                    title: '确认删除该用户？',
-                    description: '删除后该账号无法登录',
-                    onConfirm: () => remove(record),
-                  },
-                  {
-                    default: () =>
-                      h(
-                        Button,
-                        { type: 'link', size: 'small', danger: true },
-                        () => '删除',
-                      ),
-                  },
-                )
-              : null,
-          ],
-        }),
+      render: (_value, record) => (
+        <Space>
+          {can(PERMISSIONS.USER_UPDATE) ? (
+            <Button type="link" size="small" onClick={() => openEdit(record)}>
+              编辑
+            </Button>
+          ) : null}
+          {can(PERMISSIONS.USER_ASSIGN_ROLE) && !isSelf(record) ? (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => openAssignRoles(record)}
+            >
+              分配角色
+            </Button>
+          ) : null}
+          {can(PERMISSIONS.USER_ASSIGN_POST) ? (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => openAssignPosts(record)}
+            >
+              分配岗位
+            </Button>
+          ) : null}
+          {can(PERMISSIONS.USER_FORCE_LOGOUT) ? (
+            <Popconfirm
+              title="确认强制下线该用户？"
+              description="将吊销其全部登录会话"
+              onConfirm={() => forceLogout(record)}
+            >
+              <Button type="link" size="small" danger>
+                强制下线
+              </Button>
+            </Popconfirm>
+          ) : null}
+          {can(PERMISSIONS.USER_UNLOCK) && isLocked(record) ? (
+            <Popconfirm
+              title="确认解锁该用户？"
+              description="清除登录失败计数与锁定标记"
+              onConfirm={() => unlock(record)}
+            >
+              <Button type="link" size="small">
+                解锁
+              </Button>
+            </Popconfirm>
+          ) : null}
+          {can(PERMISSIONS.USER_DELETE) && !isSelf(record) ? (
+            <Popconfirm
+              title="确认删除该用户？"
+              description="删除后该账号无法登录"
+              onConfirm={() => remove(record)}
+            >
+              <Button type="link" size="small" danger>
+                删除
+              </Button>
+            </Popconfirm>
+          ) : null}
+        </Space>
+      ),
     },
   ],
   fetcher: (query) => apiUserPage(query),
@@ -554,7 +521,9 @@ defineOptions({ name: 'UserPage' });
         <a-checkbox v-for="role in roleOptions" :key="role.id" :value="role.id">
           {{ role.name }}
           <span class="text-xs a-color-text-tertiary">{{ role.code }}</span>
-          <a-tag v-if="role.isSystem" class="ml-1" color="gold">内置</a-tag>
+          <AppTag v-if="role.isSystem" class="ml-1" tone="warning">
+            内置
+          </AppTag>
         </a-checkbox>
       </a-checkbox-group>
     </a-modal>

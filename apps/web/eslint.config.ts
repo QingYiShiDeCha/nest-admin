@@ -1,6 +1,20 @@
-import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript';
+import {
+  configureVueProject,
+  defineConfigWithVueTs,
+  vueTsConfigs,
+} from '@vue/eslint-config-typescript';
 import skipFormatting from '@vue/eslint-config-prettier/skip-formatting';
 import pluginVue from 'eslint-plugin-vue';
+
+// 允许 .vue 里出现 <script setup lang="tsx">。
+// 默认只认 lang="ts"，不声明的话 vue-eslint-parser 会在 JSX 上直接报
+// '>' expected，而 vue-tsc 却能正常通过——两边配置不同步最容易踩。
+// 本项目用的是 recommended（非 type-aware）规则集，官方提示的
+// 「tsx 与 type-aware 规则冲突」在此不适用；将来若切到
+// recommendedTypeChecked，需要重新评估这个开关。
+configureVueProject({
+  scriptLangs: ['ts', 'tsx'],
+});
 
 // 前端独立的 ESLint 配置，与仓库根那份（面向 Node/NestJS）互不相干：
 // 根配置 ignore 了 apps/web，这里也不碰后端文件。
