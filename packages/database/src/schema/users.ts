@@ -35,6 +35,11 @@ export const users = mysqlTable(
      * 「权威锁定态」用于跨实例一致性与管理员可见。
      */
     lockedUntil: timestamp('locked_until'),
+    /**
+     * 密码最近一次显式设置的时间，用于有效期检查与强制改密。
+     * null 表示从未设置过——即初始密码，无论有效期是否开启都要求改密。
+     */
+    passwordChangedAt: timestamp('password_changed_at'),
     lastLoginAt: timestamp('last_login_at'),
     ...auditColumns(),
   },

@@ -1,4 +1,4 @@
-import { hash } from 'bcryptjs';
+import { compare, hash } from 'bcryptjs';
 import {
   DEFAULT_PAGE_SIZE,
   DEFAULT_SYSTEM_NAME,
@@ -6,6 +6,8 @@ import {
   LOGIN_LOCKOUT_MAX_FAILURES_RANGE,
   LOGIN_LOCKOUT_POLICY_DEFAULTS,
   LOGIN_LOCKOUT_WINDOW_SECONDS_RANGE,
+  PASSWORD_MAX_AGE_DAYS_DEFAULT,
+  PASSWORD_MAX_AGE_DAYS_RANGE,
   PASSWORD_MIN_LENGTH_RANGE,
   PASSWORD_POLICY_DEFAULTS,
   PERMISSION_DEFINITIONS,
@@ -102,6 +104,13 @@ const DEFAULT_SYSTEM_CONFIGS = [
     value: String(PASSWORD_POLICY_DEFAULTS.requireSpecial),
     valueType: 'boolean',
     remark: '开启后密码必须包含特殊字符',
+  },
+  {
+    name: '密码有效期',
+    key: SYSTEM_CONFIG_KEYS.PASSWORD_MAX_AGE_DAYS,
+    value: String(PASSWORD_MAX_AGE_DAYS_DEFAULT),
+    valueType: 'number',
+    remark: `密码超过该天数后要求修改，0 表示不过期，可配置区间 ${PASSWORD_MAX_AGE_DAYS_RANGE.min}-${PASSWORD_MAX_AGE_DAYS_RANGE.max}`,
   },
   {
     name: '登录失败锁定阈值',
@@ -331,7 +340,7 @@ const MENU_TREE: readonly MenuSeed[] = [
 /** 返回管理员用户 id，不存在则创建 */
 async function ensureAdminUser(db: DrizzleDB): Promise<number> {
   const [existing] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, password: users.password })
     .from(users)
     .where(
       and(eq(users.username, DEFAULT_ADMIN.username), isNull(users.deletedAt)),
@@ -339,7 +348,20 @@ async function ensureAdminUser(db: DrizzleDB): Promise<number> {
     .limit(1);
 
   if (existing) {
-    console.log(`用户 ${DEFAULT_ADMIN.username} 已存在，跳过创建`);
+    // 初始密码仍未修改时置空修改时间，强制登录后改密；
+    // 密码已改过则不动——迁移回填的时间是「最近一次设置」，语义正确
+    if (await compare(DEFAULT_ADMIN.password, existing.password)) {
+      await db
+        .update(users)
+        .set({ passwordChangedAt: null })
+        .where(eq(users.id, existing.id));
+      console.log(
+        `管理员 ${DEFAULT_ADMIN.username} 仍在使用初始密码，已标记为需要强制修改`,
+      );
+    } else {
+      console.log(`用户 ${DEFAULT_ADMIN.username} 已存在，跳过创建`);
+    }
+
     return existing.id;
   }
 
@@ -351,10 +373,11 @@ async function ensureAdminUser(db: DrizzleDB): Promise<number> {
     ),
     nickname: DEFAULT_ADMIN.nickname,
     status: 'active',
+    // 初始密码：password_changed_at 保持 null，登录后强制修改
   });
 
   console.log(
-    `已创建管理员 ${DEFAULT_ADMIN.username} / ${DEFAULT_ADMIN.password}，请登录后立即修改密码`,
+    `已创建管理员 ${DEFAULT_ADMIN.username} / ${DEFAULT_ADMIN.password}，首次登录将被要求修改密码`,
   );
 
   return result.insertId;
