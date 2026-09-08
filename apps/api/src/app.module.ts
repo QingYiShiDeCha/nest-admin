@@ -30,6 +30,7 @@ import { RbacModule } from './modules/rbac/rbac.module';
 import { SystemConfigModule } from './modules/system-config/system-config.module';
 import { SystemMonitorModule } from './modules/system-monitor/system-monitor.module';
 import { ScheduledTaskModule } from './modules/scheduled-task/scheduled-task.module';
+import { StatisticsModule } from './modules/statistics/statistics.module';
 import { UserModule } from './modules/user/user.module';
 import { REDIS_CLIENT, type RedisClient } from './redis/redis.constants';
 import { RedisModule } from './redis/redis.module';
@@ -89,6 +90,7 @@ import { RedisModule } from './redis/redis.module';
     SystemConfigModule,
     SystemMonitorModule,
     ScheduledTaskModule,
+    StatisticsModule,
     AuthModule,
     UserModule,
   ],

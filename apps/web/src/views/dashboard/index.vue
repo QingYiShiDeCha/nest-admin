@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import {
-  computed,
-  nextTick,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-} from 'vue';
+import type {
+  DashboardStatistics,
+  NamedCount,
+  TrendValue,
+} from '@nest-admin/shared';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
+import { apiDashboardStatistics } from '@/api/statistics';
 import AppIcon from '@/components/core/base/app-icon/index.vue';
 import {
   BarChart,
@@ -20,6 +20,8 @@ import { useSettingsStore } from '@/stores/settings';
 
 const settings = useSettingsStore();
 const chartAnimationVersion = ref(0);
+const stats = ref<DashboardStatistics | null>(null);
+const loading = ref(true);
 
 /**
  * 图表消费的主题色，来源与 App.vue 的 token 相同（palette 单一来源）。
@@ -33,72 +35,61 @@ const themeVars = computed(() => ({
   '--dash-danger': SEMANTIC_COLORS.danger,
 }));
 
-/** 顶部四张统计卡 */
 interface StatCard {
   icon: string;
-  tint: string;
+  tint: 'blue' | 'cyan' | 'green' | 'orange';
   label: string;
   value: number;
   precision: number;
-  suffix?: string;
-  formatter?: (value: number | string) => string;
-  trend: string;
-  up: boolean;
+  trend: TrendValue['trend'];
+  /** trend 之后的语义提示，如 「较昨日」「本年新增」 */
+  suffix: string;
 }
 
-const statCards: StatCard[] = [
-  {
-    icon: 'i-ri:user-3-line',
-    tint: 'blue',
-    label: '总访客数',
-    value: 48_260,
-    precision: 0,
-    trend: '1.18%',
-    up: true,
-  },
-  {
-    icon: 'i-ri:message-3-line',
-    tint: 'cyan',
-    label: '总会话数',
-    value: 156,
-    precision: 0,
-    suffix: 'K',
-    trend: '3.04%',
-    up: true,
-  },
-  {
-    icon: 'i-ri:pulse-line',
-    tint: 'green',
-    label: '跳出率',
-    value: 38.2,
-    precision: 1,
-    suffix: '%',
-    trend: '1.12%',
-    up: false,
-  },
-  {
-    icon: 'i-ri:time-line',
-    tint: 'orange',
-    label: '平均会话时长',
-    value: 252,
-    precision: 0,
-    formatter: formatDuration,
-    trend: '0.84%',
-    up: true,
-  },
+const BROWSER_COLORS = [
+  '#4080ff',
+  '#0ea5a4',
+  '#f59e0b',
+  '#f43f5e',
+  '#e11d48',
+  '#8b5cf6',
+  '#22c55e',
+  '#38bdf8',
+  '#fb923c',
+  '#94a3b8',
 ];
+
+/** 一周活跃时段热力图把 24 小时每 4 小时折叠为一行，避免 24 行压不成图。 */
+const HEATMAP_HOURS = 24;
+const HEATMAP_ROWS = 6;
+const HEATMAP_HOURS_PER_ROW = HEATMAP_HOURS / HEATMAP_ROWS;
+
+const statCards = computed<StatCard[]>(() => {
+  const summary = stats.value?.summary;
+
+  if (!summary) {
+    return [
+      { icon: 'i-ri:user-3-line', tint: 'blue', label: '系统用户', value: 0, precision: 0, trend: null, suffix: '本年新增' },
+      { icon: 'i-ri:login-circle-line', tint: 'cyan', label: '今日登录', value: 0, precision: 0, trend: null, suffix: '较昨日' },
+      { icon: 'i-ri:pulse-line', tint: 'green', label: '近 7 天登录', value: 0, precision: 0, trend: null, suffix: '较前 7 天' },
+      { icon: 'i-ri:shield-warning-line', tint: 'orange', label: '近 24 小时失败', value: 0, precision: 0, trend: null, suffix: '较前一周期' },
+    ];
+  }
+
+  return [
+    { icon: 'i-ri:user-3-line', tint: 'blue', label: '系统用户', value: summary.totalUsers.value, precision: 0, trend: summary.totalUsers.trend, suffix: '本年新增' },
+    { icon: 'i-ri:login-circle-line', tint: 'cyan', label: '今日登录', value: summary.todayLogins.value, precision: 0, trend: summary.todayLogins.trend, suffix: '较昨日' },
+    { icon: 'i-ri:pulse-line', tint: 'green', label: '近 7 天登录', value: summary.weekLogins.value, precision: 0, trend: summary.weekLogins.trend, suffix: '较前 7 天' },
+    { icon: 'i-ri:shield-warning-line', tint: 'orange', label: '近 24 小时失败', value: summary.recentFailures.value, precision: 0, trend: summary.recentFailures.trend, suffix: '较前一周期' },
+  ];
+});
 
 const statisticClasses = {
   content: '!text-2xl !font-semibold !leading-[1.4] a-color-text',
 };
-const animatedStatValues = ref(statCards.map(() => 0));
+const animatedStatValues = ref<number[]>([0, 0, 0, 0]);
 let statAnimationFrame: number | undefined;
 let finishStatAnimation: (() => void) | undefined;
-
-function formatDuration(value: number | string): string {
-  const seconds = Math.max(0, Math.round(Number(value)));
-  return `${Math.floor(seconds / 60)}分${seconds % 60}秒`;
-}
 
 function stopStatAnimation(): void {
   if (statAnimationFrame !== undefined) {
@@ -111,10 +102,11 @@ function stopStatAnimation(): void {
 
 function animateStatCards(): Promise<void> {
   stopStatAnimation();
-  animatedStatValues.value = statCards.map(() => 0);
+  const targets = statCards.value.map((card) => card.value);
+  animatedStatValues.value = targets.map(() => 0);
 
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-    animatedStatValues.value = statCards.map((card) => card.value);
+    animatedStatValues.value = targets;
     return Promise.resolve();
   }
 
@@ -127,7 +119,7 @@ function animateStatCards(): Promise<void> {
     const update = (now: number) => {
       const progress = Math.min(1, (now - startedAt) / duration);
       const eased = 1 - Math.pow(1 - progress, 3);
-      animatedStatValues.value = statCards.map((card) => card.value * eased);
+      animatedStatValues.value = targets.map((value) => value * eased);
 
       if (progress < 1) {
         statAnimationFrame = requestAnimationFrame(update);
@@ -149,264 +141,321 @@ async function replayDashboardAnimations(): Promise<void> {
   await animateStatCards();
 }
 
-usePageRefresh(replayDashboardAnimations);
-onMounted(() => void animateStatCards());
+async function loadStats(): Promise<void> {
+  try {
+    stats.value = await apiDashboardStatistics();
+    await replayDashboardAnimations();
+  } catch (error) {
+    console.warn('[dashboard] load failed', error);
+  } finally {
+    loading.value = false;
+  }
+}
+
+usePageRefresh(async () => {
+  await loadStats();
+});
+
+onMounted(() => void loadStats());
 onBeforeUnmount(stopStatAnimation);
 
-/** 终端会话占比：分段比例与底部分类统计一致，中心是总量 */
-const deviceSegments = [
-  { label: '手机', value: 1842, color: 'var(--dash-blue)' },
-  { label: '平板', value: 1026, color: 'var(--dash-green)' },
-  { label: '桌面端', value: 1364, color: 'var(--dash-orange)' },
-];
-const deviceTotal = deviceSegments.reduce((sum, s) => sum + s.value, 0);
-const deviceChartData = deviceSegments.map((segment) => ({
-  name: segment.label,
-  value: segment.value,
-}));
+/** 终端占比：未识别 UA 计入桌面端，三段之和与 devices.total 对齐 */
+const deviceSegments = computed(() => {
+  const devices = stats.value?.devices;
+  const segments = [
+    { label: '手机', key: 'mobile' as const, color: 'var(--dash-blue)' },
+    { label: '平板', key: 'tablet' as const, color: 'var(--dash-green)' },
+    { label: '桌面端', key: 'desktop' as const, color: 'var(--dash-orange)' },
+  ];
 
-/** 近 12 个月柱状图（0-50 刻度），值取自参考图目测比例 */
-const monthBars = [24, 12, 23, 29, 14, 23, 40, 22, 47, 23, 48, 38];
-const monthLabels = Array.from({ length: 12 }, (_, i) => `${i + 1}月`);
-const audienceSeries = [{ name: '访客数', data: monthBars }];
-
-const browsers = [
-  { name: 'Chrome', alias: '谷歌浏览器', value: 1428, color: '#4080ff' },
-  { name: 'Edge', alias: '微软浏览器', value: 1102, color: '#0ea5a4' },
-  { name: 'Safari', alias: '苹果浏览器', value: 864, color: '#f59e0b' },
-  { name: 'Firefox', alias: '火狐浏览器', value: 934, color: '#f43f5e' },
-  { name: 'Opera', alias: '欧朋浏览器', value: 712, color: '#e11d48' },
-  { name: '夸克', alias: 'UC 浏览器', value: 798, color: '#8b5cf6' },
-];
-const browserMax = Math.max(...browsers.map((b) => b.value));
-
-const countries = [
-  { code: 'US', name: '美国', flag: '🇺🇸', trend: 2.15, visitors: '45,860' },
-  { code: 'AR', name: '阿根廷', flag: '🇦🇷', trend: 1.62, visitors: '12,680' },
-  { code: 'DE', name: '德国', flag: '🇩🇪', trend: -0.51, visitors: '9,032' },
-  { code: 'FR', name: '法国', flag: '🇫🇷', trend: 1.44, visitors: '6,086' },
-];
-
-const activities = [
-  { owner: '陈晨', dept: '品牌合作', amount: '¥ 12,465', target: '23.3%' },
-  { owner: '李娜', dept: '渠道运营', amount: '¥ 8,930', target: '41.7%' },
-];
-
-/** 热力图使用确定性数据，避免每次渲染时随机闪动 */
-const heatLabels = ['12时', '19时', '15时', '0时', '8时', '4时'];
-const weekdayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-const heatData = heatLabels.flatMap((_, row) =>
-  weekdayLabels.map((__, col): HeatmapChartDatum => {
-    const seed =
-      Math.sin((row + 1) * 12.9898 + (col + 1) * 78.233) * 43758.5453;
-    return [col, row, Math.round((seed - Math.floor(seed)) * 100)];
-  }),
+  return segments.map((segment) => ({
+    ...segment,
+    value: devices ? devices[segment.key] : 0,
+  }));
+});
+const deviceTotal = computed(() => stats.value?.devices.total ?? 0);
+const deviceChartData = computed(() =>
+  deviceSegments.value.map((segment) => ({
+    name: segment.label,
+    value: segment.value,
+  })),
 );
+
+/** 近 12 个自然月的月登录趋势；后端已把月份补零。 */
+const audienceSeries = computed(() => [
+  {
+    name: '登录次数',
+    data: (stats.value?.monthlyTrend.months ?? []).map((month) => month.value),
+  },
+]);
+const monthLabels = computed(() =>
+  (stats.value?.monthlyTrend.months ?? []).map((month) => month.label),
+);
+const yAxisMax = computed(() => {
+  const max = Math.max(0, ...(stats.value?.monthlyTrend.months ?? []).map((m) => m.value));
+  if (max === 0) return 5;
+  const step = Math.max(1, Math.pow(10, Math.max(0, String(max).length - 1)));
+  return Math.ceil(max / step) * step;
+});
+
+/** 浏览器 Top 榜：颜色按顺序从调色板轮询，前段用主色系、尾部用中性色。 */
+const browsers = computed(() =>
+  ((stats.value?.browsers.items ?? []) as NamedCount[]).map((item, index) => ({
+    ...item,
+    color: BROWSER_COLORS[index % BROWSER_COLORS.length] as string,
+    short: (item.name.match(/[A-Za-z]+/)?.[0] ?? item.name.slice(0, 1)).slice(0, 1).toUpperCase(),
+  })),
+);
+const browserMax = computed(() => Math.max(0, ...browsers.value.map((b) => b.value)));
+
+/** 部门分布 —— 替换原「访客国家」表 */
+const deptRows = computed(() => {
+  const total = stats.value?.deptDistribution.totalUsers || 1;
+  return ((stats.value?.deptDistribution.items ?? []) as NamedCount[]).map(
+    (item) => ({
+      ...item,
+      percent: Math.max(1, Math.round((item.value / total) * 100)),
+    }),
+  );
+});
+
+/** 热门操作模块 —— 替换原「热门活动」表 */
+const moduleRows = computed(
+  () =>
+    stats.value?.topModules.items ??
+    ([] as DashboardStatistics['topModules']['items']),
+);
+
+/**
+ * 热力图数据：后端 cells 索引 = day * HEATMAP_HOURS + hour，逐小时计数。
+ * 前端每 4 小时折叠成一行（6 行 × 7 天），[col,row,value] 是给组件的三元组。
+ */
+const heatmapData = computed<HeatmapChartDatum[]>(() => {
+  const heatmap = stats.value?.activityHeatmap;
+
+  if (!heatmap) return [];
+
+  const fold: HeatmapChartDatum[] = [];
+
+  for (let day = 0; day < heatmap.weekdays.length; day += 1) {
+    for (let row = 0; row < HEATMAP_ROWS; row += 1) {
+      let sum = 0;
+
+      for (let h = 0; h < HEATMAP_HOURS_PER_ROW; h += 1) {
+        const hourIndex = row * HEATMAP_HOURS_PER_ROW + h;
+        sum += heatmap.cells[day * HEATMAP_HOURS + hourIndex] ?? 0;
+      }
+
+      fold.push([day, row, sum]);
+    }
+  }
+
+  return fold;
+});
+const heatmapMax = computed(() => {
+  const values = heatmapData.value.map((cell) => cell[2]);
+  return Math.max(...values, 100);
+});
+const heatmapYLabels = computed<string[]>(() => {
+  const labels = [];
+  for (let row = 0; row < HEATMAP_ROWS; row += 1) {
+    labels.push(`${String(row * HEATMAP_HOURS_PER_ROW).padStart(2, '0')}时`);
+  }
+  return labels;
+});
+const heatmapXLabels = computed<string[]>(
+  () => stats.value?.activityHeatmap.weekdays ?? [],
+);
+
+function formatDuration(seconds: number): string {
+  const rounded = Math.max(0, Math.round(seconds * 10) / 10);
+  if (rounded < 1) return `${Math.round(rounded * 1000)}ms`;
+  return `${rounded.toFixed(1)}s`;
+}
 
 defineOptions({ name: 'DashboardPage' });
 </script>
 
 <template>
   <div class="dash" :style="themeVars">
-    <!-- 左主体 + 右通栏 -->
-    <div class="dash-board">
-      <div class="dash-main">
-        <!-- 统计卡行 -->
-        <div class="dash-stats">
-          <div
-            v-for="(card, index) in statCards"
-            :key="card.label"
-            class="panel stat-card"
-          >
-            <div class="stat-icon" :class="`tint-${card.tint}`">
-              <AppIcon :icon="card.icon" />
-            </div>
-            <div class="stat-meta">
-              <div class="stat-label">{{ card.label }}</div>
-              <a-statistic
-                class="stat-value"
-                :value="animatedStatValues[index]"
-                :precision="card.precision"
-                :suffix="card.suffix"
-                :formatter="card.formatter"
-                :classes="statisticClasses"
-              />
-              <div class="stat-trend" :class="card.up ? 'up' : 'down'">
-                {{ card.up ? '↑' : '↓' }} {{ card.trend }} 本年
+    <a-spin :spinning="loading" size="large">
+      <div class="dash-board">
+        <div class="dash-main">
+          <!-- 统计卡行 -->
+          <div class="dash-stats">
+            <div
+              v-for="(card, index) in statCards"
+              :key="card.label"
+              class="panel stat-card"
+            >
+              <div class="stat-icon" :class="`tint-${card.tint}`">
+                <AppIcon :icon="card.icon" />
+              </div>
+              <div class="stat-meta">
+                <div class="stat-label">{{ card.label }}</div>
+                <a-statistic
+                  class="stat-value"
+                  :value="animatedStatValues[index]"
+                  :precision="card.precision"
+                  :classes="statisticClasses"
+                />
+                <div
+                  v-if="card.trend"
+                  class="stat-trend"
+                  :class="card.trend.up ? 'up' : 'down'"
+                >
+                  {{ card.trend.up ? '↑' : '↓' }}
+                  {{ card.trend.percent.toFixed(2) }}% {{ card.suffix }}
+                </div>
+                <div v-else class="stat-trend muted">暂无对比</div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- 环形图 + 柱状图，约 1 : 2.5 -->
-        <div class="dash-split">
-          <a-card title="终端会话占比" class="dash-card">
-            <template #extra>
-              <a class="card-link">查看详情</a>
-            </template>
-            <PieChart
-              :key="`device-${chartAnimationVersion}`"
-              class="h-60 w-full"
-              :data="deviceChartData"
-              :center-value="deviceTotal.toLocaleString()"
-              inner-radius="66%"
-              outer-radius="86%"
-              aria-label="终端会话占比"
-            />
-            <div class="donut-stats">
-              <div v-for="seg in deviceSegments" :key="seg.label">
-                <div class="donut-num">{{ seg.value }}</div>
-                <div class="donut-label">
-                  <span class="dot" :style="{ background: seg.color }" />
-                  {{ seg.label }}
+          <!-- 环形图 + 柱状图，约 1 : 2.5 -->
+          <div class="dash-split">
+            <a-card title="终端登录占比" class="dash-card">
+              <PieChart
+                :key="`device-${chartAnimationVersion}`"
+                class="h-60 w-full"
+                :data="deviceChartData"
+                :center-value="deviceTotal.toLocaleString()"
+                inner-radius="66%"
+                outer-radius="86%"
+                aria-label="终端登录占比"
+              />
+              <div class="donut-stats">
+                <div v-for="seg in deviceSegments" :key="seg.label">
+                  <div class="donut-num">{{ seg.value.toLocaleString() }}</div>
+                  <div class="donut-label">
+                    <span class="dot" :style="{ background: seg.color }" />
+                    {{ seg.label }}
+                  </div>
                 </div>
               </div>
-            </div>
+            </a-card>
+
+            <a-card
+              title="近 12 个月登录趋势"
+              class="dash-card min-h-80 flex flex-col [&_.ant-card-body]:flex [&_.ant-card-body]:flex-1 [&_.ant-card-body]:min-h-0"
+            >
+              <BarChart
+                :key="`audience-${chartAnimationVersion}`"
+                class="min-h-60 w-full flex-1"
+                :categories="monthLabels"
+                :series="audienceSeries"
+                :y-axis-max="yAxisMax"
+                aria-label="近十二个月登录趋势"
+              />
+            </a-card>
+          </div>
+
+          <!-- 两张表：部门分布 + 热门模块 -->
+          <div class="dash-split-eq">
+            <a-card title="部门用户分布" class="dash-card">
+              <table class="mini-table">
+                <thead>
+                  <tr>
+                    <th class="w-12">序号</th>
+                    <th>部门</th>
+                    <th class="ta-r">人数</th>
+                    <th class="ta-r w-20">占比</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, i) in deptRows" :key="row.name">
+                    <td class="w-12">{{ i + 1 }}</td>
+                    <td>{{ row.name }}</td>
+                    <td class="ta-r">{{ row.value.toLocaleString() }}</td>
+                    <td class="ta-r">
+                      <span class="percent-bar">
+                        <span :style="{ width: `${row.percent}%` }" />
+                      </span>
+                      <span class="ml-2">{{ row.percent }}%</span>
+                    </td>
+                  </tr>
+                  <tr v-if="deptRows.length === 0">
+                    <td colspan="4" class="empty-cell">暂无数据</td>
+                  </tr>
+                </tbody>
+              </table>
+            </a-card>
+
+            <a-card title="近 30 天热门操作模块" class="dash-card">
+              <table class="mini-table">
+                <thead>
+                  <tr>
+                    <th class="w-12">#</th>
+                    <th>模块</th>
+                    <th class="ta-r">次数</th>
+                    <th class="ta-r">失败</th>
+                    <th class="ta-r">均值</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, i) in moduleRows" :key="row.module">
+                    <td class="w-12">{{ i + 1 }}</td>
+                    <td>{{ row.module }}</td>
+                    <td class="ta-r">{{ row.count.toLocaleString() }}</td>
+                    <td class="ta-r">
+                      <a-tag v-if="row.failures > 0" color="error">{{
+                        row.failures
+                      }}</a-tag>
+                      <span v-else class="text-dim">0</span>
+                    </td>
+                    <td class="ta-r">{{ formatDuration(row.avgDurationSeconds) }}</td>
+                  </tr>
+                  <tr v-if="moduleRows.length === 0">
+                    <td colspan="5" class="empty-cell">暂无数据</td>
+                  </tr>
+                </tbody>
+              </table>
+            </a-card>
+          </div>
+        </div>
+
+        <!-- 右通栏 -->
+        <div class="dash-rail">
+          <a-card title="浏览器使用洞察" class="dash-card">
+            <ul v-if="browsers.length > 0" class="browser-list">
+              <li v-for="b in browsers" :key="b.name">
+                <div class="browser-row">
+                  <span
+                    class="browser-avatar"
+                    :style="{ background: `${b.color}22`, color: b.color }"
+                  >
+                    {{ b.short }}
+                  </span>
+                  <span class="browser-name">{{ b.name }}</span>
+                  <span class="browser-value">{{ b.value.toLocaleString() }}</span>
+                </div>
+                <div class="browser-bar">
+                  <span
+                    :style="{
+                      width: `${browserMax === 0 ? 0 : (b.value / browserMax) * 100}%`,
+                      background: b.color,
+                    }"
+                  />
+                </div>
+              </li>
+            </ul>
+            <a-empty v-else description="近 30 天暂无登录" />
           </a-card>
 
-          <a-card
-            title="受众趋势"
-            class="dash-card min-h-80 flex flex-col [&_.ant-card-body]:flex [&_.ant-card-body]:flex-1 [&_.ant-card-body]:min-h-0"
-          >
-            <template #extra>
-              <a class="card-link">查看详情</a>
-            </template>
-            <BarChart
-              :key="`audience-${chartAnimationVersion}`"
-              class="min-h-60 w-full flex-1"
-              :categories="monthLabels"
-              :series="audienceSeries"
-              :y-axis-max="50"
-              :y-axis-interval="10"
-              aria-label="近十二个月受众趋势"
+          <a-card title="一周登录热力" class="dash-card">
+            <HeatmapChart
+              :key="`activity-${chartAnimationVersion}`"
+              class="h-60 w-full"
+              :x-labels="heatmapXLabels"
+              :y-labels="heatmapYLabels"
+              :data="heatmapData"
+              :max="heatmapMax"
+              aria-label="一周登录热力"
             />
           </a-card>
         </div>
-
-        <!-- 两个表格，同上列宽 -->
-        <div class="dash-split">
-          <a-card title="访客国家分布" class="dash-card">
-            <template #extra>
-              <a class="card-link">查看详情</a>
-            </template>
-            <table class="mini-table">
-              <thead>
-                <tr>
-                  <th class="w-12">序号</th>
-                  <th>国家</th>
-                  <th class="ta-r">访客数</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(c, i) in countries" :key="c.code">
-                  <td class="w-12">{{ i + 1 }}</td>
-                  <td>
-                    <span class="flag">{{ c.flag }}</span>
-                    <span class="code">{{ c.code }}</span>
-                    {{ c.name }}
-                  </td>
-                  <td class="ta-r">
-                    <span :class="c.trend >= 0 ? 'trend-up' : 'trend-down'">
-                      ({{ c.trend >= 0 ? '↑' : '↓' }}
-                      {{ Math.abs(c.trend).toFixed(2) }}%)
-                    </span>
-                    {{ c.visitors }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </a-card>
-
-          <a-card title="热门活动列表" class="dash-card">
-            <template #extra>
-              <a class="card-link">查看全部</a>
-            </template>
-            <table class="mini-table">
-              <thead>
-                <tr>
-                  <th>负责人</th>
-                  <th>销售额</th>
-                  <th>目标</th>
-                  <th>状态</th>
-                  <th class="ta-r">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="act in activities" :key="act.owner">
-                  <td>
-                    <a-avatar :size="32" class="owner-avatar">{{
-                      act.owner[0]
-                    }}</a-avatar>
-                    <span class="owner-name">{{ act.owner }}</span>
-                    <span class="owner-dept">{{ act.dept }}</span>
-                  </td>
-                  <td>{{ act.amount }}</td>
-                  <td>
-                    <a class="card-link">{{ act.target }}</a>
-                  </td>
-                  <td><a-tag color="processing">进行中</a-tag></td>
-                  <td class="ta-r">
-                    <a-space :size="4">
-                      <a-button type="text" size="small">
-                        <AppIcon icon="i-ri:edit-line" />
-                      </a-button>
-                      <a-button type="text" size="small" danger>
-                        <AppIcon icon="i-ri:delete-bin-line" />
-                      </a-button>
-                    </a-space>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </a-card>
-        </div>
       </div>
-
-      <!-- 右通栏：不参与左侧分行 -->
-      <div class="dash-rail">
-        <a-card title="浏览器使用洞察" class="dash-card">
-          <ul class="browser-list">
-            <li v-for="b in browsers" :key="b.name">
-              <div class="browser-row">
-                <span
-                  class="browser-avatar"
-                  :style="{ background: `${b.color}22`, color: b.color }"
-                >
-                  {{ b.name[0] }}
-                </span>
-                <span class="browser-name">
-                  {{ b.name }}
-                  <small>{{ b.alias }}</small>
-                </span>
-                <span class="browser-value">{{
-                  b.value.toLocaleString()
-                }}</span>
-              </div>
-              <div class="browser-bar">
-                <span
-                  :style="{
-                    width: `${(b.value / browserMax) * 100}%`,
-                    background: b.color,
-                  }"
-                />
-              </div>
-            </li>
-          </ul>
-        </a-card>
-
-        <a-card title="一周活跃时段" class="dash-card">
-          <HeatmapChart
-            :key="`activity-${chartAnimationVersion}`"
-            class="h-60 w-full"
-            :x-labels="weekdayLabels"
-            :y-labels="heatLabels"
-            :data="heatData"
-            :max="100"
-            aria-label="一周活跃时段"
-          />
-        </a-card>
-      </div>
-    </div>
+    </a-spin>
   </div>
 </template>
 
@@ -446,10 +495,17 @@ defineOptions({ name: 'DashboardPage' });
   gap: 16px;
 }
 
-/* 左主体内部 1 : 2.5 双列，多行复用同一列宽 */
+/* 左主体 1 : 2.5 双列 */
 .dash-split {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2.5fr);
+  gap: 16px;
+}
+
+/* 两张等宽表 */
+.dash-split-eq {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -513,9 +569,8 @@ defineOptions({ name: 'DashboardPage' });
 .stat-trend.down {
   color: var(--dash-danger);
 }
-
-.card-link {
-  font-size: 13px;
+.stat-trend.muted {
+  color: var(--dash-text-secondary);
 }
 
 .donut-stats {
@@ -571,38 +626,30 @@ defineOptions({ name: 'DashboardPage' });
 .w-12 {
   width: 48px;
 }
-.flag {
-  margin-right: 6px;
+.w-20 {
+  width: 80px;
 }
-.code {
+.text-dim {
   color: var(--dash-text-secondary);
-  margin-right: 6px;
-  font-size: 12px;
 }
-.trend-up {
-  color: var(--dash-green);
-  margin-right: 6px;
-  font-size: 12px;
-}
-.trend-down {
-  color: var(--dash-danger);
-  margin-right: 6px;
-  font-size: 12px;
-}
-.owner-avatar {
-  background: color-mix(in srgb, var(--dash-blue) 12%, var(--dash-container));
-  color: var(--dash-blue);
-  margin-right: 8px;
-  vertical-align: middle;
-}
-.owner-name {
-  vertical-align: middle;
-  margin-right: 8px;
-}
-.owner-dept {
+.empty-cell {
+  text-align: center;
   color: var(--dash-text-secondary);
-  font-size: 12px;
+  padding: 20px 0 !important;
+}
+.percent-bar {
+  display: inline-block;
   vertical-align: middle;
+  width: 40px;
+  height: 4px;
+  background: var(--dash-fill);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.percent-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--dash-blue);
 }
 
 /* ---- 浏览器洞察 ---- */
@@ -633,11 +680,6 @@ defineOptions({ name: 'DashboardPage' });
   flex: 1;
   font-weight: 500;
 }
-.browser-name small {
-  display: block;
-  font-weight: 400;
-  color: var(--dash-text-secondary);
-}
 .browser-value {
   font-weight: 600;
 }
@@ -667,7 +709,8 @@ defineOptions({ name: 'DashboardPage' });
   }
 }
 @media (max-width: 900px) {
-  .dash-split {
+  .dash-split,
+  .dash-split-eq {
     grid-template-columns: 1fr;
   }
   .dash-stats {

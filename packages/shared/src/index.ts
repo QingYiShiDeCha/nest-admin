@@ -10,6 +10,7 @@ export * from './constants/status';
 export * from './constants/system-config';
 export * from './constants/throttle';
 export * from './interfaces/api-response.interface';
+export * from './interfaces/dashboard.interface';
 export * from './interfaces/department.interface';
 export * from './interfaces/dictionary.interface';
 export * from './interfaces/file.interface';
