@@ -6,11 +6,12 @@
 
 - **认证与会话**：access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效；密码复杂度策略参数化，登录失败按账号计数锁定，管理员可解锁。
 - **RBAC**：用户、角色、权限码、菜单树、部门数据范围和按钮级权限控制，支持 Redis 授权/数据范围缓存及主动失效，内置超管防自锁规则。
-- **系统管理**：用户、组织架构、岗位、角色、菜单、参数配置、数据字典、通知公告、操作日志、在线用户、系统监控等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
+- **系统管理**：用户、组织架构、岗位、角色、菜单、参数配置、数据字典、通知公告、登录日志、操作日志、定时任务、文件资源、在线用户、系统监控等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
+- **登录审计**：记录成功、凭据错误和锁定拦截三类结果，支持按用户名、结果与时间范围过滤；登录日志只提供查询，超期记录由内置清理任务按保留期物理删除。
 - **数据字典**：字典类型与字典项 CRUD、状态和排序管理，业务侧通过 `useDict(code)` 复用启用选项，Redis 版本票据保证写后主动失效。
 - **通知与消息**：公告草稿、发布、撤回和阅读统计，支持全员、部门、角色、指定用户发送；Header 展示未读角标和最近消息，SSE + Redis Pub/Sub 实时同步多实例事件，断线自动回退轮询。
 - **界面基础设施**：浅色/深色/跟随系统主题、可切换主色和菜单风格、KeepAlive 页签、内容区独立刷新、Remix Icon 图标体系。
-- **数据展示**：封装折线图、柱状图、饼图/环形图和热力图，统一处理主题、自适应尺寸、空状态和动画。
+- **数据展示**：封装折线图、柱状图、饼图/环形图和热力图，统一处理主题、自适应尺寸、空状态和动画。首页 `dashboard` 当前展示的是写死的演示数据，尚未接入后端统计接口（见「尚未包含」）。
 - **文件资源**：本地或 S3 兼容存储，上传资源自动登记元数据和上传人；管理页支持分类筛选、预览、复制地址、引用检查与物理删除。
 - **定时任务**：后端预注册任务白名单、Cron/时区配置、启停、异步手动触发、执行日志、Redis 多实例防重和配置对账。
 - **系统监控**：按权限查看当前实例的数据库/Redis 连通性、主机与 Node.js 进程信息、在线会话、定时任务和最近 20 次 CPU/内存采样，不写入监控采样表。
@@ -53,7 +54,7 @@ nest-admin/
 │  │  │  ├─ config/          # zod 环境变量 schema、Swagger 装配
 │  │  │  ├─ common/          # 装饰器、分页 DTO、异常过滤、响应包装
 │  │  │  ├─ database/        # Nest 侧的 DI 封装（token + 全局模块）
-│  │  │  └─ modules/         # auth、user、rbac、operation-log、file、system-monitor
+│  │  │  └─ modules/         # auth、user、rbac、dictionary、notice、file、login-log、operation-log、scheduled-task、system-config、system-monitor
 │  │  └─ test/               # e2e
 │  └─ web/                   # @nest-admin/web，Vue 管理端
 │     ├─ src/api/            # alova 请求封装与业务 API
@@ -283,27 +284,32 @@ sys_system_config (独立业务参数表)
 sys_file_resource (文件资源元数据与上传人快照)
 ```
 
-| 表                    | 作用                            | 关键约束                                                         |
-| --------------------- | ------------------------------- | ---------------------------------------------------------------- |
-| `sys_user`            | 用户                            | `username` 唯一；`dept_id` 指向直属部门                          |
-| `sys_dept`            | 部门组织树                      | `code` 唯一；`parent_id` 组成层级                                |
-| `sys_dept_transfer_log` | 部门迁移历史                  | append-only；保存迁移前后父级、原因与操作人名称快照              |
-| `sys_post`            | 岗位主数据                      | `code` 唯一；停用后不可新增用户分配                              |
-| `sys_system_config`   | 非敏感业务参数                  | 参数键唯一；按声明类型校验；内置参数不可改键或删除                |
-| `sys_file_resource`   | 文件资源元数据                  | 对象键唯一；记录分类、存储驱动、上传人快照与软删除状态            |
-| `sys_role`            | 角色                            | `code` 唯一；`data_scope` 数据权限范围；`is_system` 内置角色保护 |
-| `sys_permission`      | 权限码，如 `system:user:delete` | `code` 唯一；`module` 用于分配界面分组                           |
-| `sys_menu`            | 前端路由菜单树                  | `parent_id` 自引用，`type` 为 directory / menu / external        |
-| `sys_user_role`       | 用户授角色                      | 联合主键                                                         |
-| `sys_user_post`       | 用户分配岗位                    | 联合主键                                                         |
-| `sys_role_permission` | 角色授权限                      | 联合主键                                                         |
-| `sys_role_menu`       | 角色授菜单                      | 联合主键                                                         |
-| `sys_role_dept`       | 角色自定义部门范围              | 联合主键                                                         |
-| `sys_refresh_token`   | 登录设备会话                    | `jti` 唯一；记录过期、吊销、轮换链、IP 与 User-Agent             |
-| `sys_operation_log`   | 操作审计日志                    | append-only；保存脱敏参数、结果、耗时与客户端信息                |
-| `sys_notice`          | 通知公告主表                    | 草稿 / 已发布 / 已撤回；保存发布人名称快照                       |
-| `sys_notice_target`   | 公告定向范围                    | 部门、角色或用户多态目标；联合主键防重复                         |
-| `sys_notice_recipient` | 用户收件箱                     | 发布时生成快照；公告与用户联合唯一；`read_at` 记录已读           |
+| 表                       | 作用                            | 关键约束                                                         |
+| ------------------------ | ------------------------------- | ---------------------------------------------------------------- |
+| `sys_user`               | 用户                            | `username` 唯一；`dept_id` 指向直属部门                          |
+| `sys_dept`               | 部门组织树                      | `code` 唯一；`parent_id` 组成层级                                |
+| `sys_dept_transfer_log`  | 部门迁移历史                    | append-only；保存迁移前后父级、原因与操作人名称快照              |
+| `sys_post`               | 岗位主数据                      | `code` 唯一；停用后不可新增用户分配                              |
+| `sys_system_config`      | 非敏感业务参数                  | 参数键唯一；按声明类型校验；内置参数不可改键或删除               |
+| `sys_dict_type`          | 动态字典类型                    | `code` 唯一；软删除后不可复用                                    |
+| `sys_dict_item`          | 动态字典项                      | 同类型内 `value` 唯一；`tone` 仅用于展示                         |
+| `sys_file_resource`      | 文件资源元数据                  | 对象键唯一；记录分类、存储驱动、上传人快照与软删除状态           |
+| `sys_role`               | 角色                            | `code` 唯一；`data_scope` 数据权限范围；`is_system` 内置角色保护 |
+| `sys_permission`         | 权限码，如 `system:user:delete` | `code` 唯一；`module` 用于分配界面分组                           |
+| `sys_menu`               | 前端路由菜单树                  | `parent_id` 自引用，`type` 为 directory / menu / external        |
+| `sys_user_role`          | 用户授角色                      | 联合主键                                                         |
+| `sys_user_post`          | 用户分配岗位                    | 联合主键                                                         |
+| `sys_role_permission`    | 角色授权限                      | 联合主键                                                         |
+| `sys_role_menu`          | 角色授菜单                      | 联合主键                                                         |
+| `sys_role_dept`          | 角色自定义部门范围              | 联合主键                                                         |
+| `sys_refresh_token`      | 登录设备会话                    | `jti` 唯一；记录过期、吊销、轮换链、IP 与 User-Agent             |
+| `sys_operation_log`      | 操作审计日志                    | append-only；保存脱敏参数、结果、耗时与客户端信息                |
+| `sys_login_log`          | 登录审计日志                    | append-only；成功/失败/锁定都记录；`user_id` 可空                |
+| `sys_scheduled_task`     | 定时计划                        | `code` 唯一；`task_key` 须命中后端注册表                         |
+| `sys_scheduled_task_log` | 任务执行日志                    | append-only；保存任务名称/键快照与执行结果                       |
+| `sys_notice`             | 通知公告主表                    | 草稿 / 已发布 / 已撤回；保存发布人名称快照                       |
+| `sys_notice_target`      | 公告定向范围                    | 部门、角色或用户多态目标；联合主键防重复                         |
+| `sys_notice_recipient`   | 用户收件箱                      | 发布时生成快照；公告与用户联合唯一；`read_at` 记录已读           |
 
 几条贯穿全表的约定：
 
@@ -321,103 +327,114 @@ sys_file_resource (文件资源元数据与上传人快照)
 
 ## 接口一览
 
-| 方法   | 路径                                  | 鉴权                       | 说明                                                |
-| ------ | ------------------------------------- | -------------------------- | --------------------------------------------------- |
-| GET    | `/api/health`                         | 公开                       | 健康检查，数据库不通时返回 `degraded`               |
-| POST   | `/api/auth/register`                  | 公开                       | 注册并直接返回 token                                |
-| POST   | `/api/auth/login`                     | 公开                       | 账号密码登录；响应含 `passwordChangeRequired` 标记  |
-| POST   | `/api/auth/refresh`                   | 公开                       | 用 refreshToken 换新 token 对（会轮换旧的）         |
-| POST   | `/api/auth/logout`                    | 公开                       | 登出，物理删除本次提交的当前有效会话                |
-| GET    | `/api/auth/sessions`                  | 仅需登录                   | 我的登录设备列表，当前设备排最前                    |
-| DELETE | `/api/auth/sessions/:id`              | 仅需登录                   | 下线自己的指定设备                                  |
-| POST   | `/api/auth/sessions/revoke-others`    | 仅需登录                   | 下线除当前设备外的全部会话                          |
-| GET    | `/api/auth/profile`                   | 需要                       | 当前登录用户信息，含角色码与权限码                  |
-| GET    | `/api/users`                          | `system:user:list`         | 按数据范围分页，支持用户、状态和部门筛选            |
-| POST   | `/api/users`                          | `system:user:create`       | 新增用户                                            |
-| GET    | `/api/users/:id`                      | `system:user:read`         | 用户详情                                            |
-| PATCH  | `/api/users/:id`                      | `system:user:update`       | 更新用户（不含用户名和密码）                        |
-| DELETE | `/api/users/:id`                      | `system:user:delete`       | 删除用户                                            |
-| PATCH  | `/api/users/me/profile`               | 仅需登录                   | 修改自己的昵称、邮箱和手机号，支持清空              |
-| PATCH  | `/api/users/me/avatar`                | 仅需登录                   | 更新当前用户头像地址，传 `null` 恢复默认头像        |
-| GET    | `/api/users/:id/sessions`             | `system:user:session:list` | 查看指定用户的在线设备                              |
-| DELETE | `/api/users/:id/sessions/:sessionId`  | `system:user:force-logout` | 下线该用户的某台设备                                |
-| POST   | `/api/users/:id/force-logout`         | `system:user:force-logout` | 强制该用户下线，吊销其全部会话                      |
-| POST   | `/api/users/:id/unlock`               | `system:user:unlock`       | 解锁因登录失败被锁定的账号，清除计数与锁定标记      |
-| GET    | `/api/online-users`                   | `system:user:session:list` | 分页查询全部有效登录设备，支持用户与 IP 筛选        |
-| PUT    | `/api/users/me/password`              | 仅需登录                   | 修改自己的密码，需校验旧密码                        |
-| GET    | `/api/users/:id/roles`                | `system:user:assign-role`  | 用户已分配的角色 id，供分配界面回显                 |
-| PUT    | `/api/users/:id/roles`                | `system:user:assign-role`  | 全量替换用户的角色                                  |
-| GET    | `/api/users/:id/posts`                | `system:user:assign-post`  | 用户已分配的岗位 id                                 |
-| PUT    | `/api/users/:id/posts`                | `system:user:assign-post`  | 全量替换用户岗位                                    |
-| GET    | `/api/posts`                          | `system:post:list`         | 分页查询岗位及用户数                                |
-| POST   | `/api/posts`                          | `system:post:create`       | 新增岗位                                            |
-| GET    | `/api/posts/:id`                      | `system:post:read`         | 查询岗位详情                                        |
-| PATCH  | `/api/posts/:id`                      | `system:post:update`       | 更新岗位                                            |
-| DELETE | `/api/posts/:id`                      | `system:post:delete`       | 删除未分配用户的岗位                                |
-| GET    | `/api/roles`                          | `system:role:list`         | 分页查询角色                                        |
-| POST   | `/api/roles`                          | `system:role:create`       | 新增角色                                            |
-| GET    | `/api/roles/:id`                      | `system:role:read`         | 角色详情，含权限、菜单和自定义部门 id               |
-| PATCH  | `/api/roles/:id`                      | `system:role:update`       | 更新角色                                            |
-| DELETE | `/api/roles/:id`                      | `system:role:delete`       | 删除角色（软删除）                                  |
-| PUT    | `/api/roles/:id/permissions`          | `system:role:assign`       | 全量替换角色的权限码                                |
-| PUT    | `/api/roles/:id/menus`                | `system:role:assign`       | 全量替换角色的菜单                                  |
-| GET    | `/api/permissions`                    | `system:permission:list`   | 权限码目录，供授权界面拉取可选项                    |
-| GET    | `/api/operation-logs`                 | `system:log:list`          | 分页查询操作日志，支持用户名/模块/结果/时间范围过滤 |
-| GET    | `/api/operation-logs/:id`             | `system:log:read`          | 日志详情，含脱敏后的请求参数快照                    |
-| GET    | `/api/operation-logs/cleanup/preview` | `system:log:clean`         | 预览本次清理会删掉多少行                            |
-| POST   | `/api/operation-logs/cleanup`         | `system:log:clean`         | 立即执行一次清理                                    |
-| POST   | `/api/files/upload`                   | 仅需登录                   | 上传单个文件，multipart 字段名为 `file`             |
-| GET    | `/api/files/resources`                | `system:file:list`         | 分页查询文件资源，支持关键词、分类和存储驱动筛选    |
-| GET    | `/api/files/resources/:id`            | `system:file:read`         | 文件资源详情与当前引用数                            |
-| DELETE | `/api/files/resources/:id`            | `system:file:delete`       | 删除未被引用的物理文件并软删除元数据                |
-| GET    | `/api/system-monitor/overview`        | `system:monitor:read`      | 查询当前实例、依赖连通性、工作负载和短期趋势        |
-| GET    | `/api/menus/mine`                     | 仅需登录                   | 当前用户可见的菜单树，前端渲染侧边栏                |
-| GET    | `/api/menus`                          | `system:menu:list`         | 完整菜单树（管理端），含停用与隐藏节点              |
-| POST   | `/api/menus`                          | `system:menu:create`       | 新增菜单                                            |
-| GET    | `/api/menus/:id`                      | `system:menu:read`         | 菜单详情                                            |
-| PATCH  | `/api/menus/:id`                      | `system:menu:update`       | 更新菜单                                            |
-| DELETE | `/api/menus/:id`                      | `system:menu:delete`       | 删除菜单（软删除），有子菜单时拒绝                  |
-| GET    | `/api/departments`                    | `system:dept:list`         | 查询部门树，搜索时保留祖先节点                      |
-| POST   | `/api/departments`                    | `system:dept:create`       | 新增部门                                            |
-| GET    | `/api/departments/:id`                | `system:dept:read`         | 查询部门详情                                        |
-| GET    | `/api/departments/:id/transfers`      | `system:dept:transfer:list` | 分页查询部门迁移历史                               |
-| PATCH  | `/api/departments/:id`                | `system:dept:update`       | 更新或移动部门；移动时迁移原因必填                  |
-| DELETE | `/api/departments/:id`                | `system:dept:delete`       | 删除空部门，有下级或直属用户时拒绝                  |
-| GET    | `/api/notices`                        | `system:notice:list`       | 分页查询通知公告与阅读统计                          |
-| POST   | `/api/notices`                        | `system:notice:create`     | 新增公告草稿                                        |
-| GET    | `/api/notices/target-options`         | 新增或更新公告权限         | 查询可选部门、角色或用户                            |
-| GET    | `/api/notices/:id`                    | `system:notice:read`       | 公告详情与接收范围                                  |
-| PATCH  | `/api/notices/:id`                    | `system:notice:update`     | 更新未发布或已撤回公告                              |
-| POST   | `/api/notices/:id/publish`            | `system:notice:publish`    | 发布并生成收件人快照                                |
-| POST   | `/api/notices/:id/withdraw`           | `system:notice:withdraw`   | 撤回已发布公告                                      |
-| DELETE | `/api/notices/:id`                    | `system:notice:delete`     | 删除未发布或已撤回公告                              |
-| GET    | `/api/system-configs`                 | `system:config:list`       | 分页查询系统参数                                    |
-| POST   | `/api/system-configs`                 | `system:config:create`     | 新增自定义系统参数                                  |
-| GET    | `/api/system-configs/:id`             | `system:config:read`       | 查询系统参数详情                                    |
-| PATCH  | `/api/system-configs/:id`             | `system:config:update`     | 更新系统参数；内置参数不可改键                      |
-| DELETE | `/api/system-configs/:id`             | `system:config:delete`     | 删除非内置系统参数                                  |
-| GET    | `/api/dictionary-types`               | `system:dict:list`         | 分页查询字典类型                                    |
-| POST   | `/api/dictionary-types`               | `system:dict:create`       | 新增字典类型                                        |
-| GET    | `/api/dictionary-types/:id`           | `system:dict:read`         | 查询字典类型详情                                    |
-| PATCH  | `/api/dictionary-types/:id`           | `system:dict:update`       | 更新字典类型                                        |
-| DELETE | `/api/dictionary-types/:id`           | `system:dict:delete`       | 删除字典类型及所属字典项                            |
-| GET    | `/api/dictionary-types/:id/items`     | `system:dict:list`         | 查询指定类型的字典项                                |
-| POST   | `/api/dictionary-types/:id/items`     | `system:dict:create`       | 新增字典项                                          |
-| PATCH  | `/api/dictionary-items/:id`           | `system:dict:update`       | 更新字典项、排序与状态                              |
-| DELETE | `/api/dictionary-items/:id`           | `system:dict:delete`       | 删除字典项                                          |
-| GET    | `/api/dictionaries/:code`             | 仅需登录                   | 按编码读取启用字典选项                              |
-| GET    | `/api/messages`                       | 仅需登录                   | 分页查询我的消息                                    |
-| GET    | `/api/messages/recent`                | 仅需登录                   | Header 最近五条消息                                 |
-| GET    | `/api/messages/unread-count`          | 仅需登录                   | 查询未读消息数量                                    |
-| GET    | `/api/messages/stream`                | 仅需登录                   | 订阅站内消息 SSE 实时事件                           |
-| GET    | `/api/messages/:id`                   | 仅需登录                   | 查询属于自己的消息详情                              |
-| PATCH  | `/api/messages/:id/read`              | 仅需登录                   | 标记一条消息已读                                    |
-| PATCH  | `/api/messages/read-all`              | 仅需登录                   | 全部标记已读                                        |
+| 方法   | 路径                                  | 鉴权                             | 说明                                                |
+| ------ | ------------------------------------- | -------------------------------- | --------------------------------------------------- |
+| GET    | `/api/health`                         | 公开                             | 健康检查，数据库不通时返回 `degraded`               |
+| POST   | `/api/auth/register`                  | 公开                             | 注册并直接返回 token                                |
+| POST   | `/api/auth/login`                     | 公开                             | 账号密码登录；响应含 `passwordChangeRequired` 标记  |
+| POST   | `/api/auth/refresh`                   | 公开                             | 用 refreshToken 换新 token 对（会轮换旧的）         |
+| POST   | `/api/auth/logout`                    | 公开                             | 登出，物理删除本次提交的当前有效会话                |
+| GET    | `/api/auth/sessions`                  | 仅需登录                         | 我的登录设备列表，当前设备排最前                    |
+| DELETE | `/api/auth/sessions/:id`              | 仅需登录                         | 下线自己的指定设备                                  |
+| POST   | `/api/auth/sessions/revoke-others`    | 仅需登录                         | 下线除当前设备外的全部会话                          |
+| GET    | `/api/auth/profile`                   | 需要                             | 当前登录用户信息，含角色码与权限码                  |
+| GET    | `/api/users`                          | `system:user:list`               | 按数据范围分页，支持用户、状态和部门筛选            |
+| POST   | `/api/users`                          | `system:user:create`             | 新增用户                                            |
+| GET    | `/api/users/:id`                      | `system:user:read`               | 用户详情                                            |
+| PATCH  | `/api/users/:id`                      | `system:user:update`             | 更新用户（不含用户名和密码）                        |
+| DELETE | `/api/users/:id`                      | `system:user:delete`             | 删除用户                                            |
+| PATCH  | `/api/users/me/profile`               | 仅需登录                         | 修改自己的昵称、邮箱和手机号，支持清空              |
+| PATCH  | `/api/users/me/avatar`                | 仅需登录                         | 更新当前用户头像地址，传 `null` 恢复默认头像        |
+| GET    | `/api/users/:id/sessions`             | `system:user:session:list`       | 查看指定用户的在线设备                              |
+| DELETE | `/api/users/:id/sessions/:sessionId`  | `system:user:force-logout`       | 下线该用户的某台设备                                |
+| POST   | `/api/users/:id/force-logout`         | `system:user:force-logout`       | 强制该用户下线，吊销其全部会话                      |
+| POST   | `/api/users/:id/unlock`               | `system:user:unlock`             | 解锁因登录失败被锁定的账号，清除计数与锁定标记      |
+| GET    | `/api/online-users`                   | `system:user:session:list`       | 分页查询全部有效登录设备，支持用户与 IP 筛选        |
+| PUT    | `/api/users/me/password`              | 仅需登录                         | 修改自己的密码，需校验旧密码                        |
+| GET    | `/api/users/:id/roles`                | `system:user:assign-role`        | 用户已分配的角色 id，供分配界面回显                 |
+| PUT    | `/api/users/:id/roles`                | `system:user:assign-role`        | 全量替换用户的角色                                  |
+| GET    | `/api/users/:id/posts`                | `system:user:assign-post`        | 用户已分配的岗位 id                                 |
+| PUT    | `/api/users/:id/posts`                | `system:user:assign-post`        | 全量替换用户岗位                                    |
+| GET    | `/api/posts`                          | `system:post:list`               | 分页查询岗位及用户数                                |
+| POST   | `/api/posts`                          | `system:post:create`             | 新增岗位                                            |
+| GET    | `/api/posts/:id`                      | `system:post:read`               | 查询岗位详情                                        |
+| PATCH  | `/api/posts/:id`                      | `system:post:update`             | 更新岗位                                            |
+| DELETE | `/api/posts/:id`                      | `system:post:delete`             | 删除未分配用户的岗位                                |
+| GET    | `/api/roles`                          | `system:role:list`               | 分页查询角色                                        |
+| POST   | `/api/roles`                          | `system:role:create`             | 新增角色                                            |
+| GET    | `/api/roles/:id`                      | `system:role:read`               | 角色详情，含权限、菜单和自定义部门 id               |
+| PATCH  | `/api/roles/:id`                      | `system:role:update`             | 更新角色                                            |
+| DELETE | `/api/roles/:id`                      | `system:role:delete`             | 删除角色（软删除）                                  |
+| PUT    | `/api/roles/:id/permissions`          | `system:role:assign`             | 全量替换角色的权限码                                |
+| PUT    | `/api/roles/:id/menus`                | `system:role:assign`             | 全量替换角色的菜单                                  |
+| GET    | `/api/permissions`                    | `system:permission:list`         | 权限码目录，供授权界面拉取可选项                    |
+| GET    | `/api/operation-logs`                 | `system:log:list`                | 分页查询操作日志，支持用户名/模块/结果/时间范围过滤 |
+| GET    | `/api/operation-logs/:id`             | `system:log:read`                | 日志详情，含脱敏后的请求参数快照                    |
+| GET    | `/api/operation-logs/cleanup/preview` | `system:log:clean`               | 预览本次清理会删掉多少行                            |
+| POST   | `/api/operation-logs/cleanup`         | `system:log:clean`               | 立即执行一次清理                                    |
+| GET    | `/api/login-logs`                     | `system:login-log:list`          | 分页查询登录日志，支持用户名、结果与时间范围过滤    |
+| GET    | `/api/login-logs/:id`                 | `system:login-log:read`          | 登录日志详情，含失败原因                            |
+| GET    | `/api/scheduled-tasks`                | `system:scheduled-task:list`     | 分页查询定时计划，支持名称、任务键与状态筛选        |
+| GET    | `/api/scheduled-tasks/definitions`    | `system:scheduled-task:read`     | 查询后端预注册的任务处理器白名单                    |
+| POST   | `/api/scheduled-tasks`                | `system:scheduled-task:create`   | 新增自定义计划，任务键必须在白名单内                |
+| GET    | `/api/scheduled-tasks/:id/logs`       | `system:scheduled-task:log:list` | 分页查询执行日志，支持状态与触发方式筛选            |
+| POST   | `/api/scheduled-tasks/:id/run`        | `system:scheduled-task:run`      | 手动执行一次，立即返回 running 日志                 |
+| GET    | `/api/scheduled-tasks/:id`            | `system:scheduled-task:read`     | 查询定时计划详情                                    |
+| PATCH  | `/api/scheduled-tasks/:id`            | `system:scheduled-task:update`   | 更新 Cron、时区或启停状态                           |
+| DELETE | `/api/scheduled-tasks/:id`            | `system:scheduled-task:delete`   | 删除非内置定时计划                                  |
+| POST   | `/api/files/upload`                   | 仅需登录                         | 上传单个文件，multipart 字段名为 `file`             |
+| GET    | `/api/files/resources`                | `system:file:list`               | 分页查询文件资源，支持关键词、分类和存储驱动筛选    |
+| GET    | `/api/files/resources/:id`            | `system:file:read`               | 文件资源详情与当前引用数                            |
+| DELETE | `/api/files/resources/:id`            | `system:file:delete`             | 删除未被引用的物理文件并软删除元数据                |
+| GET    | `/api/system-monitor/overview`        | `system:monitor:read`            | 查询当前实例、依赖连通性、工作负载和短期趋势        |
+| GET    | `/api/menus/mine`                     | 仅需登录                         | 当前用户可见的菜单树，前端渲染侧边栏                |
+| GET    | `/api/menus`                          | `system:menu:list`               | 完整菜单树（管理端），含停用与隐藏节点              |
+| POST   | `/api/menus`                          | `system:menu:create`             | 新增菜单                                            |
+| GET    | `/api/menus/:id`                      | `system:menu:read`               | 菜单详情                                            |
+| PATCH  | `/api/menus/:id`                      | `system:menu:update`             | 更新菜单                                            |
+| DELETE | `/api/menus/:id`                      | `system:menu:delete`             | 删除菜单（软删除），有子菜单时拒绝                  |
+| GET    | `/api/departments`                    | `system:dept:list`               | 查询部门树，搜索时保留祖先节点                      |
+| POST   | `/api/departments`                    | `system:dept:create`             | 新增部门                                            |
+| GET    | `/api/departments/:id`                | `system:dept:read`               | 查询部门详情                                        |
+| GET    | `/api/departments/:id/transfers`      | `system:dept:transfer:list`      | 分页查询部门迁移历史                                |
+| PATCH  | `/api/departments/:id`                | `system:dept:update`             | 更新或移动部门；移动时迁移原因必填                  |
+| DELETE | `/api/departments/:id`                | `system:dept:delete`             | 删除空部门，有下级或直属用户时拒绝                  |
+| GET    | `/api/notices`                        | `system:notice:list`             | 分页查询通知公告与阅读统计                          |
+| POST   | `/api/notices`                        | `system:notice:create`           | 新增公告草稿                                        |
+| GET    | `/api/notices/target-options`         | 新增或更新公告权限               | 查询可选部门、角色或用户                            |
+| GET    | `/api/notices/:id`                    | `system:notice:read`             | 公告详情与接收范围                                  |
+| PATCH  | `/api/notices/:id`                    | `system:notice:update`           | 更新未发布或已撤回公告                              |
+| POST   | `/api/notices/:id/publish`            | `system:notice:publish`          | 发布并生成收件人快照                                |
+| POST   | `/api/notices/:id/withdraw`           | `system:notice:withdraw`         | 撤回已发布公告                                      |
+| DELETE | `/api/notices/:id`                    | `system:notice:delete`           | 删除未发布或已撤回公告                              |
+| GET    | `/api/system-configs`                 | `system:config:list`             | 分页查询系统参数                                    |
+| POST   | `/api/system-configs`                 | `system:config:create`           | 新增自定义系统参数                                  |
+| GET    | `/api/system-configs/:id`             | `system:config:read`             | 查询系统参数详情                                    |
+| PATCH  | `/api/system-configs/:id`             | `system:config:update`           | 更新系统参数；内置参数不可改键                      |
+| DELETE | `/api/system-configs/:id`             | `system:config:delete`           | 删除非内置系统参数                                  |
+| GET    | `/api/dictionary-types`               | `system:dict:list`               | 分页查询字典类型                                    |
+| POST   | `/api/dictionary-types`               | `system:dict:create`             | 新增字典类型                                        |
+| GET    | `/api/dictionary-types/:id`           | `system:dict:read`               | 查询字典类型详情                                    |
+| PATCH  | `/api/dictionary-types/:id`           | `system:dict:update`             | 更新字典类型                                        |
+| DELETE | `/api/dictionary-types/:id`           | `system:dict:delete`             | 删除字典类型及所属字典项                            |
+| GET    | `/api/dictionary-types/:id/items`     | `system:dict:list`               | 查询指定类型的字典项                                |
+| POST   | `/api/dictionary-types/:id/items`     | `system:dict:create`             | 新增字典项                                          |
+| PATCH  | `/api/dictionary-items/:id`           | `system:dict:update`             | 更新字典项、排序与状态                              |
+| DELETE | `/api/dictionary-items/:id`           | `system:dict:delete`             | 删除字典项                                          |
+| GET    | `/api/dictionaries/:code`             | 仅需登录                         | 按编码读取启用字典选项                              |
+| GET    | `/api/messages`                       | 仅需登录                         | 分页查询我的消息                                    |
+| GET    | `/api/messages/recent`                | 仅需登录                         | Header 最近五条消息                                 |
+| GET    | `/api/messages/unread-count`          | 仅需登录                         | 查询未读消息数量                                    |
+| GET    | `/api/messages/stream`                | 仅需登录                         | 订阅站内消息 SSE 实时事件                           |
+| GET    | `/api/messages/:id`                   | 仅需登录                         | 查询属于自己的消息详情                              |
+| PATCH  | `/api/messages/:id/read`              | 仅需登录                         | 标记一条消息已读                                    |
+| PATCH  | `/api/messages/read-all`              | 仅需登录                         | 全部标记已读                                        |
 
 ## 尚未包含
 
 按当前范围刻意留白的部分，后续要做时的落点：
 
+- **首页统计接口**。`dashboard` 页面的统计卡、趋势图和分布图目前全是组件内写死的演示数据，后端没有对应接口。要做实时首页时新增一个只读统计接口（用户/角色/在线会话/今日操作数等），前端改为拉取该接口。
 - **日志归档到冷存储**。目前超期日志是直接物理删除。若有合规要求需要长期留存，应在 `LogCleanupService` 删除前先导出到对象存储或归档表。
 - **通用数据权限适配**。部门数据范围当前已用于用户列表；后续业务模块需要在各自查询入口复用 `DataScopeService`，按资源所有者或部门字段追加条件。
 - **实时在线状态**。在线用户当前按有效登录会话判断，不包含 WebSocket 心跳、最后活跃时间或 IP 地理位置；浏览器关闭但会话未过期时仍会显示在线。
