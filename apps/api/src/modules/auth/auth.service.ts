@@ -57,11 +57,7 @@ export class AuthService {
   async register(dto: RegisterDto): Promise<AuthResult> {
     const user = await this.userService.create(dto);
 
-    return {
-      user,
-      ...(await this.issueTokens(user)),
-      passwordChangeRequired: false,
-    };
+    return this.issueAuthResult(user, false);
   }
 
   async login(dto: LoginDto): Promise<AuthResult> {
@@ -115,14 +111,7 @@ export class AuthService {
       await this.userService.touchLastLogin(user.id);
       // 登录成功清空失败计数与锁键；过期但残留的 locked_until 也一并清除
       await this.loginLockout.clearOnSuccess(user.username, user.id);
-      const result = {
-        user,
-        ...(await this.issueTokens(user)),
-        // 柔性中间态：登录照常成功，前端据此拦截进改密页
-        passwordChangeRequired: await this.passwordPolicy.isChangeRequired(
-          user.passwordChangedAt,
-        ),
-      };
+      const result = await this.issueAuthResult(user);
 
       await this.loginLogs.record({
         userId: user.id,
@@ -147,6 +136,19 @@ export class AuthService {
       });
       throw error;
     }
+  }
+
+  async issueAuthResult(
+    user: SafeUser,
+    passwordChangeRequired?: boolean,
+  ): Promise<AuthResult> {
+    return {
+      user,
+      ...(await this.issueTokens(user)),
+      passwordChangeRequired:
+        passwordChangeRequired ??
+        (await this.passwordPolicy.isChangeRequired(user.passwordChangedAt)),
+    };
   }
 
   /**

@@ -10,6 +10,12 @@ export const routes: RouteRecordRaw[] = [
     meta: { title: '登录', public: true },
   },
   {
+    path: '/oauth/callback',
+    name: 'oauth-callback',
+    component: () => import('@/views/oauth-callback/index.vue'),
+    meta: { title: 'OAuth 登录回调', public: true },
+  },
+  {
     path: '/',
     name: ADMIN_ROUTE_NAME,
     component: () => import('@/layouts/AdminLayout.vue'),

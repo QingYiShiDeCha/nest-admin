@@ -89,6 +89,12 @@ export const PERMISSIONS = {
   CONFIG_UPDATE: 'system:config:update',
   CONFIG_DELETE: 'system:config:delete',
 
+  OAUTH_PROVIDER_LIST: 'system:oauth-provider:list',
+  OAUTH_PROVIDER_READ: 'system:oauth-provider:read',
+  OAUTH_PROVIDER_CREATE: 'system:oauth-provider:create',
+  OAUTH_PROVIDER_UPDATE: 'system:oauth-provider:update',
+  OAUTH_PROVIDER_DELETE: 'system:oauth-provider:delete',
+
   DICT_LIST: 'system:dict:list',
   DICT_READ: 'system:dict:read',
   DICT_CREATE: 'system:dict:create',
@@ -233,6 +239,31 @@ export const PERMISSION_DEFINITIONS: readonly PermissionDefinition[] = [
   { code: PERMISSIONS.CONFIG_CREATE, name: '新增系统参数', module: 'system' },
   { code: PERMISSIONS.CONFIG_UPDATE, name: '更新系统参数', module: 'system' },
   { code: PERMISSIONS.CONFIG_DELETE, name: '删除系统参数', module: 'system' },
+  {
+    code: PERMISSIONS.OAUTH_PROVIDER_LIST,
+    name: '查询 OAuth 提供商',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.OAUTH_PROVIDER_READ,
+    name: '查看 OAuth 提供商',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.OAUTH_PROVIDER_CREATE,
+    name: '新增 OAuth 提供商',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.OAUTH_PROVIDER_UPDATE,
+    name: '更新 OAuth 提供商',
+    module: 'system',
+  },
+  {
+    code: PERMISSIONS.OAUTH_PROVIDER_DELETE,
+    name: '删除 OAuth 提供商',
+    module: 'system',
+  },
   { code: PERMISSIONS.DICT_LIST, name: '查询数据字典', module: 'system' },
   { code: PERMISSIONS.DICT_READ, name: '查看数据字典', module: 'system' },
   { code: PERMISSIONS.DICT_CREATE, name: '新增数据字典', module: 'system' },

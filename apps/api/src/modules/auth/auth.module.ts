@@ -12,6 +12,9 @@ import { RefreshTokenModule } from './refresh-token.module';
 import { UserSessionController } from './user-session.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { OnlineUserController } from './online-user.controller';
+import { OAuthController } from './oauth.controller';
+import { OAuthProviderController } from './oauth-provider.controller';
+import { OAuthService } from './oauth.service';
 
 @Module({
   imports: [
@@ -31,8 +34,14 @@ import { OnlineUserController } from './online-user.controller';
       }),
     }),
   ],
-  controllers: [AuthController, OnlineUserController, UserSessionController],
-  providers: [AuthService, JwtStrategy],
+  controllers: [
+    AuthController,
+    OnlineUserController,
+    UserSessionController,
+    OAuthController,
+    OAuthProviderController,
+  ],
+  providers: [AuthService, JwtStrategy, OAuthService],
   exports: [AuthService],
 })
 export class AuthModule {}

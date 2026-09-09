@@ -38,6 +38,16 @@ const baseEnvSchema = z.object({
     .string()
     .min(16, 'JWT_REFRESH_SECRET 至少需要 16 个字符'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  OAUTH_REDIRECT_BASE_URL: z
+    .string()
+    .url()
+    .default('http://localhost:3000/api/auth/oauth'),
+  OAUTH_FRONTEND_CALLBACK_URL: z
+    .string()
+    .url()
+    .default('http://localhost:5173/oauth/callback'),
+  /** 用于加密数据库中的 OAuth 客户端密钥；未配置时派生自 refresh secret。 */
+  OAUTH_ENCRYPTION_KEY: optionalString,
 
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(4).max(15).default(10),
 
@@ -156,7 +166,6 @@ export const envSchema = baseEnvSchema.superRefine((env, context) => {
       message: '日志归档 S3 Access Key 与 Secret Key 必须同时配置或同时留空',
     });
   }
-
 });
 
 export type Env = z.infer<typeof envSchema>;

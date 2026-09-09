@@ -10,6 +10,8 @@ export * from './notice-recipients';
 export * from './notice-targets';
 export * from './notices';
 export * from './operation-logs';
+export * from './oauth-identities';
+export * from './oauth-providers';
 export * from './permissions';
 export * from './posts';
 export * from './refresh-tokens';

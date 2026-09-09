@@ -120,6 +120,13 @@
       "when": 1788797722005,
       "tag": "0016_purple_ben_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1788925928522,
+      "tag": "0017_tearful_pride",
+      "breakpoints": true
     }
   ]
 }

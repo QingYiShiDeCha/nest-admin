@@ -280,6 +280,15 @@ const MENU_TREE: readonly MenuSeed[] = [
         keepAlive: true,
       },
       {
+        name: 'OAuth 登录',
+        type: 'menu',
+        path: '/system/oauth-provider',
+        component: 'system/oauth-provider/index',
+        icon: 'RiKey2Line',
+        sort: 58,
+        keepAlive: true,
+      },
+      {
         name: '数据字典',
         type: 'menu',
         path: '/system/dictionary',

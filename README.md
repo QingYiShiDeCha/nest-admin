@@ -4,7 +4,7 @@
 
 ## 已实现功能
 
-- **认证与会话**：用户名密码登录、access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效；密码复杂度策略参数化，登录失败按账号计数锁定，管理员可解锁。
+- **认证与会话**：用户名密码登录、GitHub OAuth 2.0 登录、access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效；密码复杂度策略参数化，登录失败按账号计数锁定，管理员可解锁。
 - **RBAC**：用户、角色、权限码、菜单树、部门数据范围和按钮级权限控制，支持 Redis 授权/数据范围缓存及主动失效，内置超管防自锁规则。
 - **系统管理**：用户、组织架构、岗位、角色、菜单、参数配置、数据字典、通知公告、登录日志、操作日志、定时任务、文件资源、在线用户、系统监控等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
 - **登录审计**：记录成功、凭据错误和锁定拦截三类结果，支持按用户名、结果与时间范围过滤；登录日志只提供查询，超期记录由内置清理任务归档后清理。
@@ -15,6 +15,7 @@
 - **文件资源**：本地或 S3 兼容存储，上传资源自动登记元数据和上传人；管理页支持分类筛选、预览、复制地址、引用检查与物理删除。
 - **定时任务**：后端预注册任务白名单、Cron/时区配置、启停、异步手动触发、执行日志、Redis 多实例防重和配置对账。
 - **系统监控**：按权限查看当前实例的数据库/Redis 连通性、主机与 Node.js 进程信息、在线会话、定时任务和最近 20 次 CPU/内存采样，不写入监控采样表。
+- **OAuth 管理**：统一维护 GitHub、钉钉、微信提供商配置，客户端密钥加密保存；登录流程使用 Redis 一次性 state、PKCE 和 ticket，当前已完成 GitHub 适配，其他提供商保留统一配置入口待接入各自协议适配器。
 
 ## 技术栈
 
@@ -366,6 +367,10 @@ sys_file_resource (文件资源元数据与上传人快照)
 | POST   | `/api/auth/login`                     | 公开                             | 账号密码登录；响应含 `passwordChangeRequired` 标记  |
 | POST   | `/api/auth/refresh`                   | 公开                             | 用 refreshToken 换新 token 对（会轮换旧的）         |
 | POST   | `/api/auth/logout`                    | 公开                             | 登出，物理删除本次提交的当前有效会话                |
+| GET    | `/api/auth/oauth/providers`           | 公开                             | 查询已启用的第三方登录按钮                          |
+| GET    | `/api/auth/oauth/:provider`           | 公开                             | 发起 OAuth 授权并跳转第三方平台                     |
+| GET    | `/api/auth/oauth/:provider/callback`  | 公开                             | OAuth 授权回调并生成一次性 ticket                   |
+| POST   | `/api/auth/oauth/exchange`            | 公开                             | 用一次性 ticket 换取系统 token 对                  |
 | GET    | `/api/auth/sessions`                  | 仅需登录                         | 我的登录设备列表，当前设备排最前                    |
 | DELETE | `/api/auth/sessions/:id`              | 仅需登录                         | 下线自己的指定设备                                  |
 | POST   | `/api/auth/sessions/revoke-others`    | 仅需登录                         | 下线除当前设备外的全部会话                          |
@@ -445,6 +450,11 @@ sys_file_resource (文件资源元数据与上传人快照)
 | GET    | `/api/system-configs/:id`             | `system:config:read`             | 查询系统参数详情                                    |
 | PATCH  | `/api/system-configs/:id`             | `system:config:update`           | 更新系统参数；内置参数不可改键                      |
 | DELETE | `/api/system-configs/:id`             | `system:config:delete`           | 删除非内置系统参数                                  |
+| GET    | `/api/oauth/providers`                | `system:oauth-provider:list`     | 分页查询 OAuth 提供商配置                           |
+| POST   | `/api/oauth/providers`                | `system:oauth-provider:create`   | 新增 OAuth 提供商并加密保存客户端密钥               |
+| GET    | `/api/oauth/providers/:id`            | `system:oauth-provider:read`     | 查询 OAuth 提供商配置（不返回客户端密钥）           |
+| PATCH  | `/api/oauth/providers/:id`            | `system:oauth-provider:update`   | 更新 OAuth 提供商配置                               |
+| DELETE | `/api/oauth/providers/:id`            | `system:oauth-provider:delete`   | 软删除 OAuth 提供商                                 |
 | GET    | `/api/dictionary-types`               | `system:dict:list`               | 分页查询字典类型                                    |
 | POST   | `/api/dictionary-types`               | `system:dict:create`             | 新增字典类型                                        |
 | GET    | `/api/dictionary-types/:id`           | `system:dict:read`               | 查询字典类型详情                                    |

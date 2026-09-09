@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { FormProps } from 'antdv-next';
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { ApiError } from '@/api/http';
+import { apiOAuthProviderEnabled, oauthAuthorizeUrl } from '@/api/oauth';
 import logoUrl from '@/assets/logo.svg';
 import AppIcon from '@/components/core/base/app-icon/index.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -47,11 +48,7 @@ const passwordVisibilityToggle = computed(() => ({
   },
 }));
 
-const thirdPartyProviders = [
-  { key: 'wechat', label: '微信', icon: 'i-ri:wechat-fill' },
-  { key: 'dingtalk', label: '钉钉', icon: 'i-ri:dingding-fill' },
-  { key: 'github', label: 'GitHub', icon: 'i-ri:github-fill' },
-] as const;
+const thirdPartyProviders = ref<Awaited<ReturnType<typeof apiOAuthProviderEnabled>>>([]);
 
 function clearError(): void {
   errorMessage.value = '';
@@ -70,6 +67,14 @@ function blurField(field: 'username' | 'password'): void {
     activeField.value = null;
   }
 }
+
+function startOAuth(provider: (typeof thirdPartyProviders.value)[number]): void {
+  window.location.assign(oauthAuthorizeUrl(provider.key));
+}
+
+onMounted(async () => {
+  thirdPartyProviders.value = await apiOAuthProviderEnabled().catch(() => []);
+});
 
 async function handleSubmit(): Promise<void> {
   if (loading.value) {
@@ -243,27 +248,25 @@ defineOptions({ name: 'LoginPage' });
           </a-button>
         </a-form>
 
-        <a-divider class="!my-7 !text-xs a-color-text-tertiary">
+        <a-divider v-if="thirdPartyProviders.length" class="!my-7 !text-xs a-color-text-tertiary">
           第三方登录
         </a-divider>
 
-        <div class="grid grid-cols-3 gap-3" aria-label="第三方登录">
+        <div v-if="thirdPartyProviders.length" class="grid grid-cols-3 gap-3" aria-label="第三方登录">
           <a-tooltip
             v-for="provider in thirdPartyProviders"
             :key="provider.key"
-            :title="`${provider.label}登录暂未开放`"
+            :title="`${provider.name}登录`"
           >
             <span class="block">
               <button
-                class="h-11 w-full inline-flex items-center justify-center gap-2 border border-solid rounded-lg a-border-border a-bg-container a-color-text-tertiary text-lg cursor-not-allowed opacity-70"
+                class="h-11 w-full inline-flex items-center justify-center gap-2 border border-solid rounded-lg a-border-border a-bg-container a-color-text-tertiary text-lg cursor-pointer transition-colors hover:border-primary hover:text-primary"
                 type="button"
-                disabled
-                :aria-label="`${provider.label}登录暂未开放`"
+                :aria-label="`${provider.name}登录`"
+                @click="startOAuth(provider)"
               >
                 <AppIcon :icon="provider.icon" />
-                <span class="hidden text-sm sm:inline">{{
-                  provider.label
-                }}</span>
+                <span class="hidden text-sm sm:inline">{{ provider.name }}</span>
               </button>
             </span>
           </a-tooltip>

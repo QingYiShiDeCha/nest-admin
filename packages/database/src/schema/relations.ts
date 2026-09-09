@@ -12,6 +12,7 @@ import { menus } from './menus';
 import { noticeRecipients } from './notice-recipients';
 import { noticeTargets } from './notice-targets';
 import { notices } from './notices';
+import { oauthIdentities } from './oauth-identities';
 import { permissions } from './permissions';
 import { posts } from './posts';
 import { roles } from './roles';
@@ -36,7 +37,18 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   userPosts: many(userPosts),
   userRoles: many(userRoles),
   noticeRecipients: many(noticeRecipients),
+  oauthIdentities: many(oauthIdentities),
 }));
+
+export const oauthIdentitiesRelations = relations(
+  oauthIdentities,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [oauthIdentities.userId],
+      references: [users.id],
+    }),
+  }),
+);
 
 export const noticesRelations = relations(notices, ({ many }) => ({
   targets: many(noticeTargets),
