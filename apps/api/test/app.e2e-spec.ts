@@ -7,16 +7,7 @@ import type { App } from 'supertest/types';
 import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
 import { TransformInterceptor } from '../src/common/interceptors/transform.interceptor';
 import { AppModule } from '../src/app.module';
-
-// 这些是 ConfigModule 校验的必填项，本地没有 .env 时兜一份，
-// 让 e2e 在不连真实数据库的情况下也能跑起来
-const ENV_FALLBACK: Record<string, string> = {
-  DB_HOST: '127.0.0.1',
-  DB_USER: 'root',
-  DB_NAME: 'nest_admin_test',
-  JWT_ACCESS_SECRET: 'e2e-access-secret-must-be-long-enough',
-  JWT_REFRESH_SECRET: 'e2e-refresh-secret-must-be-long-enough',
-};
+import { configureE2eEnvironment, resetE2eRedis } from './e2e-env';
 
 interface ResponseBody<T = unknown> {
   code: number;
@@ -28,9 +19,8 @@ describe('App (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeAll(async () => {
-    for (const [key, value] of Object.entries(ENV_FALLBACK)) {
-      process.env[key] ??= value;
-    }
+    configureE2eEnvironment(14);
+    await resetE2eRedis();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -83,6 +73,7 @@ describe('App (e2e)', () => {
 
     expect((response.body as ResponseBody).code).toBe(401);
   });
+
 
   it('POST /api/auth/login 参数不合法时返回校验错误', async () => {
     const response = await request(app.getHttpServer())
