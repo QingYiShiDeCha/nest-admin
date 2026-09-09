@@ -37,6 +37,10 @@ import {
 
 import { RequestContext } from '../../common/context/request-context.service';
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
+import {
+  DataScopeService,
+  type DataScopeSubject,
+} from '../rbac/data-scope.service';
 import type { CreateNoticeDto } from './dto/create-notice.dto';
 import type { QueryNoticeDto } from './dto/query-notice.dto';
 import type { QueryNoticeTargetDto } from './dto/query-notice-target.dto';
@@ -63,12 +67,16 @@ export class NoticeService {
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     private readonly ctx: RequestContext,
     private readonly events: NoticeEventService,
+    private readonly dataScopes: DataScopeService,
   ) {}
 
   async findPage(
     query: QueryNoticeDto,
+    subject: DataScopeSubject,
   ): Promise<PaginatedResult<NoticeListRecord>> {
+    const scopeCondition = await this.buildNoticeScope(subject);
     const where = aliveNotice(
+      scopeCondition,
       query.keyword ? like(notices.title, `%${query.keyword}%`) : undefined,
       query.status ? eq(notices.status, query.status) : undefined,
       query.type ? eq(notices.type, query.type) : undefined,
@@ -94,8 +102,11 @@ export class NoticeService {
     };
   }
 
-  async findDetail(id: number): Promise<NoticeDetailRecord> {
-    const notice = await this.findNoticeOrFail(id);
+  async findDetail(
+    id: number,
+    subject: DataScopeSubject,
+  ): Promise<NoticeDetailRecord> {
+    const notice = await this.findNoticeOrFail(id, subject);
     const [record] = await this.withMetrics([notice]);
 
     return {
@@ -106,10 +117,15 @@ export class NoticeService {
 
   async findTargetOptions(
     query: QueryNoticeTargetDto,
+    subject: DataScopeSubject,
   ): Promise<NoticeTargetOption[]> {
     const keyword = query.keyword ? `%${query.keyword}%` : undefined;
 
     if (query.targetType === 'department') {
+      const scopeCondition = await this.dataScopes.buildDepartmentCondition(
+        subject,
+        departments.id,
+      );
       return this.db
         .select({
           id: departments.id,
@@ -121,6 +137,7 @@ export class NoticeService {
           and(
             eq(departments.status, 'active'),
             isNull(departments.deletedAt),
+            scopeCondition,
             keyword
               ? or(
                   like(departments.name, keyword),
@@ -134,6 +151,7 @@ export class NoticeService {
     }
 
     if (query.targetType === 'role') {
+      const scopeCondition = await this.buildRoleTargetScope(subject);
       return this.db
         .select({ id: roles.id, label: roles.name, description: roles.code })
         .from(roles)
@@ -141,6 +159,7 @@ export class NoticeService {
           and(
             eq(roles.status, 'active'),
             isNull(roles.deletedAt),
+            scopeCondition,
             keyword
               ? or(like(roles.name, keyword), like(roles.code, keyword))
               : undefined,
@@ -150,6 +169,10 @@ export class NoticeService {
         .limit(100);
     }
 
+    const scopeCondition = await this.dataScopes.buildUserIdCondition(
+      subject,
+      users.id,
+    );
     return this.db
       .select({
         id: users.id,
@@ -161,6 +184,7 @@ export class NoticeService {
         and(
           eq(users.status, 'active'),
           isNull(users.deletedAt),
+          scopeCondition,
           keyword
             ? or(like(users.nickname, keyword), like(users.username, keyword))
             : undefined,
@@ -170,10 +194,13 @@ export class NoticeService {
       .limit(50);
   }
 
-  async create(dto: CreateNoticeDto): Promise<NoticeDetailRecord> {
+  async create(
+    dto: CreateNoticeDto,
+    subject: DataScopeSubject,
+  ): Promise<NoticeDetailRecord> {
     const targetIds = normalizeIds(dto.targetIds);
     validateTargetSelection(dto.targetType, targetIds);
-    await this.assertTargetsUsable(dto.targetType, targetIds);
+    await this.assertTargetsUsable(dto.targetType, targetIds, subject);
     const expiresAt = parseExpiry(dto.expiresAt);
 
     const noticeId = await this.db.transaction(async (tx) => {
@@ -201,15 +228,19 @@ export class NoticeService {
       return result.insertId;
     });
 
-    return this.findDetail(noticeId);
+    return this.findDetail(noticeId, subject);
   }
 
-  async update(id: number, dto: UpdateNoticeDto): Promise<NoticeDetailRecord> {
+  async update(
+    id: number,
+    dto: UpdateNoticeDto,
+    subject: DataScopeSubject,
+  ): Promise<NoticeDetailRecord> {
     if (Object.keys(dto).length === 0) {
       throw new BadRequestException('没有需要更新的字段');
     }
 
-    const current = await this.findNoticeOrFail(id);
+    const current = await this.findNoticeOrFail(id, subject);
     if (current.status === 'published') {
       throw new ConflictException('已发布公告不能编辑，请先撤回');
     }
@@ -227,14 +258,15 @@ export class NoticeService {
 
     if (targetChanged) {
       validateTargetSelection(nextTargetType, nextTargetIds);
-      await this.assertTargetsUsable(nextTargetType, nextTargetIds);
+      await this.assertTargetsUsable(nextTargetType, nextTargetIds, subject);
     }
 
     const expiresAt =
       dto.expiresAt === undefined ? undefined : parseExpiry(dto.expiresAt);
+    const scopeCondition = await this.buildNoticeScope(subject);
 
     await this.db.transaction(async (tx) => {
-      await tx
+      const [result] = await tx
         .update(notices)
         .set({
           title: dto.title,
@@ -245,7 +277,11 @@ export class NoticeService {
           expiresAt,
           ...this.ctx.auditOnUpdate(),
         })
-        .where(aliveNotice(eq(notices.id, id)));
+        .where(aliveNotice(scopeCondition, eq(notices.id, id)));
+
+      if (result.affectedRows !== 1) {
+        throw new NotFoundException(`公告 ${id} 不存在`);
+      }
 
       if (targetChanged) {
         await tx.delete(noticeTargets).where(eq(noticeTargets.noticeId, id));
@@ -262,11 +298,14 @@ export class NoticeService {
       }
     });
 
-    return this.findDetail(id);
+    return this.findDetail(id, subject);
   }
 
-  async publish(id: number): Promise<NoticeDetailRecord> {
-    const notice = await this.findNoticeOrFail(id);
+  async publish(
+    id: number,
+    subject: DataScopeSubject,
+  ): Promise<NoticeDetailRecord> {
+    const notice = await this.findNoticeOrFail(id, subject);
     if (notice.status === 'published') {
       throw new ConflictException('公告已经发布');
     }
@@ -276,11 +315,13 @@ export class NoticeService {
 
     const targetIds = await this.findTargetIds(id);
     validateTargetSelection(notice.targetType, targetIds);
-    await this.assertTargetsUsable(notice.targetType, targetIds);
+    await this.assertTargetsUsable(notice.targetType, targetIds, subject);
     const recipientIds = await this.resolveRecipientIds(
       notice.targetType,
       targetIds,
+      subject,
     );
+    const scopeCondition = await this.buildNoticeScope(subject);
 
     if (recipientIds.length === 0) {
       throw new BadRequestException('当前接收范围内没有可接收公告的启用用户');
@@ -297,7 +338,11 @@ export class NoticeService {
           ...this.ctx.auditOnUpdate(),
         })
         .where(
-          aliveNotice(eq(notices.id, id), eq(notices.status, notice.status)),
+          aliveNotice(
+            scopeCondition,
+            eq(notices.id, id),
+            eq(notices.status, notice.status),
+          ),
         );
 
       if (result.affectedRows !== 1) {
@@ -322,12 +367,16 @@ export class NoticeService {
       noticeId: id,
     });
 
-    return this.findDetail(id);
+    return this.findDetail(id, subject);
   }
 
-  async withdraw(id: number): Promise<NoticeDetailRecord> {
-    await this.findNoticeOrFail(id);
+  async withdraw(
+    id: number,
+    subject: DataScopeSubject,
+  ): Promise<NoticeDetailRecord> {
+    await this.findNoticeOrFail(id, subject);
     const recipientIds = await this.findRecipientIds(id);
+    const scopeCondition = await this.buildNoticeScope(subject);
     const [result] = await this.db
       .update(notices)
       .set({
@@ -335,7 +384,13 @@ export class NoticeService {
         withdrawnAt: sql`CURRENT_TIMESTAMP`,
         ...this.ctx.auditOnUpdate(),
       })
-      .where(aliveNotice(eq(notices.id, id), eq(notices.status, 'published')));
+      .where(
+        aliveNotice(
+          scopeCondition,
+          eq(notices.id, id),
+          eq(notices.status, 'published'),
+        ),
+      );
 
     if (result.affectedRows !== 1) {
       throw new ConflictException('只有已发布公告可以撤回');
@@ -345,26 +400,35 @@ export class NoticeService {
       noticeId: id,
     });
 
-    return this.findDetail(id);
+    return this.findDetail(id, subject);
   }
 
-  async remove(id: number): Promise<void> {
-    const notice = await this.findNoticeOrFail(id);
+  async remove(id: number, subject: DataScopeSubject): Promise<void> {
+    const notice = await this.findNoticeOrFail(id, subject);
     if (notice.status === 'published') {
       throw new ConflictException('已发布公告不能删除，请先撤回');
     }
 
-    await this.db
+    const scopeCondition = await this.buildNoticeScope(subject);
+    const [result] = await this.db
       .update(notices)
       .set({ deletedAt: sql`CURRENT_TIMESTAMP`, ...this.ctx.auditOnUpdate() })
-      .where(aliveNotice(eq(notices.id, id)));
+      .where(aliveNotice(scopeCondition, eq(notices.id, id)));
+
+    if (result.affectedRows !== 1) {
+      throw new NotFoundException(`公告 ${id} 不存在`);
+    }
   }
 
-  private async findNoticeOrFail(id: number): Promise<NoticeRow> {
+  private async findNoticeOrFail(
+    id: number,
+    subject: DataScopeSubject,
+  ): Promise<NoticeRow> {
+    const scopeCondition = await this.buildNoticeScope(subject);
     const [notice] = await this.db
       .select()
       .from(notices)
-      .where(aliveNotice(eq(notices.id, id)))
+      .where(aliveNotice(scopeCondition, eq(notices.id, id)))
       .limit(1);
 
     if (!notice) throw new NotFoundException(`公告 ${id} 不存在`);
@@ -426,11 +490,16 @@ export class NoticeService {
   private async assertTargetsUsable(
     targetType: NoticeTargetType,
     ids: number[],
+    subject: DataScopeSubject,
   ): Promise<void> {
     if (targetType === 'all') return;
 
     let found: { id: number }[];
     if (targetType === 'department') {
+      const scopeCondition = await this.dataScopes.buildDepartmentCondition(
+        subject,
+        departments.id,
+      );
       found = await this.db
         .select({ id: departments.id })
         .from(departments)
@@ -439,9 +508,11 @@ export class NoticeService {
             inArray(departments.id, ids),
             eq(departments.status, 'active'),
             isNull(departments.deletedAt),
+            scopeCondition,
           ),
         );
     } else if (targetType === 'role') {
+      const scopeCondition = await this.buildRoleTargetScope(subject);
       found = await this.db
         .select({ id: roles.id })
         .from(roles)
@@ -450,9 +521,14 @@ export class NoticeService {
             inArray(roles.id, ids),
             eq(roles.status, 'active'),
             isNull(roles.deletedAt),
+            scopeCondition,
           ),
         );
     } else {
+      const scopeCondition = await this.dataScopes.buildUserIdCondition(
+        subject,
+        users.id,
+      );
       found = await this.db
         .select({ id: users.id })
         .from(users)
@@ -461,6 +537,7 @@ export class NoticeService {
             inArray(users.id, ids),
             eq(users.status, 'active'),
             isNull(users.deletedAt),
+            scopeCondition,
           ),
         );
     }
@@ -477,7 +554,12 @@ export class NoticeService {
   private async resolveRecipientIds(
     targetType: NoticeTargetType,
     targetIds: number[],
+    subject: DataScopeSubject,
   ): Promise<number[]> {
+    const scopeCondition = await this.dataScopes.buildUserIdCondition(
+      subject,
+      users.id,
+    );
     if (targetType === 'role') {
       const rows = await this.db
         .selectDistinct({ id: users.id })
@@ -488,6 +570,7 @@ export class NoticeService {
             eq(users.id, userRoles.userId),
             eq(users.status, 'active'),
             isNull(users.deletedAt),
+            scopeCondition,
           ),
         )
         .where(inArray(userRoles.roleId, targetIds));
@@ -498,6 +581,7 @@ export class NoticeService {
       eq(users.status, 'active'),
       isNull(users.deletedAt),
     ];
+    if (scopeCondition) conditions.push(scopeCondition);
     if (targetType === 'department') {
       conditions.push(inArray(users.deptId, targetIds));
     } else if (targetType === 'user') {
@@ -509,6 +593,37 @@ export class NoticeService {
       .from(users)
       .where(and(...conditions));
     return rows.map((row) => row.id);
+  }
+
+  private async buildNoticeScope(
+    subject: DataScopeSubject,
+  ): Promise<SQL | undefined> {
+    return this.dataScopes.buildUserIdCondition(subject, notices.createdBy);
+  }
+
+  private async buildRoleTargetScope(
+    subject: DataScopeSubject,
+  ): Promise<SQL | undefined> {
+    const userScope = await this.dataScopes.buildUserIdCondition(
+      subject,
+      users.id,
+    );
+    if (!userScope) return undefined;
+
+    const scopedRoles = this.db
+      .selectDistinct({ id: userRoles.roleId })
+      .from(userRoles)
+      .innerJoin(
+        users,
+        and(
+          eq(users.id, userRoles.userId),
+          eq(users.status, 'active'),
+          isNull(users.deletedAt),
+        ),
+      )
+      .where(userScope);
+
+    return inArray(roles.id, scopedRoles);
   }
 
   private async withMetrics(rows: NoticeRow[]): Promise<NoticeListRecord[]> {
