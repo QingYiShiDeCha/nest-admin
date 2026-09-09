@@ -23,6 +23,10 @@ import {
 import { randomUUID } from 'node:crypto';
 
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
+import {
+  DataScopeService,
+  type DataScopeSubject,
+} from '../rbac/data-scope.service';
 import type { QueryOnlineUserDto } from './dto/query-online-user.dto';
 
 /** 校验一个 jti 的结果，交给调用方决定怎么响应 */
@@ -42,7 +46,10 @@ export type OnlineUserSessionRow = Omit<
 export class RefreshTokenService {
   private readonly logger = new Logger(RefreshTokenService.name);
 
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly dataScopes: DataScopeService,
+  ) {}
 
   /** 生成一个新的 jti 并落库，返回 jti 供签发 JWT 时写入 */
   async issue(
@@ -153,6 +160,7 @@ export class RefreshTokenService {
   async findOnlinePage(
     query: QueryOnlineUserDto,
     currentSessionId: string | null,
+    subject: DataScopeSubject,
   ): Promise<PaginatedResult<OnlineUserSessionRow>> {
     const keyword = query.keyword?.trim();
     const ip = query.ip?.trim();
@@ -162,6 +170,11 @@ export class RefreshTokenService {
       isNull(users.deletedAt),
       eq(users.status, 'active'),
     ];
+    const scopeCondition = await this.dataScopes.buildUserIdCondition(
+      subject,
+      users.id,
+    );
+    if (scopeCondition) conditions.push(scopeCondition);
 
     if (keyword) {
       const keywordCondition = or(

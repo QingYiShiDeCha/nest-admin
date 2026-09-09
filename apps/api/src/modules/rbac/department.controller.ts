@@ -26,12 +26,18 @@ import { CreateDepartmentDto } from './dto/create-department.dto';
 import { QueryDepartmentDto } from './dto/query-department.dto';
 import { QueryDepartmentTransferDto } from './dto/query-department-transfer.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/interfaces/auth-user.interface';
+import { DataScopeService } from './data-scope.service';
 
 @ApiTags('部门管理')
 @ApiBearerAuth()
 @Controller('departments')
 export class DepartmentController {
-  constructor(private readonly service: DepartmentService) {}
+  constructor(
+    private readonly service: DepartmentService,
+    private readonly dataScopes: DataScopeService,
+  ) {}
 
   @Get()
   @Permissions(
@@ -65,10 +71,12 @@ export class DepartmentController {
   @Get(':id/transfers')
   @Permissions(PERMISSIONS.DEPT_TRANSFER_LIST)
   @ApiOperation({ summary: '分页查询部门迁移历史' })
-  findTransfers(
+  async findTransfers(
     @Param('id', ParseIntPipe) id: number,
     @Query() query: QueryDepartmentTransferDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<PaginatedResult<DepartmentTransferRow>> {
+    await this.dataScopes.assertDepartmentAccessible(id, user);
     return this.service.findTransfers(id, query);
   }
 

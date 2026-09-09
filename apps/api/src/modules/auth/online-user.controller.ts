@@ -27,6 +27,6 @@ export class OnlineUserController {
     @Query() query: QueryOnlineUserDto,
     @CurrentUser() viewer: AuthUser,
   ): Promise<PaginatedResult<OnlineUserSessionRow>> {
-    return this.refreshTokens.findOnlinePage(query, viewer.sessionId);
+    return this.refreshTokens.findOnlinePage(query, viewer.sessionId, viewer);
   }
 }

@@ -7,7 +7,8 @@ describe('RefreshTokenService', () => {
       delete: jest.fn().mockReturnValue({ where }),
       update: jest.fn(),
     };
-    const service = new RefreshTokenService(db as never);
+    const dataScopes = { buildUserIdCondition: jest.fn() };
+    const service = new RefreshTokenService(db as never, dataScopes as never);
 
     await service.revoke('current-jti');
 

@@ -1,4 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
+import { departments as departmentTable } from '@nest-admin/database';
 
 import { DRIZZLE } from '../../database/database.constants';
 import { DataScopeService } from './data-scope.service';
@@ -109,5 +110,29 @@ describe('DataScopeService', () => {
     await expect(
       service.buildUserCondition({ id: 8, deptId: null, isSuperAdmin: false }),
     ).resolves.toBeDefined();
+  });
+
+  it('部门资源的 self 范围映射为用户所属部门', async () => {
+    mockAssignedRoles([{ id: 4, dataScope: 'self' }]);
+
+    await expect(
+      service.buildDepartmentCondition(
+        { id: 8, deptId: 5, isSuperAdmin: false },
+        departmentTable.id,
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  it('部门及下级范围展开完整树', async () => {
+    mockAssignedRoles([{ id: 4, dataScope: 'dept_and_below' }]);
+    departments.findDescendantIds.mockResolvedValue([5, 6, 7]);
+
+    await expect(
+      service.buildDepartmentCondition(
+        { id: 8, deptId: 5, isSuperAdmin: false },
+        departmentTable.id,
+      ),
+    ).resolves.toBeDefined();
+    expect(departments.findDescendantIds).toHaveBeenCalledWith(5);
   });
 });

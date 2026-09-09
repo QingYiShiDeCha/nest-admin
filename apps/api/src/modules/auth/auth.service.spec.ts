@@ -50,6 +50,12 @@ const USER: SafeUser = {
   updatedAt: new Date(),
 };
 
+const SUBJECT = {
+  id: USER.id,
+  deptId: USER.deptId,
+  isSuperAdmin: true,
+};
+
 describe('AuthService', () => {
   let service: AuthService;
   let jwtService: JwtService;
@@ -60,6 +66,7 @@ describe('AuthService', () => {
       | 'verifyPassword'
       | 'touchLastLogin'
       | 'findById'
+      | 'assertAccessible'
     >
   >;
   let passwordHash: string;
@@ -102,6 +109,7 @@ describe('AuthService', () => {
       verifyPassword: jest.fn(),
       touchLastLogin: jest.fn().mockResolvedValue(undefined),
       findById: jest.fn().mockResolvedValue(USER),
+      assertAccessible: jest.fn().mockResolvedValue(undefined),
     };
 
     refreshTokens = {
@@ -508,23 +516,24 @@ describe('AuthService', () => {
     it('管理员查会话前先确认用户存在，避免把「没这人」显示成「没登录」', async () => {
       refreshTokens.listActive.mockResolvedValue([] as never);
 
-      await service.listUserSessions(42, null);
+      await service.listUserSessions(42, null, SUBJECT);
 
-      expect(userService.findById).toHaveBeenCalledWith(42);
+      expect(userService.assertAccessible).toHaveBeenCalledWith(42, SUBJECT);
       expect(refreshTokens.listActive).toHaveBeenCalledWith(42);
     });
 
     it('管理员下线时把目标用户 id 一起带进归属条件', async () => {
-      await service.revokeUserSession(9, 42);
+      await service.revokeUserSession(9, 42, SUBJECT);
 
       // 不是 (9, 管理员自己)，否则管理员拼错 id 会下掉别人的设备
+      expect(userService.assertAccessible).toHaveBeenCalledWith(42, SUBJECT);
       expect(refreshTokens.revokeOwned).toHaveBeenCalledWith(9, 42);
     });
 
     it('会话不属于目标用户时返回 404', async () => {
       refreshTokens.revokeOwned.mockResolvedValue(false);
 
-      await expect(service.revokeUserSession(9, 42)).rejects.toThrow(
+      await expect(service.revokeUserSession(9, 42, SUBJECT)).rejects.toThrow(
         new NotFoundException('会话 9 不存在'),
       );
     });

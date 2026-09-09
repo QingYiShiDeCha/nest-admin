@@ -18,6 +18,7 @@ import { PasswordPolicyService } from '../../common/password/password-policy.ser
 import type { Env } from '../../config/env.validation';
 import { UserService } from '../user/user.service';
 import { LoginLogService } from '../login-log/login-log.service';
+import type { DataScopeSubject } from '../rbac/data-scope.service';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
 import type { SessionVo } from './dto/session.vo';
@@ -254,8 +255,9 @@ export class AuthService {
   async listUserSessions(
     targetUserId: number,
     viewerSessionId: string | null,
+    subject: DataScopeSubject,
   ): Promise<SessionVo[]> {
-    await this.userService.findById(targetUserId);
+    await this.userService.assertAccessible(targetUserId, subject);
 
     return this.listSessions(targetUserId, viewerSessionId);
   }
@@ -264,8 +266,9 @@ export class AuthService {
   async revokeUserSession(
     sessionId: number,
     targetUserId: number,
+    subject: DataScopeSubject,
   ): Promise<void> {
-    await this.userService.findById(targetUserId);
+    await this.userService.assertAccessible(targetUserId, subject);
     // 复用同一个带归属条件的方法：会话必须确实属于这个目标用户，
     // 否则管理员可能因为拼错 id 而下掉另一个人的设备
     await this.revokeSession(sessionId, targetUserId);

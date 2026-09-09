@@ -100,8 +100,9 @@ export class UserController {
   })
   forceLogout(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
   ): Promise<{ revokedSessions: number }> {
-    return this.userService.forceLogout(id);
+    return this.userService.forceLogout(id, user);
   }
 
   @Post(':id/unlock')

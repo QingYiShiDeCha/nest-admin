@@ -1,7 +1,14 @@
-import { roleDepartments, roles, userRoles, users } from '@nest-admin/database';
+import {
+  departments,
+  roleDepartments,
+  roles,
+  userRoles,
+  users,
+} from '@nest-admin/database';
 import type { DataScope } from '@nest-admin/shared';
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
+import type { AnyMySqlColumn } from 'drizzle-orm/mysql-core';
 
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
 import { DepartmentService } from './department.service';
@@ -25,21 +32,112 @@ export class DataScopeService {
   async buildUserCondition(
     subject: DataScopeSubject,
   ): Promise<SQL | undefined> {
+    return this.buildUserIdCondition(subject, users.id);
+  }
+
+  /** 返回任意带 user_id 的业务表应追加的 SQL 条件；undefined 表示不限制。 */
+  async buildUserIdCondition(
+    subject: DataScopeSubject,
+    userIdColumn: AnyMySqlColumn,
+  ): Promise<SQL | undefined> {
     if (subject.isSuperAdmin) return undefined;
 
-    const lookup = await this.cache.lookupDataScope(subject.id, subject.deptId);
-    const resolved = lookup.value ?? (await this.resolveDataScope(subject));
-    if (!lookup.value) await this.cache.store(lookup, resolved);
+    const resolved = await this.resolveCachedDataScope(subject);
 
     if (resolved.unrestricted) return undefined;
 
     const conditions: SQL[] = [];
-    if (resolved.self) conditions.push(eq(users.id, subject.id));
+    if (resolved.self) conditions.push(eq(userIdColumn, subject.id));
     if (resolved.departmentIds.length > 0) {
-      conditions.push(inArray(users.deptId, resolved.departmentIds));
+      if (userIdColumn === users.id) {
+        conditions.push(inArray(users.deptId, resolved.departmentIds));
+      } else {
+        const scopedUsers = this.db
+          .select({ id: users.id })
+          .from(users)
+          .where(
+            and(
+              isNull(users.deletedAt),
+              inArray(users.deptId, resolved.departmentIds),
+            ),
+          );
+        conditions.push(inArray(userIdColumn, scopedUsers));
+      }
     }
 
     return conditions.length > 0 ? or(...conditions) : sql`0 = 1`;
+  }
+
+  /** 返回部门资源应追加的 SQL 条件；self 语义映射为用户所属部门。 */
+  async buildDepartmentCondition(
+    subject: DataScopeSubject,
+    departmentIdColumn: AnyMySqlColumn,
+  ): Promise<SQL | undefined> {
+    if (subject.isSuperAdmin) return undefined;
+
+    const resolved = await this.resolveCachedDataScope(subject);
+    if (resolved.unrestricted) return undefined;
+
+    const departmentIds = new Set(resolved.departmentIds);
+    if (resolved.self && subject.deptId !== null) {
+      departmentIds.add(subject.deptId);
+    }
+
+    return departmentIds.size > 0
+      ? inArray(departmentIdColumn, [...departmentIds])
+      : sql`0 = 1`;
+  }
+
+  /** 校验目标用户存在且处于当前主体的数据范围内，越权时统一按不存在处理。 */
+  async assertUserAccessible(
+    userId: number,
+    subject: DataScopeSubject,
+  ): Promise<void> {
+    const scopeCondition = await this.buildUserIdCondition(subject, users.id);
+    const [user] = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, userId), isNull(users.deletedAt), scopeCondition))
+      .limit(1);
+
+    if (!user) {
+      throw new NotFoundException(`用户 ${userId} 不存在`);
+    }
+  }
+
+  /** 校验目标部门存在且处于当前主体的数据范围内，越权时统一按不存在处理。 */
+  async assertDepartmentAccessible(
+    departmentId: number,
+    subject: DataScopeSubject,
+  ): Promise<void> {
+    const scopeCondition = await this.buildDepartmentCondition(
+      subject,
+      departments.id,
+    );
+    const [department] = await this.db
+      .select({ id: departments.id })
+      .from(departments)
+      .where(
+        and(
+          eq(departments.id, departmentId),
+          isNull(departments.deletedAt),
+          scopeCondition,
+        ),
+      )
+      .limit(1);
+
+    if (!department) {
+      throw new NotFoundException(`部门 ${departmentId} 不存在`);
+    }
+  }
+
+  private async resolveCachedDataScope(
+    subject: DataScopeSubject,
+  ): Promise<CachedDataScope> {
+    const lookup = await this.cache.lookupDataScope(subject.id, subject.deptId);
+    const resolved = lookup.value ?? (await this.resolveDataScope(subject));
+    if (!lookup.value) await this.cache.store(lookup, resolved);
+    return resolved;
   }
 
   private async resolveDataScope(

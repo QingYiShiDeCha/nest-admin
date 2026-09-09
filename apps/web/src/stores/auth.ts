@@ -5,7 +5,6 @@ import { apiLogin, apiLogout, apiProfile } from '@/api/auth';
 import type { LoginPayload, PermissionCode, UserProfile } from '@nest-admin/shared';
 import { clearTokens, getTokens, saveTokens } from '@/utils/auth-token';
 
-
 export const useAuthStore = defineStore(
   'auth',
   () => {

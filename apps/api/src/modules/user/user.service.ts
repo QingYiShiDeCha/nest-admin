@@ -330,10 +330,17 @@ export class UserService {
   }
 
   /** 管理员强制某用户下线，返回被吊销的会话数 */
-  async forceLogout(id: number): Promise<{ revokedSessions: number }> {
-    await this.findById(id);
+  async forceLogout(
+    id: number,
+    subject: DataScopeSubject,
+  ): Promise<{ revokedSessions: number }> {
+    await this.dataScopes.assertUserAccessible(id, subject);
 
     return { revokedSessions: await this.refreshTokens.revokeAllForUser(id) };
+  }
+
+  async assertAccessible(id: number, subject: DataScopeSubject): Promise<void> {
+    await this.dataScopes.assertUserAccessible(id, subject);
   }
 
   /** 管理员手动解锁因登录失败被锁定的账号 */

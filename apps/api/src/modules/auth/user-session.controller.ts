@@ -41,7 +41,7 @@ export class UserSessionController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() viewer: AuthUser,
   ): Promise<SessionVo[]> {
-    return this.authService.listUserSessions(id, viewer.sessionId);
+    return this.authService.listUserSessions(id, viewer.sessionId, viewer);
   }
 
   @Delete(':id/sessions/:sessionId')
@@ -56,7 +56,8 @@ export class UserSessionController {
   revokeUserSession(
     @Param('id', ParseIntPipe) id: number,
     @Param('sessionId', ParseIntPipe) sessionId: number,
+    @CurrentUser() viewer: AuthUser,
   ): Promise<void> {
-    return this.authService.revokeUserSession(sessionId, id);
+    return this.authService.revokeUserSession(sessionId, id, viewer);
   }
 }
