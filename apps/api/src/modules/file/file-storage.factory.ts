@@ -34,6 +34,35 @@ export function createFileStorage(config: AppConfig): FileStorage {
   );
 }
 
+export function createLogArchiveStorage(config: AppConfig): FileStorage {
+  if (config.get('LOG_ARCHIVE_DRIVER', { infer: true }) === 's3') {
+    return new S3FileStorage({
+      region: config.get('LOG_ARCHIVE_S3_REGION', { infer: true }),
+      bucket: config.get('LOG_ARCHIVE_S3_BUCKET', { infer: true }),
+      endpoint: config.get('LOG_ARCHIVE_S3_ENDPOINT', { infer: true }),
+      accessKeyId: config.get('LOG_ARCHIVE_S3_ACCESS_KEY_ID', {
+        infer: true,
+      }),
+      secretAccessKey: config.get('LOG_ARCHIVE_S3_SECRET_ACCESS_KEY', {
+        infer: true,
+      }),
+      forcePathStyle: config.get('LOG_ARCHIVE_S3_FORCE_PATH_STYLE', {
+        infer: true,
+      }),
+    });
+  }
+
+  return new LocalFileStorage(
+    resolve(
+      findWorkspaceRoot(),
+      config.get('LOG_ARCHIVE_LOCAL_DIR', {
+        infer: true,
+      }),
+    ),
+    '/_internal/log-archives',
+  );
+}
+
 export function resolveLocalUploadDirectory(config: AppConfig): string {
   const directory = config.get('UPLOAD_LOCAL_DIR', { infer: true });
 

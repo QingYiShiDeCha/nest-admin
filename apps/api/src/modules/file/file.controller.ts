@@ -65,8 +65,9 @@ export class FileController {
   @ApiOperation({ summary: '分页查询文件资源' })
   findPage(
     @Query() query: QueryFileResourceDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<PaginatedResult<FileResourceRecord>> {
-    return this.service.findPage(query);
+    return this.service.findPage(query, user);
   }
 
   @Get('resources/mine')
@@ -81,8 +82,11 @@ export class FileController {
   @Get('resources/:id')
   @Permissions(PERMISSIONS.FILE_READ)
   @ApiOperation({ summary: '查询文件资源详情' })
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<FileResourceRecord> {
-    return this.service.findById(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ): Promise<FileResourceRecord> {
+    return this.service.findById(id, user);
   }
 
   @Delete('resources/:id')
@@ -90,7 +94,10 @@ export class FileController {
   @OperationLog({ module: '文件资源', action: '删除文件' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '删除未被业务引用的文件资源' })
-  remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
-    return this.service.remove(id);
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ): Promise<void> {
+    return this.service.remove(id, user);
   }
 }

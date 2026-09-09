@@ -36,6 +36,10 @@ import { extname } from 'node:path';
 import type { Env } from '../../config/env.validation';
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
 import type { AuthUser } from '../auth/interfaces/auth-user.interface';
+import {
+  DataScopeService,
+  type DataScopeSubject,
+} from '../rbac/data-scope.service';
 import type { QueryFileResourceDto } from './dto/query-file-resource.dto';
 import { FILE_STORAGE, type FileStorage } from './file-storage.interface';
 
@@ -52,6 +56,7 @@ export class FileService {
     @Inject(FILE_STORAGE) private readonly storage: FileStorage,
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     config: ConfigService<Env, true>,
+    private readonly dataScopes: DataScopeService,
   ) {
     this.allowedMimeTypes = config
       .get('UPLOAD_ALLOWED_MIME_TYPES', { infer: true })
@@ -133,8 +138,9 @@ export class FileService {
 
   async findPage(
     query: QueryFileResourceDto,
+    subject: DataScopeSubject,
   ): Promise<PaginatedResult<FileResourceRecord>> {
-    return this.findPageByUploader(query);
+    return this.findPageByUploader(query, undefined, subject);
   }
 
   async findMyPage(
@@ -147,9 +153,17 @@ export class FileService {
   private async findPageByUploader(
     query: QueryFileResourceDto,
     uploaderId?: number,
+    subject?: DataScopeSubject,
   ): Promise<PaginatedResult<FileResourceRecord>> {
+    const scopeCondition = subject
+      ? await this.dataScopes.buildUserIdCondition(
+          subject,
+          fileResources.uploaderId,
+        )
+      : undefined;
     const conditions: (SQL | undefined)[] = [
       isNull(fileResources.deletedAt),
+      scopeCondition,
       uploaderId === undefined
         ? undefined
         : eq(fileResources.uploaderId, uploaderId),
@@ -187,14 +201,17 @@ export class FileService {
     };
   }
 
-  async findById(id: number): Promise<FileResourceRecord> {
-    const row = await this.findActiveRow(id);
+  async findById(
+    id: number,
+    subject: DataScopeSubject,
+  ): Promise<FileResourceRecord> {
+    const row = await this.findActiveRow(id, subject);
     const [resource] = await this.withReferenceCounts([row]);
     return resource;
   }
 
-  async remove(id: number): Promise<void> {
-    const row = await this.findActiveRow(id);
+  async remove(id: number, subject: DataScopeSubject): Promise<void> {
+    const row = await this.findActiveRow(id, subject);
     const referenceCount = await this.countReferences(row.url);
 
     if (referenceCount > 0) {
@@ -225,11 +242,24 @@ export class FileService {
       .where(and(eq(fileResources.id, id), isNull(fileResources.deletedAt)));
   }
 
-  private async findActiveRow(id: number): Promise<FileResourceRow> {
+  private async findActiveRow(
+    id: number,
+    subject: DataScopeSubject,
+  ): Promise<FileResourceRow> {
+    const scopeCondition = await this.dataScopes.buildUserIdCondition(
+      subject,
+      fileResources.uploaderId,
+    );
     const [row] = await this.db
       .select()
       .from(fileResources)
-      .where(and(eq(fileResources.id, id), isNull(fileResources.deletedAt)))
+      .where(
+        and(
+          eq(fileResources.id, id),
+          isNull(fileResources.deletedAt),
+          scopeCondition,
+        ),
+      )
       .limit(1);
 
     if (!row) {

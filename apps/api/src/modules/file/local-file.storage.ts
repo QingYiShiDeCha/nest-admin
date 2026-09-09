@@ -19,7 +19,9 @@ export class LocalFileStorage implements FileStorage {
     const target = this.resolveTarget(input.key);
 
     await mkdir(dirname(target), { recursive: true });
-    await writeFile(target, input.buffer, { flag: 'wx' });
+    await writeFile(target, input.buffer, {
+      flag: input.overwrite ? 'w' : 'wx',
+    });
 
     return {
       key: input.key,

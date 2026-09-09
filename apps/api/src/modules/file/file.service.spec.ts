@@ -1,13 +1,14 @@
-import type { DrizzleDB } from '@nest-admin/database';
+import { fileResources, type DrizzleDB } from '@nest-admin/database';
 import type { ConfigService } from '@nestjs/config';
 import {
   BadRequestException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import type { SQL } from 'drizzle-orm';
+import { eq, type SQL } from 'drizzle-orm';
 import { MySqlDialect } from 'drizzle-orm/mysql-core';
 
 import type { Env } from '../../config/env.validation';
+import { DataScopeService } from '../rbac/data-scope.service';
 import type { QueryFileResourceDto } from './dto/query-file-resource.dto';
 import type {
   FileStorage,
@@ -24,6 +25,9 @@ describe('FileService', () => {
     allowed = 'image/*,application/pdf',
     insertValues = jest.fn().mockResolvedValue([{ insertId: 7 }]),
     database?: DrizzleDB,
+    dataScopes: Pick<DataScopeService, 'buildUserIdCondition'> = {
+      buildUserIdCondition: jest.fn().mockResolvedValue(undefined),
+    },
   ) => {
     const config = {
       get: jest.fn().mockReturnValue(allowed),
@@ -35,7 +39,12 @@ describe('FileService', () => {
       } as unknown as DrizzleDB);
 
     return {
-      service: new FileService(storage, db, config),
+      service: new FileService(
+        storage,
+        db,
+        config,
+        dataScopes as DataScopeService,
+      ),
       insertValues,
     };
   };
@@ -162,6 +171,52 @@ describe('FileService', () => {
     await service.findMyPage(query, uploader.id);
 
     expect(capturedWhere).toBeDefined();
+    const compiled = new MySqlDialect().sqlToQuery(capturedWhere!);
+    expect(compiled.sql).toContain('`sys_file_resource`.`uploader_id` = ?');
+    expect(compiled.params).toContain(uploader.id);
+  });
+
+  it('管理资源查询叠加当前用户的数据范围', async () => {
+    let capturedWhere: SQL | undefined;
+    const scopeCondition = eq(fileResources.uploaderId, uploader.id);
+    const dataScopes = {
+      buildUserIdCondition: jest.fn().mockResolvedValue(scopeCondition),
+    };
+    const rowsWhere = jest.fn((where: SQL) => {
+      capturedWhere = where;
+      return {
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockReturnValue({
+            offset: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      };
+    });
+    const totalWhere = jest.fn().mockResolvedValue([{ total: 0 }]);
+    const select = jest
+      .fn()
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({ where: rowsWhere }),
+      })
+      .mockReturnValueOnce({
+        from: jest.fn().mockReturnValue({ where: totalWhere }),
+      });
+    const database = { select } as unknown as DrizzleDB;
+    const { service } = createService(
+      createStorage(),
+      'image/*',
+      undefined,
+      database,
+      dataScopes,
+    );
+    const subject = { id: uploader.id, deptId: 1, isSuperAdmin: false };
+
+    await service.findPage({ page: 1, pageSize: 15, offset: 0 }, subject);
+
+    expect(dataScopes.buildUserIdCondition).toHaveBeenCalledWith(
+      subject,
+      fileResources.uploaderId,
+    );
     const compiled = new MySqlDialect().sqlToQuery(capturedWhere!);
     expect(compiled.sql).toContain('`sys_file_resource`.`uploader_id` = ?');
     expect(compiled.params).toContain(uploader.id);

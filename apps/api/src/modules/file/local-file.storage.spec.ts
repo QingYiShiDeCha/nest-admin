@@ -54,4 +54,27 @@ describe('LocalFileStorage', () => {
       '非法文件存储路径',
     );
   });
+
+  it('允许内部归档对象幂等覆盖', async () => {
+    const storage = new LocalFileStorage(directory, '/uploads');
+
+    await storage.upload({
+      key: 'archives/logs/login-logs/2026/09/01/1-1.json.gz',
+      buffer: Buffer.from('first'),
+      contentType: 'application/gzip',
+    });
+    await storage.upload({
+      key: 'archives/logs/login-logs/2026/09/01/1-1.json.gz',
+      buffer: Buffer.from('second'),
+      contentType: 'application/gzip',
+      overwrite: true,
+    });
+
+    await expect(
+      readFile(
+        join(directory, 'archives/logs/login-logs/2026/09/01/1-1.json.gz'),
+        'utf8',
+      ),
+    ).resolves.toBe('second');
+  });
 });

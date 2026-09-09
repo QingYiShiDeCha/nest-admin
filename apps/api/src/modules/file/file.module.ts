@@ -5,8 +5,11 @@ import { memoryStorage } from 'multer';
 
 import type { Env } from '../../config/env.validation';
 import { FileController } from './file.controller';
-import { createFileStorage } from './file-storage.factory';
-import { FILE_STORAGE } from './file-storage.interface';
+import {
+  createFileStorage,
+  createLogArchiveStorage,
+} from './file-storage.factory';
+import { FILE_STORAGE, LOG_ARCHIVE_STORAGE } from './file-storage.interface';
 import { FileService } from './file.service';
 
 @Module({
@@ -33,6 +36,12 @@ import { FileService } from './file.service';
       inject: [ConfigService],
       useFactory: createFileStorage,
     },
+    {
+      provide: LOG_ARCHIVE_STORAGE,
+      inject: [ConfigService],
+      useFactory: createLogArchiveStorage,
+    },
   ],
+  exports: [FILE_STORAGE, LOG_ARCHIVE_STORAGE],
 })
 export class FileModule {}
