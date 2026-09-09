@@ -4,10 +4,10 @@
 
 ## 已实现功能
 
-- **认证与会话**：access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效；密码复杂度策略参数化，登录失败按账号计数锁定，管理员可解锁。
+- **认证与会话**：用户名密码登录、access/refresh 双 token、refresh token 轮换与重复使用检测、当前设备识别、单设备下线、退出后立即失效；密码复杂度策略参数化，登录失败按账号计数锁定，管理员可解锁。
 - **RBAC**：用户、角色、权限码、菜单树、部门数据范围和按钮级权限控制，支持 Redis 授权/数据范围缓存及主动失效，内置超管防自锁规则。
 - **系统管理**：用户、组织架构、岗位、角色、菜单、参数配置、数据字典、通知公告、登录日志、操作日志、定时任务、文件资源、在线用户、系统监控等页面，支持部门迁移原因与历史追踪，统一使用 `ProSearch`、`ProTable` 和 `useTable`。
-- **登录审计**：记录成功、凭据错误和锁定拦截三类结果，支持按用户名、结果与时间范围过滤；登录日志只提供查询，超期记录由内置清理任务按保留期物理删除。
+- **登录审计**：记录成功、凭据错误和锁定拦截三类结果，支持按用户名、结果与时间范围过滤；登录日志只提供查询，超期记录由内置清理任务归档后清理。
 - **数据字典**：字典类型与字典项 CRUD、状态和排序管理，业务侧通过 `useDict(code)` 复用启用选项，Redis 版本票据保证写后主动失效。
 - **通知与消息**：公告草稿、发布、撤回和阅读统计，支持全员、部门、角色、指定用户发送；Header 展示未读角标和最近消息，SSE + Redis Pub/Sub 实时同步多实例事件，断线自动回退轮询。
 - **界面基础设施**：浅色/深色/跟随系统主题、可切换主色和菜单风格、KeepAlive 页签、内容区独立刷新、Remix Icon 图标体系。
@@ -27,7 +27,7 @@
 | 请求 / 图表   | alova + ECharts 6 + vue-echarts                                             |
 | ORM           | Drizzle ORM 0.45（`drizzle-orm/mysql2`），迁移用 drizzle-kit                |
 | 数据库        | MySQL 8，驱动 mysql2 连接池                                                 |
-| Redis         | 全局限流、RBAC/数据字典缓存、消息传播与定时任务分布式锁，可选配置             |
+| Redis         | 全局限流、RBAC/数据字典缓存、消息传播与定时任务分布式锁，可选配置           |
 | 配置          | `@nestjs/config` + zod 做启动期环境变量校验                                 |
 | 认证          | `@nestjs/jwt` + passport-jwt，双 token（access / refresh），bcryptjs 存密码 |
 | 校验          | class-validator / class-transformer，全局 `ValidationPipe`                  |
@@ -46,6 +46,11 @@ nest-admin/
 ├─ tsconfig.base.json        # 各包 tsconfig 统一继承它
 ├─ eslint.config.mjs         # 全仓库唯一一份 flat config
 ├─ .env / .env.example       # 唯一一份环境变量，各包都从仓库根读
+├─ .env.docker.example       # Docker 部署环境变量模板
+├─ Dockerfile                # api、web、迁移的多阶段镜像构建
+├─ docker-compose.yml        # MySQL、Redis、API、Web 编排
+├─ docker/Caddyfile          # Web 静态资源与 API/SSE/上传代理
+├─ .github/workflows/ci.yml  # CI 质量检查与镜像构建
 ├─ apps/
 │  ├─ api/                   # @nest-admin/api，NestJS HTTP 服务
 │  │  ├─ src/
@@ -102,6 +107,23 @@ pnpm dev
 
 环境变量只在仓库根维护一份。各包运行时 cwd 不同（`pnpm --filter` 会把 cwd 设到包目录），所以定位 `.env` 不靠相对层级，而是由 `@nest-admin/shared/node` 的 `findWorkspaceRoot()` 向上找 `pnpm-workspace.yaml`。本机若要覆盖某几项而不动 `.env`，可以另建 `.env.local`，它优先级更高。
 
+## Docker 部署
+
+Docker 部署使用根目录的多阶段 `Dockerfile`：`api` target 只携带生产依赖和编译产物，`web` target 使用 Caddy 提供 SPA，并代理 `/api`、SSE 和 `/uploads` 请求。`docker-compose.yml` 编排 MySQL 8.4、Redis 7、数据库迁移、API 和 Web；API 只有在迁移成功、Redis 健康后才启动。API 还挂载独立的 `log-archives` volume 保存本地日志归档，不会被 Caddy 的 `/uploads` 路由公开。
+
+```bash
+cp .env.docker.example .env.docker
+# 编辑 .env.docker，至少替换数据库密码、初始管理员密码和两个 JWT 密钥
+docker compose --env-file .env.docker up -d
+
+# 首次部署写入管理员、权限、菜单和内置配置；该服务带 init profile，不会随普通 up 自动执行
+docker compose --env-file .env.docker run --rm db-seed
+```
+
+部署完成后访问 `http://localhost:5173`。API 健康检查地址为 `http://localhost:3000/api/health`；生产环境可以将 `CADDY_SITE_ADDRESS` 改为实际域名，并把 `WEB_PORT`/`WEB_HTTPS_PORT` 映射为 `80`/`443`，由 Caddy 自动申请和续期 HTTPS 证书，证书数据会持久化到 `caddy-data`/`caddy-config` 卷。也建议关闭主机 API 端口映射，只通过 Caddy 或独立反向代理暴露服务。数据库迁移是一次性 `db-migrate` 服务，修改迁移后重新执行 `docker compose --env-file .env.docker up db-migrate`。
+
+CI 配置位于 `.github/workflows/ci.yml`，在 push 和 Pull Request 时执行依赖安装、Lint、类型检查、API/Web 测试、全量构建、Compose 配置校验和 API/Web/迁移 Docker 镜像构建，不自动发布镜像或部署生产环境。
+
 ## 常用命令
 
 根目录的命令会自动处理包之间的依赖顺序，日常用它们就够了：
@@ -120,9 +142,11 @@ pnpm dev
 | `pnpm db:migrate`                 | 把未执行的迁移应用到数据库                                                          |
 | `pnpm db:push`                    | 不生成迁移文件直接同步 schema，**仅限本地试验**                                     |
 | `pnpm db:studio`                  | 打开 Drizzle Studio 可视化查看数据                                                  |
-| `pnpm db:seed`                    | 幂等地创建管理员、组织岗位、权限菜单、内置参数和示例业务字典                       |
+| `pnpm db:seed`                    | 幂等地创建管理员、组织岗位、权限菜单、内置参数和示例业务字典                        |
 
 要只操作某个包，用 `pnpm --filter @nest-admin/api <script>`。
+
+`pnpm test:e2e` 会使用隔离的 `nest_admin_test` 数据库和 Redis DB 15，自动创建数据库、执行迁移和 seed，再运行真实 HTTP 链路测试。默认会读取当前环境中的数据库连接信息；也可以通过 `E2E_DB_HOST`、`E2E_DB_PORT`、`E2E_DB_USER`、`E2E_DB_PASSWORD`、`E2E_DB_NAME` 和 `E2E_REDIS_URL` 覆盖。测试会创建并清理带随机后缀的用户和角色，不应将 `E2E_DB_NAME` 指向开发或生产数据库。
 
 **修改共享包后先构建**。`apps/web` 的 Vite 开发环境通过 `@nest-admin/source` condition 直接读取 `packages/shared` 源码，但 API 与各包的独立 typecheck 读取构建产物。修改 `packages/shared` 或 `packages/database` 后应先执行 `pnpm build:packages`，否则可能仍看到旧的 `dist` 类型。`pnpm dev`、`pnpm test` 和数据库脚本已经内置这一步。
 
@@ -205,6 +229,10 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 **消息入口与公告管理授权分离**。`/messages` 是所有登录用户都可访问的个人收件箱，Header 始终展示铃铛；没有通知公告菜单只代表不能创建、发布或管理公告。发布时系统按全员、部门、角色或指定用户解析收件人快照，消息查询也始终带当前用户 id，因此每个人只会看到推送给自己的消息。Header 通过 Bearer SSE 接收发布、撤回和已读事件，Redis Pub/Sub 负责多实例传播，Redis 未配置或故障时保留本机推送，浏览器断线期间回退到 60 秒轮询。
 
+**公告管理遵守数据范围**。公告列表、详情和写操作按 `created_by` 过滤；部门、用户和角色接收对象选择器只返回当前用户可见范围，发布时还会按收件人数据范围过滤，避免通过全员或角色目标绕过 RBAC 数据权限。
+
+**数据权限适配范围已收口**。用户、操作日志、登录日志、在线会话、部门迁移历史、岗位关系、文件资源和通知公告使用 `DataScopeService` 处理本人、部门、部门及下级、自定义范围和超级管理员。系统参数、数据字典、定时任务、系统监控、统计、角色和菜单是系统级资源，不存在可靠的用户归属字段，继续使用独立的管理权限控制，不错误套用用户数据范围。
+
 **几条防自锁规则**。内置角色（`is_system`）不可删除、不可停用、不可改角色码——停用超管角色会把所有管理员一起锁在系统外；改角色码会让守卫里的超管短路判断失效。另外不允许修改自己的角色，否则误摘超管后只能去数据库手工恢复。改名称和备注不受限制。
 
 **菜单树的几条规则**。节点分三类：`directory` 只做分组、不对应页面也不能有 `component`；`menu` 必须有 `path`，前端根据当前用户菜单动态注册路由，`component` 可填写相对 `apps/web/src/views` 的组件路径，也可留空并按 `path` 自动匹配对应目录下的 `index.vue`；`external` 的 `path` 必须是完整 URL。只有目录能当父节点。改 `parentId` 时会拒绝指向自己或自己的后代，避免子树脱离主干成环。删除和「目录改成其他类型」在还有子节点时都会被拒绝——级联删一棵子树不可逆，让调用方显式逐个确认更安全。
@@ -237,13 +265,13 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 **手动触发不长时占用 HTTP 请求**。接口先写入 `running` 日志并立即返回，后台再继续执行；最终的成功、失败或跳过状态在执行日志中查看。日志保存任务名称/任务键快照、触发方式、操作人、耗时、截断后的结果和错误。
 
-**日志与过期会话清理是首个内置任务**。保留天数仍由 `LOG_RETENTION_DAYS` 控制；`LOG_CLEANUP_CRON` 和 `LOG_CLEANUP_ENABLED` 只在首次创建内置计划时作为初值，之后以定时任务管理页中的配置为准。
+**日志与过期会话清理是首个内置任务**。保留天数仍由 `LOG_RETENTION_DAYS` 控制；超期登录日志和操作日志会按 1000 条一批压缩为 `json.gz`，先上传到独立的 `LOG_ARCHIVE_DRIVER` 存储，再删除已归档的原记录；归档失败时保留原日志。归档对象使用 `LOG_ARCHIVE_PREFIX` 前缀，确定性 key 支持失败重试覆盖。生产环境建议使用独立的私有 S3 bucket；本地模式默认写入 `.log-archives`，不会通过 `/uploads` 静态资源路由暴露。`LOG_CLEANUP_CRON` 和 `LOG_CLEANUP_ENABLED` 只在首次创建内置计划时作为初值，之后以定时任务管理页中的配置为准。
 
 **系统监控是只读快照**。`GET /api/system-monitor/overview` 只返回当前 API 实例的非敏感运行信息；数据库或 Redis 探测失败会分别标记为异常，不会让整个概览接口失败。趋势采样只保留在当前进程内存中的最近 20 条，页面每 30 秒刷新一次，实例重启后自然清空。
 
 **首页统计来自既有业务数据**。`GET /api/statistics/dashboard` 聚合用户、登录日志、操作日志和部门数据，返回概览卡、终端/浏览器分布、近 12 个自然月趋势、近 7 天按小时热力图、部门分布和热门操作模块。登录事件统计使用近 30 天成功登录记录，浏览器识别按 Edge、Opera、微信、夸克等特殊 UA 规则优先于 Chrome/Safari；单个统计块查询失败时只降级该块，不影响首页其他数据。
 
-**删除是分批的。** 一条 `DELETE WHERE created_at < ?` 打在几百万行上会长时间持锁、撑爆 undo 和 binlog，线上表现就是整个库卡住。这里每批 1000 行、单次最多 100 批，超出部分留到下一轮。
+**日志归档与清理是分批的。** 一条大范围 `DELETE WHERE created_at < ?` 打在几百万行上会长时间持锁、撑爆 undo 和 binlog。这里每批最多归档并清理 1000 行、单次最多 100 批，归档对象上传成功后才删除对应 ID，超出部分留到下一轮；refresh token 仍只做原有分批清理。
 
 **多实例下靠 Redis 锁保证只跑一份。** 锁用 `SET NX PX` 获取、Lua 脚本比对持有者后删除——分两步做的话，恰好在两步之间锁过期被别人抢到，就会误删对方的锁。抢不到锁直接记为 `skipped` 而不排队，避免慢任务形成积压。没配 Redis 时不加锁直接执行，单实例部署本就不需要它。
 
@@ -251,11 +279,13 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 日志表 append-only，没有软删除也没有 `created_by`——日志本身就是「谁在何时做了什么」，再套一层审计字段是循环。`username` 冗余存一份而非做外键：用户被删除后仍要能回答「是谁做的」。接口只提供查询，不提供删除，能被随手删掉的审计日志没有审计价值；清理历史应当是运维层面按 `created_at` 批量删除的定时任务。
 
+**审计日志按数据范围查询**。操作日志和登录日志会按记录中的 `user_id` 叠加当前用户的本人、部门、部门及下级或自定义范围；匿名失败记录的 `user_id` 为空，不会被普通用户看到。详情接口同样带范围条件，用户即使猜到其他日志 ID，也只会得到 404。
+
 **限流**。全局默认按客户端 IP 计数，窗口与配额由 `THROTTLE_TTL` / `THROTTLE_LIMIT` 控制；登录和注册另有更严格的固定阈值（60 秒 5 次，见 `packages/shared` 的 `LOGIN_THROTTLE`）。写成常量而非环境变量是因为 `@Throttle` 是装饰器，在类定义时求值，那会儿 ConfigModule 还没加载 `.env`。
 
 限流守卫注册在守卫链最前面：它必须先于认证执行，否则每次暴力尝试都会先做一遍查库和 bcrypt 比对，防护本身反而成了最贵的一环。健康检查用 `@SkipThrottle()` 豁免，避免被负载均衡和监控的轮询打满。
 
-按 IP 而不按用户名计数是有意的：按用户名会让攻击者用错误密码反复请求就能锁死任意真实账号，把防护变成拒绝服务的入口。**部署在 nginx 之后必须把 `TRUST_PROXY` 设为 true**，否则所有请求的来源 IP 都是代理地址，限流退化成全站共用一个配额；反过来直接暴露公网时必须保持 false，否则客户端可伪造 `X-Forwarded-For` 绕过限流。
+按 IP 而不按用户名计数是有意的：按用户名会让攻击者用错误密码反复请求就能锁死任意真实账号，把防护变成拒绝服务的入口。**部署在 Caddy、Nginx 或其他反向代理之后必须把 `TRUST_PROXY` 设为 true**，否则所有请求的来源 IP 都是代理地址，限流退化成全站共用一个配额；反过来直接暴露公网时必须保持 false，否则客户端可伪造 `X-Forwarded-For` 绕过限流。
 
 **计数存哪由 `REDIS_URL` 决定**。配了就用 Redis，多实例共享同一份计数；不配（或留空）则回退到进程内存，此时每个实例各算各的、实际配额按实例数翻倍。启动日志会明确打印当前用的是哪一种——线上最怕的是以为配了 Redis 其实回退了，所以这行日志是必需的而不是装饰。
 
@@ -437,8 +467,6 @@ sys_file_resource (文件资源元数据与上传人快照)
 
 按当前范围刻意留白的部分，后续要做时的落点：
 
-- **日志归档到冷存储**。目前超期日志是直接物理删除。若有合规要求需要长期留存，应在 `LogCleanupService` 删除前先导出到对象存储或归档表。
-- **通用数据权限适配**。部门数据范围当前已用于用户列表；后续业务模块需要在各自查询入口复用 `DataScopeService`，按资源所有者或部门字段追加条件。
 - **实时在线状态**。在线用户当前按有效登录会话判断，不包含 WebSocket 心跳、最后活跃时间或 IP 地理位置；浏览器关闭但会话未过期时仍会显示在线。
 - **实时消息不做历史事件重放**。SSE 重连后会主动同步当前未读数和可见消息，Redis 只传播轻量失效事件；消息正文、收件人快照和已读状态仍以 MySQL 为准。
 - **构建缓存**。包数量变多、CI 变慢时可以再引入 Turborepo，现在 pnpm 原生编排够用。

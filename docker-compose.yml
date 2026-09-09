@@ -1,0 +1,170 @@
+x-database-environment: &database-environment
+  DB_HOST: mysql
+  DB_PORT: 3306
+  DB_USER: ${MYSQL_APP_USER:-nest_admin}
+  DB_PASSWORD: ${MYSQL_APP_PASSWORD:?MYSQL_APP_PASSWORD must be set}
+  DB_NAME: ${MYSQL_DATABASE:-nest_admin}
+
+x-api-environment: &api-environment
+  <<: *database-environment
+  NODE_ENV: production
+  PORT: 3000
+  API_PREFIX: api
+  SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+  DB_POOL_LIMIT: ${DB_POOL_LIMIT:-10}
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET must be set}
+  JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-30m}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
+  JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+  BCRYPT_SALT_ROUNDS: ${BCRYPT_SALT_ROUNDS:-10}
+  THROTTLE_TTL: ${THROTTLE_TTL:-60}
+  THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
+  TRUST_PROXY: ${TRUST_PROXY:-true}
+  REDIS_URL: redis://redis:6379/0
+  RBAC_CACHE_TTL_SECONDS: ${RBAC_CACHE_TTL_SECONDS:-300}
+  DICT_CACHE_TTL_SECONDS: ${DICT_CACHE_TTL_SECONDS:-300}
+  LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-90}
+  LOG_CLEANUP_CRON: ${LOG_CLEANUP_CRON:-0 3 * * *}
+  LOG_CLEANUP_ENABLED: ${LOG_CLEANUP_ENABLED:-true}
+  LOG_ARCHIVE_PREFIX: ${LOG_ARCHIVE_PREFIX:-archives/logs}
+  LOG_ARCHIVE_DRIVER: ${LOG_ARCHIVE_DRIVER:-local}
+  LOG_ARCHIVE_LOCAL_DIR: ${LOG_ARCHIVE_LOCAL_DIR:-.log-archives}
+  LOG_ARCHIVE_S3_ENDPOINT: ${LOG_ARCHIVE_S3_ENDPOINT:-}
+  LOG_ARCHIVE_S3_REGION: ${LOG_ARCHIVE_S3_REGION:-us-east-1}
+  LOG_ARCHIVE_S3_BUCKET: ${LOG_ARCHIVE_S3_BUCKET:-}
+  LOG_ARCHIVE_S3_ACCESS_KEY_ID: ${LOG_ARCHIVE_S3_ACCESS_KEY_ID:-}
+  LOG_ARCHIVE_S3_SECRET_ACCESS_KEY: ${LOG_ARCHIVE_S3_SECRET_ACCESS_KEY:-}
+  LOG_ARCHIVE_S3_FORCE_PATH_STYLE: ${LOG_ARCHIVE_S3_FORCE_PATH_STYLE:-false}
+  UPLOAD_DRIVER: ${UPLOAD_DRIVER:-local}
+  UPLOAD_MAX_FILE_SIZE_MB: ${UPLOAD_MAX_FILE_SIZE_MB:-10}
+  UPLOAD_ALLOWED_MIME_TYPES: ${UPLOAD_ALLOWED_MIME_TYPES:-image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,application/zip}
+  UPLOAD_LOCAL_DIR: .uploads
+  UPLOAD_LOCAL_URL_PREFIX: /uploads
+  UPLOAD_S3_ENDPOINT: ${UPLOAD_S3_ENDPOINT:-}
+  UPLOAD_S3_REGION: ${UPLOAD_S3_REGION:-us-east-1}
+  UPLOAD_S3_BUCKET: ${UPLOAD_S3_BUCKET:-}
+  UPLOAD_S3_ACCESS_KEY_ID: ${UPLOAD_S3_ACCESS_KEY_ID:-}
+  UPLOAD_S3_SECRET_ACCESS_KEY: ${UPLOAD_S3_SECRET_ACCESS_KEY:-}
+  UPLOAD_S3_FORCE_PATH_STYLE: ${UPLOAD_S3_FORCE_PATH_STYLE:-false}
+  UPLOAD_S3_PUBLIC_BASE_URL: ${UPLOAD_S3_PUBLIC_BASE_URL:-}
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-nest_admin}
+      MYSQL_USER: ${MYSQL_APP_USER:-nest_admin}
+      MYSQL_PASSWORD: ${MYSQL_APP_PASSWORD:?MYSQL_APP_PASSWORD must be set}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set}
+    command:
+      [
+        'mysqld',
+        '--character-set-server=utf8mb4',
+        '--collation-server=utf8mb4_unicode_ci',
+      ]
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'mysqladmin ping -h 127.0.0.1 -uroot --password=$${MYSQL_ROOT_PASSWORD} --silent',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  db-migrate:
+    build:
+      context: .
+      target: migrate
+    environment: *database-environment
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: 'no'
+
+  db-seed:
+    profiles: ['init']
+    build:
+      context: .
+      target: migrate
+    command: ['pnpm', 'db:seed']
+    environment:
+      <<: *database-environment
+      BCRYPT_SALT_ROUNDS: ${BCRYPT_SALT_ROUNDS:-10}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-admin}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD must be set}
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      target: api
+    environment: *api-environment
+    volumes:
+      - uploads:/app/.uploads
+      - log-archives:/app/${LOG_ARCHIVE_LOCAL_DIR:-.log-archives}
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    ports:
+      - '${API_PORT:-3000}:3000'
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'node -e "fetch(''http://127.0.0.1:3000/api/health'').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      target: web
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-/api}
+    environment:
+      CADDY_SITE_ADDRESS: ${CADDY_SITE_ADDRESS:-:80}
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    ports:
+      - '${WEB_PORT:-5173}:80'
+      - '${WEB_HTTPS_PORT:-5443}:443'
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1/ || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql-data:
+  redis-data:
+  uploads:
+  log-archives:
+  caddy-data:
+  caddy-config:

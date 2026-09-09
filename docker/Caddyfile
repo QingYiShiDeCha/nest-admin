@@ -1,0 +1,21 @@
+{$CADDY_SITE_ADDRESS} {
+  root * /srv
+  encode zstd gzip
+
+  @api path /api /api/*
+  handle @api {
+    reverse_proxy api:3000 {
+      flush_interval -1
+    }
+  }
+
+  @uploads path /uploads /uploads/*
+  handle @uploads {
+    reverse_proxy api:3000
+  }
+
+  handle {
+    try_files {path} /index.html
+    file_server
+  }
+}

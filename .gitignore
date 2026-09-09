@@ -42,6 +42,7 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 .env.local
+.env.docker
 
 # temp directory
 .temp
@@ -51,6 +52,7 @@ lerna-debug.log*
 # Runtime data
 pids
 .uploads/
+.log-archives/
 *.pid
 *.seed
 *.pid.lock

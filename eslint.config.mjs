@@ -10,6 +10,7 @@ export default tseslint.config(
   {
     ignores: [
       'eslint.config.mjs',
+      'scripts/**/*.mjs',
       '**/dist/**',
       '**/coverage/**',
       '**/migrations/**',

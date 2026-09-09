@@ -13,7 +13,7 @@
     "lint": "pnpm lint:api && pnpm lint:web",
     "format": "prettier --write \"{apps,packages}/*/{src,test}/**/*.ts\"",
     "test": "pnpm build:packages && pnpm -r test",
-    "test:e2e": "pnpm build:packages && pnpm --filter @nest-admin/api test:e2e",
+    "test:e2e": "node scripts/test-e2e.mjs",
     "clean": "node -e \"for (const p of require('fast-glob').sync(['apps/*/dist','packages/*/dist','**/*.tsbuildinfo'],{onlyFiles:false,ignore:['**/node_modules/**']})) require('fs').rmSync(p,{recursive:true,force:true})\"",
     "db:generate": "pnpm build:packages && pnpm --filter @nest-admin/database db:generate",
     "db:migrate": "pnpm build:packages && pnpm --filter @nest-admin/database db:migrate",
