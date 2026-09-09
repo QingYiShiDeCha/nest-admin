@@ -84,6 +84,7 @@ function createComponentTokens(
       optionSelectedColor: primaryColor,
       optionSelectedFontWeight: 500,
       optionSelectedBg: background.active,
+      optionPadding: '8px 12px',
       optionActiveBg: background.hover,
       hoverBorderColor: primaryColor,
       activeBorderColor: primaryColor,
