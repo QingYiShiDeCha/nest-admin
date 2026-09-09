@@ -2,6 +2,8 @@
 import type { MenuProps } from 'antdv-next';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-vue';
+import 'overlayscrollbars/overlayscrollbars.css';
 
 import logoUrl from '@/assets/logo.svg';
 import { DARK_THEME_COLORS, LIGHT_THEME_COLORS } from '@/constants/palette';
@@ -152,16 +154,26 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
       </span>
     </div>
 
-    <a-menu
-      class="flex-1 min-h-0 overflow-y-auto"
-      :theme="settings.menuBackground"
-      mode="inline"
-      :items="sidebarItems"
-      :selected-keys="selectedKeys"
-      :open-keys="openKeys"
-      @open-change="handleOpenChange"
-      @click="handleMenuClick"
-    />
+    <OverlayScrollbarsComponent
+      class="flex-1 min-h-0"
+      :options="{
+        scrollbars: {
+          autoHide: 'leave',
+          autoHideDelay: 800,
+        },
+      }"
+    >
+      <a-menu
+        class="sidebar-menu"
+        :theme="settings.menuBackground"
+        mode="inline"
+        :items="sidebarItems"
+        :selected-keys="selectedKeys"
+        :open-keys="openKeys"
+        @open-change="handleOpenChange"
+        @click="handleMenuClick"
+      />
+    </OverlayScrollbarsComponent>
 
     <div
       v-if="!hasMenus && !collapsed"
@@ -176,3 +188,23 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
     </div>
   </a-layout-sider>
 </template>
+
+<style scoped>
+/* 自定义 OverlayScrollbars 滚动条颜色 - 更浅的颜色 */
+:deep(.os-scrollbar-handle) {
+  background: rgba(0, 0, 0, 0.15) !important;
+}
+
+:deep(.os-scrollbar-handle:hover) {
+  background: rgba(0, 0, 0, 0.25) !important;
+}
+
+/* 暗色主题下的滚动条 */
+.admin-sidebar :deep(.ant-menu-dark) ~ :deep(.os-scrollbar .os-scrollbar-handle) {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.admin-sidebar :deep(.ant-menu-dark) ~ :deep(.os-scrollbar .os-scrollbar-handle:hover) {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+</style>

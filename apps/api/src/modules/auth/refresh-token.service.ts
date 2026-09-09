@@ -45,11 +45,97 @@ export type OnlineUserSessionRow = Omit<
 @Injectable()
 export class RefreshTokenService {
   private readonly logger = new Logger(RefreshTokenService.name);
+  /** 单个用户允许的最大活跃会话数（跨设备） */
+  private readonly MAX_SESSIONS_PER_USER = 10;
 
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     private readonly dataScopes: DataScopeService,
   ) {}
+
+  /**
+   * 清理同一设备的旧会话，实现"同设备单点登录"。
+   *
+   * 同设备判断依据：相同的 userId + IP + User-Agent。
+   * 这样用户可以在手机、电脑、平板同时登录，但同一设备重新登录会清理旧会话。
+   */
+  private async revokeDeviceSessions(
+    userId: number,
+    client: { ip?: string | null; userAgent?: string | null },
+  ): Promise<void> {
+    // 缺少设备信息时跳过（降级为允许多会话）
+    if (!client.ip || !client.userAgent) {
+      return;
+    }
+
+    const result = await this.db
+      .update(refreshTokens)
+      .set({ revokedAt: sql`CURRENT_TIMESTAMP` })
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          eq(refreshTokens.ip, client.ip),
+          eq(refreshTokens.userAgent, client.userAgent.slice(0, 255)),
+          isNull(refreshTokens.revokedAt),
+          gt(refreshTokens.expiresAt, new Date()),
+        ),
+      );
+
+    if (result[0]?.affectedRows > 0) {
+      this.logger.debug(
+        `用户 ${userId} 在当前设备重新登录，清理 ${result[0].affectedRows} 个旧会话`,
+      );
+    }
+  }
+
+  /**
+   * 强制执行单用户会话数上限。
+   * 超过上限时，自动清理最旧的会话（按 createdAt 排序）。
+   */
+  private async enforceSessionLimit(userId: number): Promise<void> {
+    // 查询当前有效会话，按创建时间降序（最新的在前）
+    const activeSessions = await this.db
+      .select({ id: refreshTokens.id, createdAt: refreshTokens.createdAt })
+      .from(refreshTokens)
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          isNull(refreshTokens.revokedAt),
+          gt(refreshTokens.expiresAt, new Date()),
+        ),
+      )
+      .orderBy(desc(refreshTokens.createdAt));
+
+    // 未超限，无需处理
+    if (activeSessions.length < this.MAX_SESSIONS_PER_USER) {
+      return;
+    }
+
+    // 保留最新的 N-1 个，清理其余
+    const sessionsToKeep = activeSessions.slice(
+      0,
+      this.MAX_SESSIONS_PER_USER - 1,
+    );
+    const keepIds = sessionsToKeep.map((s) => s.id);
+
+    await this.db
+      .update(refreshTokens)
+      .set({ revokedAt: sql`CURRENT_TIMESTAMP` })
+      .where(
+        and(
+          eq(refreshTokens.userId, userId),
+          sql`${refreshTokens.id} NOT IN (${sql.join(
+            keepIds.map((id) => sql`${id}`),
+            sql`, `,
+          )})`,
+          isNull(refreshTokens.revokedAt),
+        ),
+      );
+
+    this.logger.log(
+      `用户 ${userId} 会话数达上限（${activeSessions.length}/${this.MAX_SESSIONS_PER_USER}），清理 ${activeSessions.length - this.MAX_SESSIONS_PER_USER + 1} 个旧会话`,
+    );
+  }
 
   /** 生成一个新的 jti 并落库，返回 jti 供签发 JWT 时写入 */
   async issue(
@@ -57,6 +143,12 @@ export class RefreshTokenService {
     expiresAt: Date,
     client: { ip?: string | null; userAgent?: string | null } = {},
   ): Promise<string> {
+    // 1. 优先清理同设备的旧会话（开发时刷新页面不会产生多个会话）
+    await this.revokeDeviceSessions(userId, client);
+
+    // 2. 检查会话总数上限（防止恶意注册大量会话）
+    await this.enforceSessionLimit(userId);
+
     const jti = randomUUID();
 
     await this.db.insert(refreshTokens).values({

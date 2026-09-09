@@ -1,6 +1,10 @@
 import { noticeRecipients, notices } from '@nest-admin/database';
-import type { NoticeMessage, PaginatedResult } from '@nest-admin/shared';
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type {
+  NoticeMessage,
+  NoticeRealtimeEvent,
+  PaginatedResult,
+} from '@nest-admin/shared';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   and,
   count,
@@ -43,6 +47,8 @@ const messageColumns = {
 
 @Injectable()
 export class MessageService {
+  private readonly logger = new Logger(MessageService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     private readonly events: NoticeEventService,
@@ -148,6 +154,98 @@ export class MessageService {
     if (result.affectedRows > 0) {
       await this.events.publishToUsers([userId], 'message.read-all');
     }
+  }
+
+  /**
+   * 查询用户在断线期间错过的消息事件，用于 SSE 重连时的历史事件重放。
+   *
+   * @param userId 用户 ID
+   * @param lastEventId 用户最后接收的事件 ID（来自 SSE 的 Last-Event-ID 请求头）
+   * @returns 断线期间产生的历史事件列表（按时间升序，先推送旧事件）
+   */
+  async findMissedEvents(
+    userId: number,
+    lastEventId: string,
+  ): Promise<NoticeRealtimeEvent[]> {
+    try {
+      // 解析 lastEventId 的时间戳部分（格式: uuid@timestamp）
+      const lastTimestamp = this.parseEventTimestamp(lastEventId);
+      if (!lastTimestamp) {
+        this.logger.debug(
+          `无法解析事件 ID ${lastEventId}，跳过历史事件重放`,
+        );
+        return [];
+      }
+
+      // 查询断线后新增的消息（通过 createdAt 判断）
+      const missedMessages = await this.db
+        .select({
+          id: noticeRecipients.id,
+          noticeId: notices.id,
+          createdAt: noticeRecipients.createdAt,
+          readAt: noticeRecipients.readAt,
+        })
+        .from(noticeRecipients)
+        .innerJoin(notices, eq(notices.id, noticeRecipients.noticeId))
+        .where(
+          and(
+            eq(noticeRecipients.userId, userId),
+            eq(notices.status, 'published'),
+            isNull(notices.deletedAt),
+            gt(noticeRecipients.createdAt, lastTimestamp),
+          ),
+        )
+        .orderBy(noticeRecipients.createdAt)
+        .limit(50); // 限制最多重放 50 条，避免一次推送过多
+
+      // 将消息记录转换为实时事件
+      const events: NoticeRealtimeEvent[] = missedMessages.map((msg) => ({
+        id: this.generateEventId(msg.createdAt),
+        type: 'message.created' as const,
+        occurredAt: msg.createdAt.toISOString(),
+        messageId: msg.id,
+        noticeId: msg.noticeId,
+      }));
+
+      if (events.length > 0) {
+        this.logger.log(
+          `用户 ${userId} 重连，推送 ${events.length} 条历史消息事件`,
+        );
+      }
+
+      return events;
+    } catch (error) {
+      this.logger.error(
+        `查询用户 ${userId} 的历史事件失败: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * 从事件 ID 中解析时间戳。
+   * 事件 ID 格式: {uuid}@{timestamp} 或纯 uuid（旧格式）
+   */
+  private parseEventTimestamp(eventId: string): Date | null {
+    const parts = eventId.split('@');
+    if (parts.length === 2) {
+      const timestamp = parseInt(parts[1], 10);
+      if (!isNaN(timestamp) && timestamp > 0) {
+        return new Date(timestamp);
+      }
+    }
+
+    // 旧格式或无法解析，返回较早的时间（5分钟前）作为降级
+    return new Date(Date.now() - 5 * 60 * 1000);
+  }
+
+  /**
+   * 生成带时间戳的事件 ID，用于历史事件重放。
+   * 格式: {uuid}@{timestamp}
+   */
+  private generateEventId(timestamp: Date): string {
+    const uuid = crypto.randomUUID();
+    return `${uuid}@${timestamp.getTime()}`;
   }
 }
 

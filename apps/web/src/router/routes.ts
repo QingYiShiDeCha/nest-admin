@@ -32,6 +32,17 @@ export const routes: RouteRecordRaw[] = [
           cacheName: 'MessageCenterPage',
         },
       },
+      {
+        path: '/editor',
+        name: 'editor-demo',
+        component: () => import('@/views/editor/index.vue'),
+        meta: {
+          title: '富文本编辑器',
+          icon: 'RiEditLine',
+          keepAlive: true,
+          cacheName: 'EditorDemoPage',
+        },
+      },
     ],
   },
   {

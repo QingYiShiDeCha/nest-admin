@@ -96,7 +96,7 @@ export class NoticeEventService implements OnModuleInit, OnModuleDestroy {
     if (recipients.length === 0) return;
 
     const event: NoticeRealtimeEvent = {
-      id: randomUUID(),
+      id: this.generateEventId(),
       type,
       occurredAt: new Date().toISOString(),
       ...reference,
@@ -124,6 +124,16 @@ export class NoticeEventService implements OnModuleInit, OnModuleDestroy {
         return;
       }
     }
+  }
+
+  /**
+   * 生成带时间戳的事件 ID，用于 SSE 历史事件重放。
+   * 格式: {uuid}@{timestamp}
+   */
+  private generateEventId(): string {
+    const uuid = randomUUID();
+    const timestamp = Date.now();
+    return `${uuid}@${timestamp}`;
   }
 
   private getOrCreateStream(userId: number): UserStream {

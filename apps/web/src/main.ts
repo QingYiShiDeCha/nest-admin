@@ -1,10 +1,12 @@
 import 'virtual:uno.css';
+import 'antdv-next-tiptap/index.css';
 
 import './assets/main.css';
 
 import { createApp, watch } from 'vue';
 import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate';
+import AntdvNextTiptap from 'antdv-next-tiptap';
 
 import App from './App.vue';
 import router from './router';
@@ -28,6 +30,7 @@ const pinia = createPinia();
 pinia.use(piniaPluginPersistedstate);
 
 app.use(pinia);
+app.use(AntdvNextTiptap);
 const systemConfig = useSystemConfigStore(pinia);
 const systemConfigReady = systemConfig.load().catch((error: unknown) => {
   console.error('运行时系统参数加载失败，将使用默认配置', error);

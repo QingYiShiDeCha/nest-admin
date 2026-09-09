@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { RouterView, useRoute } from 'vue-router';
+import { OverlayScrollbarsComponent } from 'overlayscrollbars-vue';
+import 'overlayscrollbars/overlayscrollbars.css';
 
 import { providePageRefresh } from '@/composables/use-page-refresh';
 import { DARK_THEME_COLORS, LIGHT_THEME_COLORS } from '@/constants/palette';
@@ -79,64 +81,72 @@ watch(
   <a-layout class="h-screen overflow-hidden">
     <AdminSidebar :collapsed="sidebarCollapsed" />
 
-    <a-layout class="min-w-0 min-h-0 overflow-y-auto">
-      <AdminHeader
-        :sidebar-collapsed="sidebarCollapsed"
-        :refreshing="pageRefresh.refreshing.value"
-        @refresh-content="pageRefresh.refresh"
-        @toggle-sidebar="sidebarCollapsed = !sidebarCollapsed"
-      />
-
-      <TabBar
-        v-if="settings.showTabs"
-        class="sticky top-13 z-10 shrink-0 mb-3 a-bg-layout"
-      />
-
-      <a-watermark
-        class="flex flex-col flex-1 min-h-0"
-        :content="settings.showWatermark ? watermarkContent : undefined"
-        :font="watermarkFont"
+    <a-layout class="min-w-0 min-h-0 flex flex-col relative">
+      <OverlayScrollbarsComponent
+        class="flex-1 min-h-0"
+        :options="{
+          scrollbars: {
+            autoHide: 'leave',
+            autoHideDelay: 800,
+          },
+        }"
       >
-        <!-- 右侧 Layout 统一承载纵向滚动，使滚动条从视口顶部开始；Header 和 Tabs 吸顶。 -->
-        <a-layout-content
-          class="px-[15px] md:px-5 pb-6 flex flex-col flex-1 min-h-0"
-          :class="[
-            { 'pt-3': !settings.showTabs },
-            settings.containerWidth === 'fixed'
-              ? 'w-full max-w-[1440px] mx-auto'
-              : 'w-full',
-          ]"
-        >
-          <div class="flex flex-col flex-1 min-h-0">
-            <RouterView v-slot="{ Component }">
-              <Transition
-                mode="out-in"
-                :css="settings.pageTransition !== 'none'"
-                :enter-active-class="transitionClasses.enterActive"
-                :enter-from-class="transitionClasses.enterFrom"
-                :enter-to-class="transitionClasses.enterTo"
-                :leave-active-class="transitionClasses.leaveActive"
-                :leave-from-class="transitionClasses.leaveFrom"
-                :leave-to-class="transitionClasses.leaveTo"
-              >
-                <!-- include 用页签的组件名：关掉页签 = 移出缓存 = 状态丢弃，
-                     页签里开着的页面在切换间保持实例 -->
-                <KeepAlive :include="tabs.cachedNames">
-                  <component :is="Component" :key="contentKey" />
-                </KeepAlive>
-              </Transition>
-            </RouterView>
-          </div>
+        <div class="sticky top-0 z-20 a-bg-layout">
+          <AdminHeader
+            :sidebar-collapsed="sidebarCollapsed"
+            :refreshing="pageRefresh.refreshing.value"
+            @refresh-content="pageRefresh.refresh"
+            @toggle-sidebar="sidebarCollapsed = !sidebarCollapsed"
+          />
 
-          <footer
-            v-if="settings.showCopyright"
-            class="shrink-0 pt-4 text-center text-xs a-color-text-tertiary"
+          <TabBar v-if="settings.showTabs" class="mb-3" />
+        </div>
+
+        <a-watermark
+          class="flex flex-col min-h-full"
+          :content="settings.showWatermark ? watermarkContent : undefined"
+          :font="watermarkFont"
+        >
+          <a-layout-content
+            class="px-[15px] md:px-5 pb-6 flex flex-col flex-1"
+            :class="[
+              { 'pt-3': !settings.showTabs },
+              settings.containerWidth === 'fixed'
+                ? 'w-full max-w-[1440px] mx-auto'
+                : 'w-full',
+            ]"
           >
-            © {{ currentYear }} {{ systemConfig.systemName }}. All rights
-            reserved.
-          </footer>
-        </a-layout-content>
-      </a-watermark>
+            <div class="flex flex-col flex-1">
+              <RouterView v-slot="{ Component }">
+                <Transition
+                  mode="out-in"
+                  :css="settings.pageTransition !== 'none'"
+                  :enter-active-class="transitionClasses.enterActive"
+                  :enter-from-class="transitionClasses.enterFrom"
+                  :enter-to-class="transitionClasses.enterTo"
+                  :leave-active-class="transitionClasses.leaveActive"
+                  :leave-from-class="transitionClasses.leaveFrom"
+                  :leave-to-class="transitionClasses.leaveTo"
+                >
+                  <!-- include 用页签的组件名：关掉页签 = 移出缓存 = 状态丢弃，
+                       页签里开着的页面在切换间保持实例 -->
+                  <KeepAlive :include="tabs.cachedNames">
+                    <component :is="Component" :key="contentKey" />
+                  </KeepAlive>
+                </Transition>
+              </RouterView>
+            </div>
+
+            <footer
+              v-if="settings.showCopyright"
+              class="shrink-0 pt-4 text-center text-xs a-color-text-tertiary"
+            >
+              © {{ currentYear }} {{ systemConfig.systemName }}. All rights
+              reserved.
+            </footer>
+          </a-layout-content>
+        </a-watermark>
+      </OverlayScrollbarsComponent>
     </a-layout>
   </a-layout>
 </template>
