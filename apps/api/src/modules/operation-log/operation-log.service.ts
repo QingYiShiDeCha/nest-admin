@@ -8,13 +8,20 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, count, desc, eq, gte, like, lte, type SQL } from 'drizzle-orm';
 
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
+import {
+  DataScopeService,
+  type DataScopeSubject,
+} from '../rbac/data-scope.service';
 import type { QueryOperationLogDto } from './dto/query-operation-log.dto';
 
 @Injectable()
 export class OperationLogService {
   private readonly logger = new Logger(OperationLogService.name);
 
-  constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DrizzleDB,
+    private readonly dataScopes: DataScopeService,
+  ) {}
 
   /**
    * 写入一条日志。刻意不抛错也不 await 调用方——
@@ -33,8 +40,14 @@ export class OperationLogService {
 
   async findPage(
     query: QueryOperationLogDto,
+    subject: DataScopeSubject,
   ): Promise<PaginatedResult<OperationLogRow>> {
+    const scopeCondition = await this.dataScopes.buildUserIdCondition(
+      subject,
+      operationLogs.userId,
+    );
     const conditions: (SQL | undefined)[] = [
+      scopeCondition,
       query.username
         ? like(operationLogs.username, `%${query.username}%`)
         : undefined,
@@ -61,11 +74,18 @@ export class OperationLogService {
     return { list, total, page: query.page, pageSize: query.pageSize };
   }
 
-  async findById(id: number): Promise<OperationLogRow> {
+  async findById(
+    id: number,
+    subject: DataScopeSubject,
+  ): Promise<OperationLogRow> {
+    const scopeCondition = await this.dataScopes.buildUserIdCondition(
+      subject,
+      operationLogs.userId,
+    );
     const [log] = await this.db
       .select()
       .from(operationLogs)
-      .where(eq(operationLogs.id, id))
+      .where(and(eq(operationLogs.id, id), scopeCondition))
       .limit(1);
 
     if (!log) {

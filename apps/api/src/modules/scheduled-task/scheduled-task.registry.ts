@@ -19,7 +19,8 @@ export class ScheduledTaskRegistry {
       {
         key: 'system.log.cleanup',
         name: '日志与过期会话清理',
-        description: '按系统保留天数分批清理登录日志、操作日志和失效会话',
+        description:
+          '按系统保留天数将登录日志、操作日志压缩归档后清理，并清理失效会话',
         execute: () => logCleanup.runManually(),
       },
     ];

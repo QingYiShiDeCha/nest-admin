@@ -46,7 +46,7 @@ const baseEnvSchema = z.object({
   THROTTLE_LIMIT: z.coerce.number().int().min(1).default(120),
   /**
    * 是否信任反向代理传来的 X-Forwarded-For。
-   * 部署在 nginx 之后必须打开，否则所有请求的来源 IP 都是同一个代理地址，
+   * 部署在 Caddy、Nginx 或其他反向代理之后必须打开，否则所有请求的来源 IP 都是同一个代理地址，
    * 限流会退化成「全站共用一个配额」，一个人就能把所有人挡在外面。
    * 直接暴露在公网时必须保持关闭，否则客户端可伪造该头绕过限流。
    */
@@ -58,8 +58,19 @@ const baseEnvSchema = z.object({
    * 格式：redis://[:password@]host:port[/db]
    * 启动日志会明确打印当前用的是哪种，避免线上以为配了其实没生效。
    */
-  /** 操作日志保留天数，超过则被定时任务物理删除 */
+  /** 操作日志保留天数，超过则先归档到对象存储再清理 */
   LOG_RETENTION_DAYS: z.coerce.number().int().min(1).default(90),
+  /** 日志归档对象在当前文件存储驱动下的 key 前缀 */
+  LOG_ARCHIVE_PREFIX: z.string().default('archives/logs'),
+  /** 日志归档存储驱动，local 目录不通过 HTTP 静态服务暴露 */
+  LOG_ARCHIVE_DRIVER: z.enum(['local', 's3']).default('local'),
+  LOG_ARCHIVE_LOCAL_DIR: z.string().min(1).default('.log-archives'),
+  LOG_ARCHIVE_S3_ENDPOINT: optionalUrl,
+  LOG_ARCHIVE_S3_REGION: z.string().min(1).default('us-east-1'),
+  LOG_ARCHIVE_S3_BUCKET: optionalString,
+  LOG_ARCHIVE_S3_ACCESS_KEY_ID: optionalString,
+  LOG_ARCHIVE_S3_SECRET_ACCESS_KEY: optionalString,
+  LOG_ARCHIVE_S3_FORCE_PATH_STYLE: booleanFromString.default(false),
   /** 内置清理计划首次创建时的 cron 初值 */
   LOG_CLEANUP_CRON: z.string().default('0 3 * * *'),
   /** 内置清理计划首次创建时的启用状态 */
@@ -122,6 +133,30 @@ export const envSchema = baseEnvSchema.superRefine((env, context) => {
       message: 'S3 Access Key 与 Secret Key 必须同时配置或同时留空',
     });
   }
+
+  if (env.LOG_ARCHIVE_DRIVER === 's3' && !env.LOG_ARCHIVE_S3_BUCKET) {
+    context.addIssue({
+      code: 'custom',
+      path: ['LOG_ARCHIVE_S3_BUCKET'],
+      message: 'LOG_ARCHIVE_DRIVER=s3 时必须配置 LOG_ARCHIVE_S3_BUCKET',
+    });
+  }
+
+  const hasArchiveAccessKey = Boolean(env.LOG_ARCHIVE_S3_ACCESS_KEY_ID);
+  const hasArchiveSecretKey = Boolean(env.LOG_ARCHIVE_S3_SECRET_ACCESS_KEY);
+
+  if (hasArchiveAccessKey !== hasArchiveSecretKey) {
+    context.addIssue({
+      code: 'custom',
+      path: [
+        hasArchiveAccessKey
+          ? 'LOG_ARCHIVE_S3_SECRET_ACCESS_KEY'
+          : 'LOG_ARCHIVE_S3_ACCESS_KEY_ID',
+      ],
+      message: '日志归档 S3 Access Key 与 Secret Key 必须同时配置或同时留空',
+    });
+  }
+
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -173,7 +173,7 @@ async function runCleanup(): Promise<void> {
   try {
     const result = await apiLogCleanup();
     void message.success(
-      `已清理 ${result.loginLogs} 条登录日志、${result.operationLogs} 条操作日志和 ${result.refreshTokens} 个过期令牌`,
+      `已归档并清理 ${result.loginLogs} 条登录日志、${result.operationLogs} 条操作日志，清理 ${result.refreshTokens} 个过期令牌`,
     );
     cleanupOpen.value = false;
     await table.reload();
@@ -275,7 +275,7 @@ defineOptions({ name: 'LogPage' });
     >
       <template v-if="cleanupPreview">
         <p>
-          按当前保留期设置，将物理删除
+          按当前保留期设置，日志将先归档到文件存储后再清理
           <strong>{{ cleanupPreview.loginLogs }}</strong>
           条登录日志、
           <strong>{{ cleanupPreview.operationLogs }}</strong>
@@ -284,7 +284,7 @@ defineOptions({ name: 'LogPage' });
           个过期登录令牌。
         </p>
         <p class="text-xs a-color-text-tertiary">
-          删除不可恢复；与定时任务共用同一把分布式锁，不会重复执行。
+          归档失败时不会删除对应日志；与定时任务共用同一把分布式锁，不会重复执行。
         </p>
       </template>
       <a-skeleton v-else active :paragraph="{ rows: 2 }" />

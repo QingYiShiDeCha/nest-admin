@@ -4,6 +4,8 @@ import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/interfaces/auth-user.interface';
 import { QueryLoginLogDto } from './dto/query-login-log.dto';
 import { LoginLogService } from './login-log.service';
 
@@ -21,14 +23,18 @@ export class LoginLogController {
   })
   findPage(
     @Query() query: QueryLoginLogDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<PaginatedResult<LoginLogRow>> {
-    return this.service.findPage(query);
+    return this.service.findPage(query, user);
   }
 
   @Get(':id')
   @Permissions(PERMISSIONS.LOGIN_LOG_READ)
   @ApiOperation({ summary: '查看登录日志详情' })
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<LoginLogRow> {
-    return this.service.findById(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ): Promise<LoginLogRow> {
+    return this.service.findById(id, user);
   }
 }

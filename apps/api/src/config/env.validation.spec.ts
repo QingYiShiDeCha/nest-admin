@@ -52,4 +52,30 @@ describe('文件上传环境变量校验', () => {
       UPLOAD_S3_SECRET_ACCESS_KEY: undefined,
     });
   });
+
+  it('日志归档默认使用独立本地目录', () => {
+    expect(validateEnv(requiredEnv)).toMatchObject({
+      LOG_ARCHIVE_DRIVER: 'local',
+      LOG_ARCHIVE_LOCAL_DIR: '.log-archives',
+      LOG_ARCHIVE_PREFIX: 'archives/logs',
+    });
+  });
+
+  it('日志归档 S3 模式必须配置独立 bucket', () => {
+    expect(() =>
+      validateEnv({ ...requiredEnv, LOG_ARCHIVE_DRIVER: 's3' }),
+    ).toThrow('LOG_ARCHIVE_S3_BUCKET');
+  });
+
+  it('日志归档 S3 静态密钥必须成对配置', () => {
+    expect(() =>
+      validateEnv({
+        ...requiredEnv,
+        LOG_ARCHIVE_DRIVER: 's3',
+        LOG_ARCHIVE_S3_BUCKET: 'log-archives',
+        LOG_ARCHIVE_S3_ACCESS_KEY_ID: 'access-key',
+      }),
+    ).toThrow('LOG_ARCHIVE_S3_SECRET_ACCESS_KEY');
+  });
+
 });

@@ -40,7 +40,7 @@ export function apiLoginLogPage(
   );
 }
 
-/** 清理结果：日志行数与连带过期的 refreshToken 数 */
+/** 清理结果：已归档并清理的日志行数与连带清理的 refreshToken 数 */
 export interface CleanupResult {
   loginLogs: number;
   operationLogs: number;

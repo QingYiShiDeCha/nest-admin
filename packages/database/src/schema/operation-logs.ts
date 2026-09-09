@@ -18,7 +18,7 @@ export { OPERATION_STATUS, type OperationStatus };
 /**
  * 操作日志。append-only，没有软删除也没有 created_by/updated_by——
  * 日志本身就是「谁在何时做了什么」的记录，再套一层审计字段是循环。
- * 清理历史数据靠按 created_at 批量物理删除。
+ * 清理历史数据靠按 created_at 批量归档后删除。
  */
 export const operationLogs = mysqlTable(
   'sys_operation_log',

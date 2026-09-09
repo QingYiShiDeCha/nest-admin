@@ -11,7 +11,7 @@ import { foreignId, primaryId } from './columns';
 
 export { LOGIN_STATUS, type LoginStatus };
 
-/** 登录审计日志。成功与失败都记录，历史数据按保留期物理清理。 */
+/** 登录审计日志。成功与失败都记录，历史数据按保留期归档后清理。 */
 export const loginLogs = mysqlTable(
   'sys_login_log',
   {

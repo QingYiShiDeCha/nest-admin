@@ -13,6 +13,8 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import type { AuthUser } from '../auth/interfaces/auth-user.interface';
 import { QueryOperationLogDto } from './dto/query-operation-log.dto';
 import { LogCleanupService, type CleanupResult } from './log-cleanup.service';
 import { OperationLog } from './operation-log.decorator';
@@ -39,15 +41,17 @@ export class OperationLogController {
   })
   findPage(
     @Query() query: QueryOperationLogDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<PaginatedResult<OperationLogRow>> {
-    return this.service.findPage(query);
+    return this.service.findPage(query, user);
   }
 
   @Get('cleanup/preview')
   @Permissions(PERMISSIONS.LOG_CLEAN)
   @ApiOperation({
     summary: '预览本次清理会删掉多少行',
-    description: '按 LOG_RETENTION_DAYS 计算，执行前可先看一眼规模',
+    description:
+      '按 LOG_RETENTION_DAYS 计算日志归档与清理规模，执行前可先看一眼规模',
   })
   previewCleanup(): Promise<CleanupResult> {
     return this.cleanup.countExpired();
@@ -60,7 +64,7 @@ export class OperationLogController {
   @ApiOperation({
     summary: '立即执行一次清理',
     description:
-      '与定时任务共用同一把 Redis 锁，不会和它撞在一起同时删。单次上限 10 万行，超出部分留到下一轮。',
+      '日志先按批次压缩归档到文件存储，归档成功后才清理原记录；与定时任务共用同一把 Redis 锁，单次上限 10 万行，超出部分留到下一轮。',
   })
   runCleanup(): Promise<CleanupResult> {
     return this.cleanup.runManually();
@@ -69,7 +73,10 @@ export class OperationLogController {
   @Get(':id')
   @Permissions(PERMISSIONS.LOG_READ)
   @ApiOperation({ summary: '日志详情，含脱敏后的请求参数快照' })
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<OperationLogRow> {
-    return this.service.findById(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ): Promise<OperationLogRow> {
+    return this.service.findById(id, user);
   }
 }
