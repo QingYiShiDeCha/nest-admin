@@ -58,6 +58,10 @@ describe('checkPermission', () => {
     expect(checkPermission([])).toBe(true);
   });
 
+  it.each([undefined, null, ''])('缺失或空权限码 %s 不使页面崩溃', (value) => {
+    expect(checkPermission(value)).toBe(true);
+  });
+
   it('超管在 permissions 为空时也全部通过', () => {
     useAuthStore().profile = profileOf({ isSuperAdmin: true, permissions: [] });
 

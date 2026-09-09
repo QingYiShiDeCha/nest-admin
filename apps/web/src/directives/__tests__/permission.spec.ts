@@ -2,8 +2,10 @@ import { PERMISSIONS } from '@nest-admin/shared';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { PropType } from 'vue';
 
 import type { UserProfile } from '@nest-admin/shared';
+import type { PermissionInput } from '@/composables/use-permission';
 import { vPermission } from '@/directives/permission';
 import { useAuthStore } from '@/stores/auth';
 
@@ -33,7 +35,7 @@ const profileOf = (overrides: Partial<UserProfile>): UserProfile =>
   }) as UserProfile;
 
 /** 挂一个带工具栏的壳子，模拟真实用法：容器里若干受控按钮 */
-function mountToolbar(code: string) {
+function mountToolbar(code?: string | null) {
   return mount(
     {
       template: `
@@ -42,7 +44,9 @@ function mountToolbar(code: string) {
           <button class="guarded" v-permission="code">危险操作</button>
         </div>
       `,
-      props: { code: { type: [String, Array], required: true } },
+      props: {
+        code: { type: [String, Array] as PropType<PermissionInput>, required: false },
+      },
     },
     {
       props: { code },
@@ -66,6 +70,25 @@ describe('v-permission 指令', () => {
     expect(wrapper.find('.guarded').exists()).toBe(true);
   });
 
+  it.each([undefined, null])('缺失权限码 %s 时保留按钮和相邻内容', (value) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    try {
+      const wrapper = mountToolbar(value);
+
+      expect(wrapper.find('.guarded').exists()).toBe(true);
+      expect(wrapper.find('.keep').exists()).toBe(true);
+      expect(warn).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenCalledWith(
+        '[v-permission] 权限码为空，该元素不会受控',
+        wrapper.get('.guarded').element,
+      );
+      wrapper.unmount();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('无权限时元素从 DOM 里移除，而不是留着隐藏', () => {
     useAuthStore().profile = profileOf({ permissions: [PERMISSIONS.USER_LIST] });
 
@@ -75,6 +98,22 @@ describe('v-permission 指令', () => {
     // 被读屏软件读到，用户碰得到却点不动，比看不见更糟
     expect(wrapper.find('.guarded').exists()).toBe(false);
     expect(wrapper.html()).not.toContain('危险操作');
+  });
+
+  it('OAuth 新增按钮使用共享权限码并服从授权', () => {
+    const auth = useAuthStore();
+    const code = PERMISSIONS.OAUTH_PROVIDER_CREATE;
+    expect(typeof code).toBe('string');
+
+    auth.profile = profileOf({ permissions: [] });
+    const denied = mountToolbar(code);
+    expect(denied.find('.guarded').exists()).toBe(false);
+    denied.unmount();
+
+    auth.profile = profileOf({ permissions: [code] });
+    const allowed = mountToolbar(code);
+    expect(allowed.find('.guarded').exists()).toBe(true);
+    allowed.unmount();
   });
 
   it('只摘掉受控元素，不影响同容器里的兄弟节点', () => {

@@ -7,7 +7,9 @@ import { useAuthStore } from '@/stores/auth';
 export type PermissionInput =
   | PermissionCode
   | string
-  | readonly (PermissionCode | string)[];
+  | readonly (PermissionCode | string)[]
+  | null
+  | undefined;
 
 /**
  * 权限判定的唯一实现。
@@ -19,15 +21,14 @@ export type PermissionInput =
  * 可以在组件外调用：pinia 装好之后 useAuthStore() 不要求 setup 上下文。
  */
 export function checkPermission(value: PermissionInput): boolean {
-  const codes = typeof value === 'string' ? [value] : value;
-
   // 没写码等于不限制。这里刻意「失败开放」而不是隐藏：真正的关卡在后端
   // PermissionGuard，前端漏判最多是多显示一个点了会 403 的按钮；
   // 反过来若默认隐藏，写错码的按钮会无声消失，排查起来非常费劲
-  if (codes.length === 0) {
+  if (!value?.length) {
     return true;
   }
 
+  const codes = typeof value === 'string' ? [value] : value;
   return useAuthStore().hasAnyPermission([...codes]);
 }
 

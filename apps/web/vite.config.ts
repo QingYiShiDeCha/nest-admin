@@ -12,10 +12,20 @@ import Unocss from 'unocss/vite';
 // 后端本地端口。dev 时把 /api 代理过去，前端代码里只需要写相对路径，
 // 不必关心后端跑在哪个端口、也没有跨域问题
 const API_PROXY_TARGET = 'http://localhost:3000';
+const SHARED_SOURCE_DIRECTORY = fileURLToPath(
+  new URL('../../packages/shared/src', import.meta.url),
+);
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    {
+      name: 'watch-workspace-shared-source',
+      apply: 'serve',
+      configureServer(server) {
+        server.watcher.add(SHARED_SOURCE_DIRECTORY);
+      },
+    },
     vue(),
     vueJsx(),
     vueDevTools(),
