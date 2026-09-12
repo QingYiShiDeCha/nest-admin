@@ -82,8 +82,13 @@ watch(
     <AdminSidebar :collapsed="sidebarCollapsed" />
 
     <a-layout class="min-w-0 min-h-0 flex flex-col relative">
+
+      <!-- OS 视口本身是 flex 列（任意变体注入）：滚动条挂在全局视口上。
+           头部/页签 sticky 常驻视口顶部（与 art-design-pro 的 #app-header 同构）。
+           min-h-0 链把高度约束传导到 ProTable：表格页表体内部滚、分页器常驻；
+           内容天然超高的页面（如富文本）溢出传播，在全局视口滚动 -->
       <OverlayScrollbarsComponent
-        class="flex-1 min-h-0"
+        class="flex-1 min-h-0 [&_[data-overlayscrollbars-viewport]]:flex [&_[data-overlayscrollbars-viewport]]:flex-col"
         :options="{
           scrollbars: {
             autoHide: 'leave',
@@ -91,7 +96,7 @@ watch(
           },
         }"
       >
-        <div class="sticky top-0 z-20 a-bg-layout">
+        <div class="sticky top-0 z-20 a-bg-layout shrink-0">
           <AdminHeader
             :sidebar-collapsed="sidebarCollapsed"
             :refreshing="pageRefresh.refreshing.value"
@@ -103,12 +108,13 @@ watch(
         </div>
 
         <a-watermark
-          class="flex flex-col min-h-full"
+          class="flex flex-col flex-1 min-h-0"
+          style="overflow: visible"
           :content="settings.showWatermark ? watermarkContent : undefined"
           :font="watermarkFont"
         >
           <a-layout-content
-            class="px-[15px] md:px-5 pb-6 flex flex-col flex-1"
+            class="px-[15px] md:px-5 pb-6 flex flex-col flex-1 min-h-0"
             :class="[
               { 'pt-3': !settings.showTabs },
               settings.containerWidth === 'fixed'
@@ -116,7 +122,7 @@ watch(
                 : 'w-full',
             ]"
           >
-            <div class="flex flex-col flex-1">
+            <div class="flex flex-col flex-1 min-h-0">
               <RouterView v-slot="{ Component }">
                 <Transition
                   mode="out-in"
@@ -130,8 +136,9 @@ watch(
                 >
                   <!-- include 用页签的组件名：关掉页签 = 移出缓存 = 状态丢弃，
                        页签里开着的页面在切换间保持实例 -->
+                  <!-- min-h-full：非 flex 布局的页面（如富文本 demo）也撑满视口 -->
                   <KeepAlive :include="tabs.cachedNames">
-                    <component :is="Component" :key="contentKey" />
+                    <component :is="Component" :key="contentKey" class="min-h-full" />
                   </KeepAlive>
                 </Transition>
               </RouterView>

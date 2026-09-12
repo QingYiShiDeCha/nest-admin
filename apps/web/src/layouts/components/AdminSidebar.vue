@@ -156,6 +156,11 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
 
     <OverlayScrollbarsComponent
       class="flex-1 min-h-0"
+      :class="
+        settings.menuBackground === 'dark'
+          ? '[&_.os-scrollbar-handle]:!bg-white/20 [&_.os-scrollbar-handle:hover]:!bg-white/30'
+          : '[&_.os-scrollbar-handle]:!bg-black/15 [&_.os-scrollbar-handle:hover]:!bg-black/25'
+      "
       :options="{
         scrollbars: {
           autoHide: 'leave',
@@ -189,22 +194,3 @@ const handleOpenChange: NonNullable<MenuProps['onOpenChange']> = (keys) => {
   </a-layout-sider>
 </template>
 
-<style scoped>
-/* 自定义 OverlayScrollbars 滚动条颜色 - 更浅的颜色 */
-:deep(.os-scrollbar-handle) {
-  background: rgba(0, 0, 0, 0.15) !important;
-}
-
-:deep(.os-scrollbar-handle:hover) {
-  background: rgba(0, 0, 0, 0.25) !important;
-}
-
-/* 暗色主题下的滚动条 */
-.admin-sidebar :deep(.ant-menu-dark) ~ :deep(.os-scrollbar .os-scrollbar-handle) {
-  background: rgba(255, 255, 255, 0.2) !important;
-}
-
-.admin-sidebar :deep(.ant-menu-dark) ~ :deep(.os-scrollbar .os-scrollbar-handle:hover) {
-  background: rgba(255, 255, 255, 0.3) !important;
-}
-</style>

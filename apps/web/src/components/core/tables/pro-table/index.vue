@@ -10,6 +10,9 @@ import {
   type VNodeChild,
 } from 'vue';
 
+import { OverlayScrollbars } from 'overlayscrollbars';
+import 'overlayscrollbars/overlayscrollbars.css';
+
 import type { UseTableReturn } from '@/composables/use-table';
 import { useSettingsStore } from '@/stores/settings';
 
@@ -66,6 +69,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   'update:expandedRowKeys': [keys: RowKey[]];
 }>();
+const tableBodyHost = ref<HTMLElement>();
+
 const settings = useSettingsStore();
 
 const emptyClasses = {
@@ -90,6 +95,20 @@ const tableLocale = {
 // 挂载即首查；KeepAlive 下实例常驻，重复激活不会重复请求
 onMounted(() => {
   void props.table.reload();
+
+  // 表体内部滚动换用 OverlayScrollbars，与全局滚动条观感一致。
+  // antd 拆分出的 .ant-table-body 是滚动容器，OS 以 host=viewport 模式接管，
+  // 不改动其子节点，antd 自身的表头吸顶与列宽测量不受影响。
+  try {
+    const body = tableBodyHost.value?.querySelector('.ant-table-body');
+    if (body instanceof HTMLElement) {
+      OverlayScrollbars(body, {
+        scrollbars: { autoHide: 'leave', autoHideDelay: 800 },
+      });
+    }
+  } catch {
+    // 环境不支持（如 jsdom）时静默降级为原生滚动
+  }
 });
 
 // ---- 工具栏：密度 / 全屏 ----
@@ -474,6 +493,7 @@ const emptyStretchChain = computed(() =>
       </div>
 
       <div
+        ref="tableBodyHost"
         class="flex-col flex-1 min-h-0"
         :class="settings.mobileTableCardMode ? 'hidden md:flex' : 'flex'"
       >

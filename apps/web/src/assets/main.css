@@ -176,3 +176,9 @@ body {
     transform: none;
   }
 }
+
+/* antd Watermark 包装层默认 overflow: hidden，会裁掉超高页面内容
+   并阻断滚动溢出向全局视口的传播；放开后水印画布仍覆盖组件盒子 */
+.ant-watermark {
+  overflow: visible !important;
+}

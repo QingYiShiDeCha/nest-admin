@@ -288,8 +288,9 @@ describe('AdminLayout scroll ownership', () => {
     expect(layouts[0]!.classes()).toEqual(
       expect.arrayContaining(['h-screen', 'overflow-hidden']),
     );
+    // 滚动归属移到 OverlayScrollbarsComponent，右栏本身只做 flex 纵向布局
     expect(layouts[1]!.classes()).toEqual(
-      expect.arrayContaining(['min-h-0', 'overflow-y-auto']),
+      expect.arrayContaining(['min-w-0', 'min-h-0', 'flex', 'flex-col', 'relative']),
     );
     expect(wrapper.get('[data-testid="header"]').classes()).toEqual(
       expect.arrayContaining([
@@ -304,17 +305,12 @@ describe('AdminLayout scroll ownership', () => {
       ]),
     );
     expect(wrapper.find('[data-testid="breadcrumb"]').exists()).toBe(true);
+    // 吸顶由 sticky 包装层承担，TabBar 只保留间距
     expect(wrapper.get('[data-testid="tab-bar"]').classes()).toEqual(
-      expect.arrayContaining(['sticky', 'top-13', 'shrink-0', 'mb-3']),
+      expect.arrayContaining(['mb-3']),
     );
     expect(wrapper.get('[data-testid="content"]').classes()).toEqual(
-      expect.arrayContaining([
-        'px-[15px]',
-        'md:px-5',
-        'pb-6',
-        'flex-1',
-        'min-h-0',
-      ]),
+      expect.arrayContaining(['px-[15px]', 'md:px-5', 'pb-6', 'flex', 'flex-col', 'flex-1']),
     );
     expect(wrapper.get('[data-testid="content"]').classes()).not.toContain(
       'pt-6',
@@ -353,7 +349,7 @@ describe('AdminLayout scroll ownership', () => {
 
     expect(watermark.props('content')).toEqual(['Nest Admin', 'admin']);
     expect(watermark.classes()).toEqual(
-      expect.arrayContaining(['flex-1', 'min-h-0']),
+      expect.arrayContaining(['flex', 'flex-col', 'flex-1', 'min-h-0']),
     );
     expect(content.classes()).toEqual(
       expect.arrayContaining(['w-full', 'max-w-[1440px]', 'mx-auto']),
