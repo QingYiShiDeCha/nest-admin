@@ -1,8 +1,17 @@
 import dayjs from 'dayjs';
 
+/**
+ * API 返回的时间戳是数据库墙钟时间的 ISO 字符串（时区标记不可靠）。
+ * 去掉时区标记后按原样解析显示，不做时区换算——
+ * 否则 dayjs 会把它当 UTC 再叠加本地时区偏移，造成 +8 小时的双重偏移。
+ */
+function parseApiTime(value: string): dayjs.Dayjs {
+  return dayjs(value.replace(/(Z|[+-]\d{2}:?\d{2})$/i, ''));
+}
+
 /** 列表里的时间戳统一显示格式，空值显示占位符 */
 export function formatDateTime(value: string | null | undefined): string {
-  return value ? dayjs(value).format('YYYY-MM-DD HH:mm:ss') : '—';
+  return value ? parseApiTime(value).format('YYYY-MM-DD HH:mm:ss') : '—';
 }
 
 export function formatFileSize(bytes: number): string {
