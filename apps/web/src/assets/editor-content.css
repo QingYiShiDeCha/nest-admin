@@ -1,0 +1,112 @@
+/**
+ * 富文本渲染内容（v-html）的排版样式。
+ *
+ * 编辑器内内容由 antdv-next-tiptap/index.css 提供（.editor-content .tiptap），
+ * 这里对齐同一套 antd token（--ant-color-*），保证「编辑器所见 = 预览所得」，
+ * 且随 ConfigProvider 的浅色/深色/主色切换自动联动。
+ *
+ * 这是全局 CSS 而非 SFC <style> 块：富文本 HTML 是运行时生成的内容，
+ * 无法逐元素挂 UnoCSS 工具类，元素/后代选择器是刚需。
+ */
+.rich-content {
+  color: var(--ant-color-text);
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+
+.rich-content h1,
+.rich-content h2,
+.rich-content h3,
+.rich-content h4,
+.rich-content h5 {
+  font-weight: 700;
+  margin-block: 20px;
+}
+
+.rich-content h1 { font-size: 2em; }
+.rich-content h2 { font-size: 1.5em; }
+.rich-content h3 { font-size: 1.25em; }
+.rich-content h4 { font-size: 1em; }
+.rich-content h5 { font-size: 0.875em; }
+
+.rich-content p {
+  margin-block: 8px;
+}
+
+.rich-content ul,
+.rich-content ol {
+  margin-block: 8px;
+  margin-left: 24px;
+}
+
+.rich-content li {
+  margin-block: 4px;
+}
+
+.rich-content blockquote {
+  margin-block: 8px;
+  border-left: 3px solid var(--ant-color-border-secondary);
+  padding-left: 12px;
+  color: var(--ant-color-text-secondary);
+}
+
+.rich-content pre {
+  background-color: var(--ant-color-fill-secondary);
+  border-radius: 6px;
+  margin-block: 8px;
+  padding: 12px;
+  overflow-x: auto;
+}
+
+.rich-content code {
+  background-color: var(--ant-color-fill-secondary);
+  border-radius: 3px;
+  padding: 0.2em 0.4em;
+  font-size: 0.9em;
+  font-family: var(--font-mono, monospace);
+}
+
+.rich-content pre code {
+  background-color: transparent;
+  padding: 0;
+  font-size: 13px;
+}
+
+.rich-content a {
+  color: var(--ant-color-primary);
+  text-decoration: underline;
+}
+
+.rich-content img {
+  max-width: 100%;
+}
+
+.rich-content hr {
+  border: none;
+  height: 1px;
+  margin-block: 12px;
+  background-color: var(--ant-color-border-secondary);
+}
+
+.rich-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-block: 8px;
+}
+
+.rich-content table th,
+.rich-content table td {
+  border: 1px solid var(--ant-color-border-secondary);
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.rich-content table th {
+  font-weight: 700;
+  background-color: var(--ant-color-fill-quaternary);
+}
+
+.rich-content table tbody tr:hover {
+  background-color: var(--ant-color-fill-quaternary);
+}

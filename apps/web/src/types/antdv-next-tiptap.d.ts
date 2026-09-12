@@ -1,5 +1,5 @@
 declare module 'antdv-next-tiptap' {
-  import type { DefineComponent } from 'vue';
+  import type { DefineComponent, Plugin } from 'vue';
 
   export interface TiptapProps {
     content?: string;
@@ -8,6 +8,7 @@ declare module 'antdv-next-tiptap' {
     extensions?: any[];
   }
 
-  const AntdvNextTiptap: DefineComponent<TiptapProps>;
+  /** 同时满足组件用法与 app.use() 插件用法 */
+  const AntdvNextTiptap: DefineComponent<TiptapProps> & Plugin;
   export default AntdvNextTiptap;
 }

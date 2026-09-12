@@ -1,6 +1,8 @@
 import 'virtual:uno.css';
 import 'antdv-next-tiptap/index.css';
 
+import './assets/editor-content.css';
+
 import './assets/main.css';
 
 import { createApp, watch } from 'vue';

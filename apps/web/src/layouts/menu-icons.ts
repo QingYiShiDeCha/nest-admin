@@ -420,6 +420,12 @@ export const MENU_ICON_OPTIONS = [
     label: '定时任务',
     keywords: 'timer cron schedule task',
   },
+  {
+    value: 'RiEditLine',
+    icon: 'i-ri:edit-line',
+    label: '编辑器',
+    keywords: 'edit editor',
+  },
 ] as const satisfies readonly MenuIconOption[];
 
 export type MenuIconName = (typeof MENU_ICON_OPTIONS)[number]['value'];
