@@ -219,9 +219,6 @@ importers:
       vue-router:
         specifier: ^5.2.0
         version: 5.3.0(@vue/compiler-sfc@3.5.42)(esbuild@0.28.2)(pinia@4.0.3(@vue/devtools-api@8.2.1)(typescript@6.0.3)(vue@3.5.42(typescript@6.0.3)))(rolldown@1.2.6)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.0)(tsx@4.23.12))(vue@3.5.42(typescript@6.0.3))(webpack@5.106.2(esbuild@0.28.2)(lightningcss@1.33.0)(postcss@8.5.26)(uglify-js@3.19.3))
-      vue3-perfect-scrollbar:
-        specifier: ^2.0.0
-        version: 2.0.0(vue@3.5.42(typescript@6.0.3))
     devDependencies:
       '@antdv-next/auto-import-resolver':
         specifier: ^1.1.1
@@ -5223,9 +5220,6 @@ packages:
   perfect-debounce@2.1.0:
     resolution: {integrity: sha512-LjgdTytVFXeUgtHZr9WYViYSM/g8MkcTPYDlPa3cDqMirHjKiSZPYd6DoL7pK8AJQr+uWkQvCjHNdiMqsrJs+g==}
 
-  perfect-scrollbar@1.5.6:
-    resolution: {integrity: sha512-rixgxw3SxyJbCaSpo1n35A/fwI1r2rdwMKOTCg/AcG+xOEyZcE8UHVjpZMFCVImzsFoCZeJTT+M/rdEIQYO2nw==}
-
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -6261,11 +6255,6 @@ packages:
     hasBin: true
     peerDependencies:
       typescript: '>=5.0.0'
-
-  vue3-perfect-scrollbar@2.0.0:
-    resolution: {integrity: sha512-nSWVcRyViCgt0Pe3RhU3w/BllLcFSrEzYOGlRBjSyhVmiZlERHHziffW+9P8L0IMEWouC5t+uYrgNJGSAElqMA==}
-    peerDependencies:
-      vue: ^3.0.0
 
   vue@3.5.42:
     resolution: {integrity: sha512-4RyHQTbQvOPs3MfvUO1Sg0YRrKNnA0mAVtvpd12Tg1fKDN7OHBUl1IqSn8zGJjK9nI3NkNp8cgTpVrSZC5TTcA==}
@@ -11726,8 +11715,6 @@ snapshots:
 
   perfect-debounce@2.1.0: {}
 
-  perfect-scrollbar@1.5.6: {}
-
   picocolors@1.1.1: {}
 
   picomatch@2.3.2: {}
@@ -12797,11 +12784,6 @@ snapshots:
       '@volar/typescript': 2.4.28
       '@vue/language-core': 3.3.11
       typescript: 6.0.3
-
-  vue3-perfect-scrollbar@2.0.0(vue@3.5.42(typescript@6.0.3)):
-    dependencies:
-      perfect-scrollbar: 1.5.6
-      vue: 3.5.42(typescript@6.0.3)
 
   vue@3.5.42(typescript@6.0.3):
     dependencies:
