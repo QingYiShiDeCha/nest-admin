@@ -69,27 +69,93 @@ const statCards = computed<StatCard[]>(() => {
 
   if (!summary) {
     return [
-      { icon: 'i-ri:user-3-line', tint: 'blue', label: '系统用户', value: 0, precision: 0, trend: null, suffix: '本年新增' },
-      { icon: 'i-ri:login-circle-line', tint: 'cyan', label: '今日登录', value: 0, precision: 0, trend: null, suffix: '较昨日' },
-      { icon: 'i-ri:pulse-line', tint: 'green', label: '近 7 天登录', value: 0, precision: 0, trend: null, suffix: '较前 7 天' },
-      { icon: 'i-ri:shield-warning-line', tint: 'orange', label: '近 24 小时失败', value: 0, precision: 0, trend: null, suffix: '较前一周期' },
+      {
+        icon: 'i-ri:user-3-line',
+        tint: 'blue',
+        label: '系统用户',
+        value: 0,
+        precision: 0,
+        trend: null,
+        suffix: '本年新增',
+      },
+      {
+        icon: 'i-ri:login-circle-line',
+        tint: 'cyan',
+        label: '今日登录',
+        value: 0,
+        precision: 0,
+        trend: null,
+        suffix: '较昨日',
+      },
+      {
+        icon: 'i-ri:pulse-line',
+        tint: 'green',
+        label: '近 7 天登录',
+        value: 0,
+        precision: 0,
+        trend: null,
+        suffix: '较前 7 天',
+      },
+      {
+        icon: 'i-ri:shield-warning-line',
+        tint: 'orange',
+        label: '近 24 小时失败',
+        value: 0,
+        precision: 0,
+        trend: null,
+        suffix: '较前一周期',
+      },
     ];
   }
 
   return [
-    { icon: 'i-ri:user-3-line', tint: 'blue', label: '系统用户', value: summary.totalUsers.value, precision: 0, trend: summary.totalUsers.trend, suffix: '本年新增' },
-    { icon: 'i-ri:login-circle-line', tint: 'cyan', label: '今日登录', value: summary.todayLogins.value, precision: 0, trend: summary.todayLogins.trend, suffix: '较昨日' },
-    { icon: 'i-ri:pulse-line', tint: 'green', label: '近 7 天登录', value: summary.weekLogins.value, precision: 0, trend: summary.weekLogins.trend, suffix: '较前 7 天' },
-    { icon: 'i-ri:shield-warning-line', tint: 'orange', label: '近 24 小时失败', value: summary.recentFailures.value, precision: 0, trend: summary.recentFailures.trend, suffix: '较前一周期' },
+    {
+      icon: 'i-ri:user-3-line',
+      tint: 'blue',
+      label: '系统用户',
+      value: summary.totalUsers.value,
+      precision: 0,
+      trend: summary.totalUsers.trend,
+      suffix: '本年新增',
+    },
+    {
+      icon: 'i-ri:login-circle-line',
+      tint: 'cyan',
+      label: '今日登录',
+      value: summary.todayLogins.value,
+      precision: 0,
+      trend: summary.todayLogins.trend,
+      suffix: '较昨日',
+    },
+    {
+      icon: 'i-ri:pulse-line',
+      tint: 'green',
+      label: '近 7 天登录',
+      value: summary.weekLogins.value,
+      precision: 0,
+      trend: summary.weekLogins.trend,
+      suffix: '较前 7 天',
+    },
+    {
+      icon: 'i-ri:shield-warning-line',
+      tint: 'orange',
+      label: '近 24 小时失败',
+      value: summary.recentFailures.value,
+      precision: 0,
+      trend: summary.recentFailures.trend,
+      suffix: '较前一周期',
+    },
   ];
 });
 
 /** 语义色浅底 + 图标前景色（静态类名字符串，供 UnoCSS 扫描生成） */
-const TINT_CLASSES: Record<StatCard["tint"], string> = {
-  blue: "bg-[color-mix(in_srgb,var(--dash-blue)_12%,var(--ant-color-bg-container))] text-[var(--dash-blue)]",
-  cyan: "bg-[color-mix(in_srgb,var(--dash-cyan)_12%,var(--ant-color-bg-container))] text-[var(--dash-cyan)]",
-  green: "bg-[color-mix(in_srgb,var(--dash-green)_12%,var(--ant-color-bg-container))] text-[var(--dash-green)]",
-  orange: "bg-[color-mix(in_srgb,var(--dash-orange)_12%,var(--ant-color-bg-container))] text-[var(--dash-orange)]",
+const TINT_CLASSES: Record<StatCard['tint'], string> = {
+  blue: 'bg-[color-mix(in_srgb,var(--dash-blue)_12%,var(--ant-color-bg-container))] text-[var(--dash-blue)]',
+  cyan: 'bg-[color-mix(in_srgb,var(--dash-cyan)_12%,var(--ant-color-bg-container))] text-[var(--dash-cyan)]',
+  green:
+    'bg-[color-mix(in_srgb,var(--dash-green)_12%,var(--ant-color-bg-container))] text-[var(--dash-green)]',
+  orange:
+    'bg-[color-mix(in_srgb,var(--dash-orange)_12%,var(--ant-color-bg-container))] text-[var(--dash-orange)]',
 };
 
 const statisticClasses = {
@@ -200,7 +266,10 @@ const monthLabels = computed(() =>
   (stats.value?.monthlyTrend.months ?? []).map((month) => month.label),
 );
 const yAxisMax = computed(() => {
-  const max = Math.max(0, ...(stats.value?.monthlyTrend.months ?? []).map((m) => m.value));
+  const max = Math.max(
+    0,
+    ...(stats.value?.monthlyTrend.months ?? []).map((m) => m.value),
+  );
   if (max === 0) return 5;
   const step = Math.max(1, Math.pow(10, Math.max(0, String(max).length - 1)));
   return Math.ceil(max / step) * step;
@@ -211,10 +280,14 @@ const browsers = computed(() =>
   ((stats.value?.browsers.items ?? []) as NamedCount[]).map((item, index) => ({
     ...item,
     color: BROWSER_COLORS[index % BROWSER_COLORS.length] as string,
-    short: (item.name.match(/[A-Za-z]+/)?.[0] ?? item.name.slice(0, 1)).slice(0, 1).toUpperCase(),
+    short: (item.name.match(/[A-Za-z]+/)?.[0] ?? item.name.slice(0, 1))
+      .slice(0, 1)
+      .toUpperCase(),
   })),
 );
-const browserMax = computed(() => Math.max(0, ...browsers.value.map((b) => b.value)));
+const browserMax = computed(() =>
+  Math.max(0, ...browsers.value.map((b) => b.value)),
+);
 
 /** 部门分布 —— 替换原「访客国家」表 */
 const deptRows = computed(() => {
@@ -289,11 +362,11 @@ defineOptions({ name: 'DashboardPage' });
     <a-spin :spinning="loading" size="large">
       <!-- 左主体 + 右通栏；右栏 320px，≤1280px 折为单列 -->
       <div
-        class="grid grid-cols-1 items-start gap-4 min-[1281px]:grid-cols-[minmax(0,1fr)_320px]"
+        class="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-4 max-[1280px]:grid-cols-1"
       >
         <div class="flex flex-col gap-4 min-w-0">
           <!-- 统计卡行：≤1280px 两列，≥1281px 一行等宽四张 -->
-          <div class="grid grid-cols-2 gap-4 min-[1281px]:grid-cols-4">
+          <div class="grid grid-cols-4 gap-4 max-[1280px]:grid-cols-2">
             <div
               v-for="(card, index) in statCards"
               :key="card.label"
@@ -327,14 +400,16 @@ defineOptions({ name: 'DashboardPage' });
                   {{ card.trend.up ? '↑' : '↓' }}
                   {{ card.trend.percent.toFixed(2) }}% {{ card.suffix }}
                 </div>
-                <div v-else class="text-xs a-color-text-secondary">暂无对比</div>
+                <div v-else class="text-xs a-color-text-secondary">
+                  暂无对比
+                </div>
               </div>
             </div>
           </div>
 
           <!-- 环形图 + 柱状图，约 1 : 2.5；≤900px 折为单列 -->
           <div
-            class="grid grid-cols-1 gap-4 min-[901px]:grid-cols-[minmax(0,1fr)_minmax(0,2.5fr)]"
+            class="grid grid-cols-[minmax(0,1fr)_minmax(0,2.5fr)] gap-4 max-[900px]:grid-cols-1"
           >
             <a-card title="终端登录占比">
               <PieChart
@@ -384,7 +459,7 @@ defineOptions({ name: 'DashboardPage' });
           </div>
 
           <!-- 两张等宽表；≤900px 折为单列 -->
-          <div class="grid grid-cols-1 gap-4 min-[901px]:grid-cols-2">
+          <div class="grid grid-cols-2 gap-4 max-[900px]:grid-cols-1">
             <a-card title="部门用户分布">
               <table class="w-full border-collapse text-[13px]">
                 <thead>
@@ -443,7 +518,10 @@ defineOptions({ name: 'DashboardPage' });
                     </td>
                   </tr>
                   <tr v-if="deptRows.length === 0">
-                    <td colspan="4" class="text-center a-color-text-secondary py-5">
+                    <td
+                      colspan="4"
+                      class="text-center a-color-text-secondary py-5"
+                    >
                       暂无数据
                     </td>
                   </tr>
@@ -505,7 +583,9 @@ defineOptions({ name: 'DashboardPage' });
                       <a-tag v-if="row.failures > 0" color="error">{{
                         row.failures
                       }}</a-tag>
-                      <span v-else class="text-dim a-color-text-secondary">0</span>
+                      <span v-else class="text-dim a-color-text-secondary"
+                        >0</span
+                      >
                     </td>
                     <td
                       class="text-right px-1 py-2.5 border-b border-solid a-border-border-secondary [tr:last-child_&]:border-b-0"
@@ -514,7 +594,10 @@ defineOptions({ name: 'DashboardPage' });
                     </td>
                   </tr>
                   <tr v-if="moduleRows.length === 0">
-                    <td colspan="5" class="text-center a-color-text-secondary py-5">
+                    <td
+                      colspan="5"
+                      class="text-center a-color-text-secondary py-5"
+                    >
                       暂无数据
                     </td>
                   </tr>
@@ -526,7 +609,7 @@ defineOptions({ name: 'DashboardPage' });
 
         <!-- 右通栏：≤900px 单列，901–1280px 两列，≥1281px 单列 -->
         <div
-          class="flex flex-col gap-4 min-w-0 min-[901px]:grid min-[901px]:grid-cols-2 min-[901px]:items-start min-[1281px]:flex min-[1281px]:flex-col"
+          class="flex flex-col gap-4 min-w-0 max-[1280px]:grid max-[1280px]:grid-cols-2 max-[1280px]:items-start max-[900px]:!flex max-[900px]:!flex-col"
         >
           <a-card title="浏览器使用洞察">
             <ul v-if="browsers.length > 0">
@@ -539,7 +622,9 @@ defineOptions({ name: 'DashboardPage' });
                     {{ b.short }}
                   </span>
                   <span class="flex-1 font-medium">{{ b.name }}</span>
-                  <span class="font-semibold">{{ b.value.toLocaleString() }}</span>
+                  <span class="font-semibold">{{
+                    b.value.toLocaleString()
+                  }}</span>
                 </div>
                 <div
                   class="h-1 rounded-sm a-bg-fill-tertiary mt-2 ml-[46px] overflow-hidden"
