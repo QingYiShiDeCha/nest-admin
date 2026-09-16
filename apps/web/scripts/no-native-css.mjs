@@ -16,13 +16,7 @@ const SRC = new URL('../src', import.meta.url).pathname
   .replace(/^\/([A-Za-z]:)/, '$1');
 
 /** 允许保留 <style> 的文件（相对 src/ 的路径）→ 为什么原生 CSS 是必要的 */
-const ALLOWLIST = new Map([
-  [
-    'views/dashboard/index.vue',
-    '图表占位样式：.donut-stats > div + div 这类兄弟选择器、@media 响应式网格重排，' +
-      '用任意变体写成一长串 class 可读性远差于十行 scoped CSS',
-  ],
-]);
+const ALLOWLIST = new Map();
 
 /** 递归收集 .vue 文件 */
 function walk(dir) {

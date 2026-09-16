@@ -84,6 +84,14 @@ const statCards = computed<StatCard[]>(() => {
   ];
 });
 
+/** 语义色浅底 + 图标前景色（静态类名字符串，供 UnoCSS 扫描生成） */
+const TINT_CLASSES: Record<StatCard["tint"], string> = {
+  blue: "bg-[color-mix(in_srgb,var(--dash-blue)_12%,var(--ant-color-bg-container))] text-[var(--dash-blue)]",
+  cyan: "bg-[color-mix(in_srgb,var(--dash-cyan)_12%,var(--ant-color-bg-container))] text-[var(--dash-cyan)]",
+  green: "bg-[color-mix(in_srgb,var(--dash-green)_12%,var(--ant-color-bg-container))] text-[var(--dash-green)]",
+  orange: "bg-[color-mix(in_srgb,var(--dash-orange)_12%,var(--ant-color-bg-container))] text-[var(--dash-orange)]",
+};
+
 const statisticClasses = {
   content: '!text-2xl !font-semibold !leading-[1.4] a-color-text',
 };
@@ -277,44 +285,58 @@ defineOptions({ name: 'DashboardPage' });
 </script>
 
 <template>
-  <div class="dash" :style="themeVars">
+  <div class="a-color-text" :style="themeVars">
     <a-spin :spinning="loading" size="large">
-      <div class="dash-board">
-        <div class="dash-main">
-          <!-- 统计卡行 -->
-          <div class="dash-stats">
+      <!-- 左主体 + 右通栏；右栏 320px，≤1280px 折为单列 -->
+      <div
+        class="grid grid-cols-1 items-start gap-4 min-[1281px]:grid-cols-[minmax(0,1fr)_320px]"
+      >
+        <div class="flex flex-col gap-4 min-w-0">
+          <!-- 统计卡行：≤1280px 两列，≥1281px 一行等宽四张 -->
+          <div class="grid grid-cols-2 gap-4 min-[1281px]:grid-cols-4">
             <div
               v-for="(card, index) in statCards"
               :key="card.label"
-              class="panel stat-card"
+              class="a-bg-container border border-solid a-border-border-secondary rounded-lg p-5 flex items-center gap-4"
             >
-              <div class="stat-icon" :class="`tint-${card.tint}`">
+              <div
+                class="grid place-items-center w-12 h-12 rounded-xl text-[22px] shrink-0"
+                :class="TINT_CLASSES[card.tint]"
+              >
                 <AppIcon :icon="card.icon" />
               </div>
-              <div class="stat-meta">
-                <div class="stat-label">{{ card.label }}</div>
+              <div>
+                <div class="text-[13px] a-color-text-secondary">
+                  {{ card.label }}
+                </div>
                 <a-statistic
-                  class="stat-value"
+                  class="whitespace-nowrap"
                   :value="animatedStatValues[index]"
                   :precision="card.precision"
                   :classes="statisticClasses"
                 />
                 <div
                   v-if="card.trend"
-                  class="stat-trend"
-                  :class="card.trend.up ? 'up' : 'down'"
+                  class="text-xs"
+                  :class="
+                    card.trend.up
+                      ? 'text-[var(--dash-green)]'
+                      : 'text-[var(--dash-danger)]'
+                  "
                 >
                   {{ card.trend.up ? '↑' : '↓' }}
                   {{ card.trend.percent.toFixed(2) }}% {{ card.suffix }}
                 </div>
-                <div v-else class="stat-trend muted">暂无对比</div>
+                <div v-else class="text-xs a-color-text-secondary">暂无对比</div>
               </div>
             </div>
           </div>
 
-          <!-- 环形图 + 柱状图，约 1 : 2.5 -->
-          <div class="dash-split">
-            <a-card title="终端登录占比" class="dash-card">
+          <!-- 环形图 + 柱状图，约 1 : 2.5；≤900px 折为单列 -->
+          <div
+            class="grid grid-cols-1 gap-4 min-[901px]:grid-cols-[minmax(0,1fr)_minmax(0,2.5fr)]"
+          >
+            <a-card title="终端登录占比">
               <PieChart
                 :key="`device-${chartAnimationVersion}`"
                 class="h-60 w-full"
@@ -324,11 +346,22 @@ defineOptions({ name: 'DashboardPage' });
                 outer-radius="86%"
                 aria-label="终端登录占比"
               />
-              <div class="donut-stats">
-                <div v-for="seg in deviceSegments" :key="seg.label">
-                  <div class="donut-num">{{ seg.value.toLocaleString() }}</div>
-                  <div class="donut-label">
-                    <span class="dot" :style="{ background: seg.color }" />
+              <div
+                class="grid grid-cols-3 border-t border-solid a-border-border-secondary pt-3.5 text-center"
+              >
+                <div
+                  v-for="seg in deviceSegments"
+                  :key="seg.label"
+                  class="border-l border-solid a-border-border-secondary first:border-l-0"
+                >
+                  <div class="text-xl font-semibold">
+                    {{ seg.value.toLocaleString() }}
+                  </div>
+                  <div class="mt-1 text-[13px] a-color-text-secondary">
+                    <span
+                      class="inline-block w-2 h-2 rounded-full mr-1"
+                      :style="{ background: seg.color }"
+                    />
                     {{ seg.label }}
                   </div>
                 </div>
@@ -337,7 +370,7 @@ defineOptions({ name: 'DashboardPage' });
 
             <a-card
               title="近 12 个月登录趋势"
-              class="dash-card min-h-80 flex flex-col [&_.ant-card-body]:flex [&_.ant-card-body]:flex-1 [&_.ant-card-body]:min-h-0"
+              class="min-h-80 flex flex-col [&_.ant-card-body]:flex [&_.ant-card-body]:flex-1 [&_.ant-card-body]:min-h-0"
             >
               <BarChart
                 :key="`audience-${chartAnimationVersion}`"
@@ -350,63 +383,140 @@ defineOptions({ name: 'DashboardPage' });
             </a-card>
           </div>
 
-          <!-- 两张表：部门分布 + 热门模块 -->
-          <div class="dash-split-eq">
-            <a-card title="部门用户分布" class="dash-card">
-              <table class="mini-table">
+          <!-- 两张等宽表；≤900px 折为单列 -->
+          <div class="grid grid-cols-1 gap-4 min-[901px]:grid-cols-2">
+            <a-card title="部门用户分布">
+              <table class="w-full border-collapse text-[13px]">
                 <thead>
                   <tr>
-                    <th class="w-12">序号</th>
-                    <th>部门</th>
-                    <th class="ta-r">人数</th>
-                    <th class="ta-r w-20">占比</th>
+                    <th
+                      class="w-12 text-left font-medium a-color-text-secondary px-1 py-2 border-b border-solid a-border-border-secondary"
+                    >
+                      序号
+                    </th>
+                    <th
+                      class="text-left font-medium a-color-text-secondary px-1 py-2 border-b border-solid a-border-border-secondary"
+                    >
+                      部门
+                    </th>
+                    <th
+                      class="text-right font-medium a-color-text-secondary px-1 py-2 border-b border-solid a-border-border-secondary"
+                    >
+                      人数
+                    </th>
+                    <th
+                      class="text-right font-medium a-color-text-secondary px-1 py-2 border-b border-solid a-border-border-secondary w-20"
+                    >
+                      占比
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="(row, i) in deptRows" :key="row.name">
-                    <td class="w-12">{{ i + 1 }}</td>
-                    <td>{{ row.name }}</td>
-                    <td class="ta-r">{{ row.value.toLocaleString() }}</td>
-                    <td class="ta-r">
-                      <span class="percent-bar">
-                        <span :style="{ width: `${row.percent}%` }" />
+                    <td
+                      class="w-12 px-1 py-2.5 border-b border-solid a-border-border-secondary [tr:last-child_&]:border-b-0"
+                    >
+                      {{ i + 1 }}
+                    </td>
+                    <td
+                      class="px-1 py-2.5 border-b border-solid a-border-border-secondary [tr:last-child_&]:border-b-0"
+                    >
+                      {{ row.name }}
+                    </td>
+                    <td
+                      class="text-right px-1 py-2.5 border-b border-solid a-border-border-secondary [tr:last-child_&]:border-b-0"
+                    >
+                      {{ row.value.toLocaleString() }}
+                    </td>
+                    <td
+                      class="text-right px-1 py-2.5 border-b border-solid a-border-border-secondary [tr:last-child_&]:border-b-0"
+                    >
+                      <span
+                        class="inline-block align-middle w-10 h-1 rounded-sm overflow-hidden a-bg-fill-tertiary"
+                      >
+                        <span
+                          class="block h-full bg-[var(--dash-blue)]"
+                          :style="{ width: `${row.percent}%` }"
+                        />
                       </span>
                       <span class="ml-2">{{ row.percent }}%</span>
                     </td>
                   </tr>
                   <tr v-if="deptRows.length === 0">
-                    <td colspan="4" class="empty-cell">暂无数据</td>
+                    <td colspan="4" class="text-center a-color-text-secondary py-5">
+                      暂无数据
+                    </td>
                   </tr>
                 </tbody>
               </table>
             </a-card>
 
-            <a-card title="近 30 天热门操作模块" class="dash-card">
-              <table class="mini-table">
+            <a-card title="近 30 天热门操作模块">
+              <table class="w-full border-collapse text-[13px]">
                 <thead>
                   <tr>
-                    <th class="w-12">#</th>
-                    <th>模块</th>
-                    <th class="ta-r">次数</th>
-                    <th class="ta-r">失败</th>
-                    <th class="ta-r">均值</th>
+                    <th
+                      class="w-12 text-left font-medium a-color-text-secondary px-1 py-2 border-b border-solid a-border-border-secondary"
+                    >
+                      #
+                    </th>
+                    <th
+                      class="text-left font-medium a-color-text-secondary px-1 py-2 border-b border-solid a-border-border-secondary"
+                    >
+                      模块
+                    </th>
+                    <th
+                      class="text-right font-medium a-color-text-secondary px-1 py-2 border-b border-solid a-border-border-secondary"
+                    >
+                      次数
+                    </th>
+                    <th
+                      class="text-right font-medium a-color-text-secondary px-1 py-2 border-b border-solid a-border-border-secondary"
+                    >
+                      失败
+                    </th>
+                    <th
+                      class="text-right font-medium a-color-text-secondary px-1 py-2 border-b border-solid a-border-border-secondary"
+                    >
+                      均值
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="(row, i) in moduleRows" :key="row.module">
-                    <td class="w-12">{{ i + 1 }}</td>
-                    <td>{{ row.module }}</td>
-                    <td class="ta-r">{{ row.count.toLocaleString() }}</td>
-                    <td class="ta-r">
+                    <td
+                      class="w-12 px-1 py-2.5 border-b border-solid a-border-border-secondary [tr:last-child_&]:border-b-0"
+                    >
+                      {{ i + 1 }}
+                    </td>
+                    <td
+                      class="px-1 py-2.5 border-b border-solid a-border-border-secondary [tr:last-child_&]:border-b-0"
+                    >
+                      {{ row.module }}
+                    </td>
+                    <td
+                      class="text-right px-1 py-2.5 border-b border-solid a-border-border-secondary [tr:last-child_&]:border-b-0"
+                    >
+                      {{ row.count.toLocaleString() }}
+                    </td>
+                    <td
+                      class="text-right px-1 py-2.5 border-b border-solid a-border-border-secondary [tr:last-child_&]:border-b-0"
+                    >
                       <a-tag v-if="row.failures > 0" color="error">{{
                         row.failures
                       }}</a-tag>
-                      <span v-else class="text-dim">0</span>
+                      <span v-else class="text-dim a-color-text-secondary">0</span>
                     </td>
-                    <td class="ta-r">{{ formatDuration(row.avgDurationSeconds) }}</td>
+                    <td
+                      class="text-right px-1 py-2.5 border-b border-solid a-border-border-secondary [tr:last-child_&]:border-b-0"
+                    >
+                      {{ formatDuration(row.avgDurationSeconds) }}
+                    </td>
                   </tr>
                   <tr v-if="moduleRows.length === 0">
-                    <td colspan="5" class="empty-cell">暂无数据</td>
+                    <td colspan="5" class="text-center a-color-text-secondary py-5">
+                      暂无数据
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -414,23 +524,28 @@ defineOptions({ name: 'DashboardPage' });
           </div>
         </div>
 
-        <!-- 右通栏 -->
-        <div class="dash-rail">
-          <a-card title="浏览器使用洞察" class="dash-card">
-            <ul v-if="browsers.length > 0" class="browser-list">
-              <li v-for="b in browsers" :key="b.name">
-                <div class="browser-row">
+        <!-- 右通栏：≤900px 单列，901–1280px 两列，≥1281px 单列 -->
+        <div
+          class="flex flex-col gap-4 min-w-0 min-[901px]:grid min-[901px]:grid-cols-2 min-[901px]:items-start min-[1281px]:flex min-[1281px]:flex-col"
+        >
+          <a-card title="浏览器使用洞察">
+            <ul v-if="browsers.length > 0">
+              <li v-for="b in browsers" :key="b.name" class="mt-4 first:mt-0">
+                <div class="flex items-center gap-2.5">
                   <span
-                    class="browser-avatar"
+                    class="grid place-items-center w-9 h-9 rounded-full text-base font-semibold shrink-0"
                     :style="{ background: `${b.color}22`, color: b.color }"
                   >
                     {{ b.short }}
                   </span>
-                  <span class="browser-name">{{ b.name }}</span>
-                  <span class="browser-value">{{ b.value.toLocaleString() }}</span>
+                  <span class="flex-1 font-medium">{{ b.name }}</span>
+                  <span class="font-semibold">{{ b.value.toLocaleString() }}</span>
                 </div>
-                <div class="browser-bar">
+                <div
+                  class="h-1 rounded-sm a-bg-fill-tertiary mt-2 ml-[46px] overflow-hidden"
+                >
                   <span
+                    class="block h-full"
                     :style="{
                       width: `${browserMax === 0 ? 0 : (b.value / browserMax) * 100}%`,
                       background: b.color,
@@ -442,7 +557,7 @@ defineOptions({ name: 'DashboardPage' });
             <a-empty v-else description="近 30 天暂无登录" />
           </a-card>
 
-          <a-card title="一周登录热力" class="dash-card">
+          <a-card title="一周登录热力">
             <HeatmapChart
               :key="`activity-${chartAnimationVersion}`"
               class="h-60 w-full"
@@ -458,266 +573,3 @@ defineOptions({ name: 'DashboardPage' });
     </a-spin>
   </div>
 </template>
-
-<style scoped>
-/* 布局用到的主题色，接 echarts 时保持同一组取值 */
-.dash {
-  /* --dash-blue/green/cyan/orange/danger 由模板 :style 注入 */
-  --dash-radius: 8px;
-  --dash-container: var(--ant-color-bg-container);
-  --dash-text: var(--ant-color-text);
-  --dash-text-secondary: var(--ant-color-text-secondary);
-  --dash-border: var(--ant-color-border-secondary);
-  --dash-fill: var(--ant-color-fill-tertiary);
-  color: var(--dash-text);
-}
-
-/* 左主体 + 右通栏；右栏定宽，窄屏折行 */
-.dash-board {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 16px;
-  align-items: start;
-}
-
-.dash-main,
-.dash-rail {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
-
-/* 统计卡行：一行等宽四张 */
-.dash-stats {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-}
-
-/* 左主体 1 : 2.5 双列 */
-.dash-split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2.5fr);
-  gap: 16px;
-}
-
-/* 两张等宽表 */
-.dash-split-eq {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.panel {
-  background: var(--dash-container);
-  border: 1px solid var(--dash-border);
-  border-radius: var(--dash-radius);
-  padding: 20px;
-}
-
-.stat-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.stat-icon {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  font-size: 22px;
-  flex-shrink: 0;
-}
-
-/* 浅色底用 color-mix 从语义色自动生成，跟随主题不必逐个调 */
-.tint-blue {
-  background: color-mix(in srgb, var(--dash-blue) 12%, var(--dash-container));
-  color: var(--dash-blue);
-}
-.tint-cyan {
-  background: color-mix(in srgb, var(--dash-cyan) 12%, var(--dash-container));
-  color: var(--dash-cyan);
-}
-.tint-green {
-  background: color-mix(in srgb, var(--dash-green) 12%, var(--dash-container));
-  color: var(--dash-green);
-}
-.tint-orange {
-  background: color-mix(in srgb, var(--dash-orange) 12%, var(--dash-container));
-  color: var(--dash-orange);
-}
-
-.stat-label {
-  font-size: 13px;
-  color: var(--dash-text-secondary);
-}
-.stat-value {
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-.stat-trend {
-  font-size: 12px;
-}
-.stat-trend.up {
-  color: var(--dash-green);
-}
-.stat-trend.down {
-  color: var(--dash-danger);
-}
-.stat-trend.muted {
-  color: var(--dash-text-secondary);
-}
-
-.donut-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  border-top: 1px solid var(--dash-border);
-  padding-top: 14px;
-  text-align: center;
-}
-.donut-stats > div + div {
-  border-left: 1px solid var(--dash-border);
-}
-.donut-num {
-  font-size: 20px;
-  font-weight: 600;
-}
-.donut-label {
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--dash-text-secondary);
-}
-.dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 4px;
-}
-
-/* ---- 轻量表格 ---- */
-.mini-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.mini-table th {
-  text-align: left;
-  font-weight: 500;
-  color: var(--dash-text-secondary);
-  padding: 8px 4px;
-  border-bottom: 1px solid var(--dash-border);
-}
-.mini-table td {
-  padding: 10px 4px;
-  border-bottom: 1px solid var(--dash-border);
-}
-.mini-table tr:last-child td {
-  border-bottom: none;
-}
-.ta-r {
-  text-align: right !important;
-}
-.w-12 {
-  width: 48px;
-}
-.w-20 {
-  width: 80px;
-}
-.text-dim {
-  color: var(--dash-text-secondary);
-}
-.empty-cell {
-  text-align: center;
-  color: var(--dash-text-secondary);
-  padding: 20px 0 !important;
-}
-.percent-bar {
-  display: inline-block;
-  vertical-align: middle;
-  width: 40px;
-  height: 4px;
-  background: var(--dash-fill);
-  border-radius: 2px;
-  overflow: hidden;
-}
-.percent-bar > span {
-  display: block;
-  height: 100%;
-  background: var(--dash-blue);
-}
-
-/* ---- 浏览器洞察 ---- */
-.browser-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.browser-list li + li {
-  margin-top: 16px;
-}
-.browser-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.browser-avatar {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  font-size: 16px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.browser-name {
-  flex: 1;
-  font-weight: 500;
-}
-.browser-value {
-  font-weight: 600;
-}
-.browser-bar {
-  height: 4px;
-  border-radius: 2px;
-  background: var(--dash-fill);
-  margin-top: 8px;
-  margin-left: 46px;
-  overflow: hidden;
-}
-.browser-bar span {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-}
-
-/* 窄屏：右栏折到下方成两列，双列改单列，统计卡两列 */
-@media (max-width: 1280px) {
-  .dash-board {
-    grid-template-columns: 1fr;
-  }
-  .dash-rail {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    align-items: start;
-  }
-}
-@media (max-width: 900px) {
-  .dash-split,
-  .dash-split-eq {
-    grid-template-columns: 1fr;
-  }
-  .dash-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .dash-rail {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
