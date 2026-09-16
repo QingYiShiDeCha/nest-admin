@@ -204,7 +204,7 @@ GET 的默认缓存被关掉了（`cacheFor: { GET: 0 }`）。alova 默认给 GE
 
 **超管短路**。持有 `super_admin` 角色的用户在 `PermissionGuard` 里直接放行，不参与权限码比对。这不是图省事——没有这条兜底，一旦权限数据配错或被清空，管理员会连「修复权限」的接口都调不了，只能去数据库手工插数据。所以超管的 `permissions` 字段返回空数组，前端见到 `isSuperAdmin: true` 应视为拥有全部权限。
 
-**授权与分配接口是全量替换语义**。`PUT /roles/:id/permissions` 和 `PUT /users/:id/posts` 传入的集合就是最终结果，未包含的视为撤销，空数组清空全部。比增量的 add/remove 少一半接口，也不会因为前端漏发某一项而产生「以为撤销了其实没撤销」的偏差。替换在事务里完成（先删后插），已实测插入失败时删除会回滚。
+**授权与分配接口是全量替换语义**。`PUT /roles/:id/permissions` 和 `PUT /users/:id/posts` 传入的集合就是最终结果，未包含的视为撤销，空数组清空全部。比增量的 add/remove 少一半接口，也不会因为前端漏发某一项而产生「以为撤销了其实没撤销」的偏差。替换在事务里完成（先删后插），已实测插入失败时删除会回滚。授权界面用的 `PUT /roles/:id/grants` 把权限码与菜单放进**同一个事务**替换——拆成两个请求时，一个成功一个失败会把角色留在「权限码换了、菜单没换」的半授权状态。配套的 `GET /roles/:id/grants` 把回显（已授权的 id）与候选项（权限码目录 + 完整菜单树）一次取回，因此整个授权能力只由 `system:role:assign` 管辖：若沿用拆开的三个接口，调用方还得分别持有界面上没有菜单入口的 `system:permission:list` 与 `system:menu:list`，漏掉任何一个，「授权」按钮点开就是打不开也看不到报错。
 
 **部门与数据范围**。`sys_dept` 是自关联组织树，一个用户最多直属一个部门。角色的 `data_scope` 支持全部、本部门、本部门及下级、仅本人和自定义部门；自定义集合保存在 `sys_role_dept`。同一用户拥有多个角色时取范围并集，超级管理员始终查看全部。部门有子部门或直属用户时拒绝删除，停用部门不可再作为父部门或分配给用户。
 
@@ -410,6 +410,8 @@ sys_file_resource (文件资源元数据与上传人快照)
 | DELETE | `/api/roles/:id`                      | `system:role:delete`             | 删除角色（软删除）                                  |
 | PUT    | `/api/roles/:id/permissions`          | `system:role:assign`             | 全量替换角色的权限码                                |
 | PUT    | `/api/roles/:id/menus`                | `system:role:assign`             | 全量替换角色的菜单                                  |
+| PUT    | `/api/roles/:id/grants`               | `system:role:assign`             | 一次替换角色的权限码与菜单（同一事务内提交）        |
+| GET    | `/api/roles/:id/grants`               | `system:role:assign`             | 角色授权界面的聚合读：回显与候选项一次取回          |
 | GET    | `/api/permissions`                    | `system:permission:list`         | 权限码目录，供授权界面拉取可选项                    |
 | GET    | `/api/operation-logs`                 | `system:log:list`                | 分页查询操作日志，支持用户名/模块/结果/时间范围过滤 |
 | GET    | `/api/operation-logs/:id`             | `system:log:read`                | 日志详情，含脱敏后的请求参数快照                    |
