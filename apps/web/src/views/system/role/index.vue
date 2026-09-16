@@ -5,22 +5,13 @@ import { computed, reactive, ref } from 'vue';
 
 import { PERMISSIONS } from '@nest-admin/shared';
 
-import type {
-  DepartmentNode,
-  MenuNode,
-  PermissionCatalogItem,
-  Role,
-} from '@nest-admin/shared';
+import type { DepartmentNode, Role } from '@nest-admin/shared';
 import { apiDepartmentTree } from '@/api/departments';
-import { apiMenuTree } from '@/api/menu';
 import {
-  apiPermissionCatalog,
   apiRoleCreate,
   apiRoleDetail,
   apiRolePage,
   apiRoleRemove,
-  apiRoleSetMenus,
-  apiRoleSetPermissions,
   apiRoleUpdate,
   type RoleQuery,
 } from '@/api/roles';
@@ -36,6 +27,7 @@ import {
   STATUS_META,
   STATUS_OPTIONS,
 } from '@/constants/dicts';
+import RoleGrantModal from './components/role-grant-modal/index.vue';
 
 const { message } = App.useApp();
 import { formatDateTime } from '@/utils/format';
@@ -253,165 +245,19 @@ async function remove(record: Role): Promise<void> {
 
 const grantModalOpen = ref(false);
 const grantTarget = ref<Role | null>(null);
-const grantSubmitting = ref(false);
-
-const catalog = ref<PermissionCatalogItem[]>([]);
-const menuTree = ref<MenuNode[]>([]);
-
-/** 选中的权限码 id，权限区所有模块的 checkbox-group 共享这一份 */
-const permissionIds = ref<number[]>([]);
 
 /**
- * 菜单树的勾选 keys。默认父子联动模式下，「子节点全选的父节点」出现在
- * checkedKeys 里，只勾了部分孩子的父节点出现在 halfCheckedKeys 里。
+ * 打开授权弹窗。数据加载、错误提示与保存都在弹窗组件内部完成：
+ * 授权的权限门禁只需要 system:role:assign，与弹窗内那个聚合接口一一对应，
+ * 列表页不必再关心它要拉哪些数据、要哪些附加权限。
  */
-const menuCheckedKeys = ref<number[]>([]);
-const menuHalfCheckedKeys = ref<number[]>([]);
-
-/** 权限目录按 module 分组，渲染成一块块勾选区 */
-const catalogGroups = computed(() => {
-  const groups = new Map<string, PermissionCatalogItem[]>();
-
-  for (const item of catalog.value) {
-    const key = item.module ?? '其他';
-    const bucket = groups.get(key);
-
-    if (bucket) {
-      bucket.push(item);
-    } else {
-      groups.set(key, [item]);
-    }
-  }
-
-  return [...groups.entries()].map(([module, items]) => ({ module, items }));
-});
-
-/** 后端菜单树 → a-tree 数据，key 直接用菜单 id */
-const menuTreeData = computed(() => toTreeData(menuTree.value));
-
-function toTreeData(nodes: MenuNode[]): {
-  key: number;
-  title: string;
-  children?: { key: number; title: string }[];
-}[] {
-  return nodes.map((node) => ({
-    key: node.id,
-    title:
-      node.name +
-      (node.status === 'disabled' ? '（已停用）' : '') +
-      (node.visible ? '' : '（隐藏）'),
-    children:
-      node.children.length > 0
-        ? (toTreeData(node.children) as { key: number; title: string }[])
-        : undefined,
-  }));
-}
-
-function handleMenuCheck(
-  keys: number[] | { checked: number[]; halfChecked: number[] },
-  info: { halfCheckedKeys?: Array<number | string> },
-): void {
-  menuCheckedKeys.value = Array.isArray(keys) ? keys : keys.checked;
-  menuHalfCheckedKeys.value = (info.halfCheckedKeys ?? []).map(Number);
-}
-
-/**
- * 打开授权弹窗并回显，策略见函数体内的注释。
- * 提交时把 checkedKeys 与 halfCheckedKeys 取并集，
- * 原始授权集合不会因为「打开看一眼又关掉」而悄悄变大或缩小。
- */
-async function openGrant(record: Role): Promise<void> {
+function openGrant(record: Role): void {
   grantTarget.value = record;
   grantModalOpen.value = true;
-
-  try {
-    const [detail, catalogData, tree] = await Promise.all([
-      apiRoleDetail(record.id),
-      catalog.value.length > 0
-        ? Promise.resolve(catalog.value)
-        : apiPermissionCatalog(),
-      menuTree.value.length > 0
-        ? Promise.resolve(menuTree.value)
-        : apiMenuTree(),
-    ]);
-
-    catalog.value = catalogData;
-    menuTree.value = tree;
-    permissionIds.value = [...detail.permissionIds];
-
-    const parentIds = collectParentIds(tree);
-    // 回显只勾「叶子」：把目录 id 一起塞进 checkedKeys 会触发 antd 的父子
-    // 联动，把它全部子节点自动勾上，显示成比实际授权更大的权限。
-    // 半选的父目录不能指望 @check 回调补——它只在用户点击时触发，
-    // 打开弹窗不动任何勾选就点确定的话它永远是空的，目录授权会被悄悄丢掉。
-    // 所以这里按授权集合自己算一遍祖先链。
-    menuCheckedKeys.value = detail.menuIds.filter((id) => !parentIds.has(id));
-    const granted = new Set(detail.menuIds);
-    const ancestors = new Set<number>();
-    collectAncestorsOfGranted(tree, granted, [], ancestors);
-    menuHalfCheckedKeys.value = [...ancestors];
-  } catch (error) {
-    grantModalOpen.value = false;
-    throw error;
-  }
 }
 
-/** 收集树里所有「有孩子」的节点 id */
-function collectParentIds(
-  nodes: MenuNode[],
-  acc = new Set<number>(),
-): Set<number> {
-  for (const node of nodes) {
-    if (node.children.length > 0) {
-      acc.add(node.id);
-      collectParentIds(node.children, acc);
-    }
-  }
-
-  return acc;
-}
-
-/**
- * 收集每个已授权节点的全部祖先 id（不含节点自身）。
- * path 是从根到当前节点的祖先链。
- */
-function collectAncestorsOfGranted(
-  nodes: MenuNode[],
-  granted: Set<number>,
-  path: number[],
-  acc: Set<number>,
-): void {
-  for (const node of nodes) {
-    if (granted.has(node.id)) {
-      path.forEach((id) => acc.add(id));
-    }
-
-    collectAncestorsOfGranted(node.children, granted, [...path, node.id], acc);
-  }
-}
-
-async function submitGrant(): Promise<void> {
-  if (!grantTarget.value) {
-    return;
-  }
-
-  grantSubmitting.value = true;
-  try {
-    const menuIds = [
-      ...new Set([...menuCheckedKeys.value, ...menuHalfCheckedKeys.value]),
-    ];
-
-    await Promise.all([
-      apiRoleSetPermissions(grantTarget.value.id, permissionIds.value),
-      apiRoleSetMenus(grantTarget.value.id, menuIds),
-    ]);
-
-    void message.success('授权已更新');
-    grantModalOpen.value = false;
-    await table.reload();
-  } finally {
-    grantSubmitting.value = false;
-  }
+async function onGrantSaved(): Promise<void> {
+  await table.reload();
 }
 
 defineOptions({ name: 'RolePage' });
@@ -502,57 +348,10 @@ defineOptions({ name: 'RolePage' });
     </a-modal>
 
     <!-- 授权 -->
-    <a-modal
+    <RoleGrantModal
       v-model:open="grantModalOpen"
-      :title="`授权：${grantTarget?.name ?? ''}`"
-      :confirm-loading="grantSubmitting"
-      width="880px"
-      @ok="submitGrant"
-    >
-      <div class="flex flex-col gap-4 md:flex-row">
-        <div class="w-full md:w-1/2">
-          <h4 class="mb-2 font-medium">权限码</h4>
-          <a-collapse ghost>
-            <a-collapse-panel
-              v-for="group in catalogGroups"
-              :key="group.module"
-              :header="`${group.module}（${group.items.length}）`"
-            >
-              <a-checkbox-group
-                v-model:value="permissionIds"
-                class="flex flex-col gap-1"
-              >
-                <a-checkbox
-                  v-for="item in group.items"
-                  :key="item.id"
-                  :value="item.id"
-                >
-                  {{ item.name }}
-                  <span class="text-xs a-color-text-tertiary">{{
-                    item.code
-                  }}</span>
-                </a-checkbox>
-              </a-checkbox-group>
-            </a-collapse-panel>
-          </a-collapse>
-        </div>
-
-        <div class="w-full md:w-1/2">
-          <h4 class="mb-2 font-medium">菜单（勾选父节点会带上全部子菜单）</h4>
-          <div class="max-h-96 overflow-auto">
-            <a-tree
-              v-if="menuTreeData.length > 0"
-              v-model:checked-keys="menuCheckedKeys"
-              checkable
-              block-node
-              :tree-data="menuTreeData"
-              :default-expand-all="true"
-              @check="handleMenuCheck"
-            />
-            <a-empty v-else description="暂无菜单" />
-          </div>
-        </div>
-      </div>
-    </a-modal>
+      :role="grantTarget"
+      @saved="onGrantSaved"
+    />
   </div>
 </template>

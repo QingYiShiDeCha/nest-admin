@@ -1,8 +1,8 @@
 import type {
   PaginatedResult,
-  PermissionCatalogItem,
   Role,
   RoleDetail,
+  RoleGrants,
 } from '@nest-admin/shared';
 import {
   httpDelete,
@@ -54,20 +54,21 @@ export function apiRoleDetail(id: number): Promise<RoleDetail> {
   return httpGet<RoleDetail>(`/roles/${id}`);
 }
 
-/** 全量替换角色的权限码，空数组即清空 */
-export function apiRoleSetPermissions(
+/**
+ * 授权界面的聚合读：角色已授权的权限码/菜单（回显），
+ * 加上可授权的权限码目录与完整菜单树（候选项）。
+ */
+export function apiRoleGrants(id: number): Promise<RoleGrants> {
+  return httpGet<RoleGrants>(`/roles/${id}/grants`);
+}
+
+/**
+ * 一次提交权限码与菜单。后端在同一事务里替换两张关联表，
+ * 不会出现「权限码改了、菜单没改」的半授权状态。
+ */
+export function apiRoleSetGrants(
   id: number,
-  ids: number[],
+  payload: { permissionIds: number[]; menuIds: number[] },
 ): Promise<void> {
-  return httpPut(`/roles/${id}/permissions`, { ids });
-}
-
-/** 全量替换角色的菜单 */
-export function apiRoleSetMenus(id: number, ids: number[]): Promise<void> {
-  return httpPut(`/roles/${id}/menus`, { ids });
-}
-
-/** 权限码目录，只读 */
-export function apiPermissionCatalog(): Promise<PermissionCatalogItem[]> {
-  return httpGet<PermissionCatalogItem[]>('/permissions');
+  return httpPut(`/roles/${id}/grants`, payload);
 }
