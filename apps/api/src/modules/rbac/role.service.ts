@@ -13,6 +13,7 @@ import {
 import {
   SUPER_ADMIN_ROLE_CODE,
   type PaginatedResult,
+  type PermissionCatalogItem,
 } from '@nest-admin/shared';
 import {
   BadRequestException,
@@ -42,11 +43,32 @@ import type { CreateRoleDto } from './dto/create-role.dto';
 import type { QueryRoleDto } from './dto/query-role.dto';
 import type { UpdateRoleDto } from './dto/update-role.dto';
 import { RbacCacheService } from './rbac-cache.service';
+import type { MenuTreeNode } from './menu.service';
 
 export interface RoleDetail extends RoleRow {
   permissionIds: number[];
   menuIds: number[];
   departmentIds: number[];
+}
+
+/** 一次提交权限码与菜单时的入参，两个集合都必填 */
+export interface RoleGrantsInput {
+  permissionIds: number[];
+  menuIds: number[];
+}
+
+/**
+ * 授权聚合接口的响应形状（后端侧）。
+ *
+ * 时间字段仍是 Date：ISO 字符串是 JSON.stringify 在运行时转换的线上形态，
+ * controller 声明后端类型、由 wire-contract 断言序列化结果与契约一致——
+ * 与 /menus、/roles/:id 的既有做法保持一致。
+ */
+export interface RoleGrantsRecord {
+  permissionIds: number[];
+  menuIds: number[];
+  catalog: PermissionCatalogItem[];
+  menuTree: MenuTreeNode[];
 }
 
 /** 统一叠加「未软删除」，所有面向业务的角色查询都必须走它 */
@@ -238,46 +260,79 @@ export class RoleService {
 
   /** 全量替换角色的权限码 */
   async setPermissions(roleId: number, permissionIds: number[]): Promise<void> {
-    await this.findRoleOrFail(roleId);
-    await this.assertAllExist(permissions, permissionIds, '权限');
-
-    await this.db.transaction(async (tx) => {
-      await tx
-        .delete(rolePermissions)
-        .where(eq(rolePermissions.roleId, roleId));
-
-      if (permissionIds.length > 0) {
-        await tx.insert(rolePermissions).values(
-          permissionIds.map((permissionId) => ({
-            roleId,
-            permissionId,
-            createdBy: this.ctx.userId,
-          })),
-        );
-      }
-    });
-
-    await this.invalidateRoleUsers(roleId);
+    await this.replaceAssignments(roleId, { permissionIds });
   }
 
   /** 全量替换角色的菜单 */
   async setMenus(roleId: number, menuIds: number[]): Promise<void> {
+    await this.replaceAssignments(roleId, { menuIds });
+  }
+
+  /**
+   * 全量替换角色的权限码与菜单，两张关联表在同一事务里提交。
+   *
+   * 授权界面本来就是同时改这两项：拆成两个请求时，其中一个失败不会回滚
+   * 另一个，角色会停在「权限码换了、菜单没换」的半授权状态，
+   * 重试还得先猜哪一半成功了。
+   */
+  async setGrants(roleId: number, grant: RoleGrantsInput): Promise<void> {
+    await this.replaceAssignments(roleId, grant);
+  }
+
+  /**
+   * 替换授权关联行的公共实现：只动显式传入的那一侧，
+   * 未传的集合保持不变——单改权限、单改菜单的老接口依赖这个语义。
+   */
+  private async replaceAssignments(
+    roleId: number,
+    grant: { permissionIds?: number[]; menuIds?: number[] },
+  ): Promise<void> {
     await this.findRoleOrFail(roleId);
-    await this.assertAllExist(menus, menuIds, '菜单');
+
+    if (grant.permissionIds) {
+      await this.assertAllExist(permissions, grant.permissionIds, '权限');
+    }
+
+    if (grant.menuIds) {
+      await this.assertAllExist(menus, grant.menuIds, '菜单');
+    }
 
     await this.db.transaction(async (tx) => {
-      await tx.delete(roleMenus).where(eq(roleMenus.roleId, roleId));
+      if (grant.permissionIds) {
+        await tx
+          .delete(rolePermissions)
+          .where(eq(rolePermissions.roleId, roleId));
 
-      if (menuIds.length > 0) {
-        await tx.insert(roleMenus).values(
-          menuIds.map((menuId) => ({
-            roleId,
-            menuId,
-            createdBy: this.ctx.userId,
-          })),
-        );
+        if (grant.permissionIds.length > 0) {
+          await tx.insert(rolePermissions).values(
+            grant.permissionIds.map((permissionId) => ({
+              roleId,
+              permissionId,
+              createdBy: this.ctx.userId,
+            })),
+          );
+        }
+      }
+
+      if (grant.menuIds) {
+        await tx.delete(roleMenus).where(eq(roleMenus.roleId, roleId));
+
+        if (grant.menuIds.length > 0) {
+          await tx.insert(roleMenus).values(
+            grant.menuIds.map((menuId) => ({
+              roleId,
+              menuId,
+              createdBy: this.ctx.userId,
+            })),
+          );
+        }
       }
     });
+
+    // 菜单树每个请求实时查询、不进 RBAC 缓存，只有权限集合变化才需要主动失效
+    if (grant.permissionIds) {
+      await this.invalidateRoleUsers(roleId);
+    }
   }
 
   /** 全量替换用户的角色 */

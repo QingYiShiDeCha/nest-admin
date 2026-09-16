@@ -20,6 +20,7 @@ import type {
   PostListItem,
   Role,
   RoleDetail,
+  RoleGrants,
   ScheduledTask,
   ScheduledTaskLog,
   SystemConfig,
@@ -46,6 +47,7 @@ import type { AuthResult } from './modules/auth/interfaces/jwt-payload.interface
 import type { OnlineUserSessionRow } from './modules/auth/refresh-token.service';
 import type { MenuTreeNode } from './modules/rbac/menu.service';
 import type { RoleDetail as BackendRoleDetail } from './modules/rbac/role.service';
+import type { RoleGrantsRecord } from './modules/rbac/role.service';
 import type { PostListRecord } from './modules/rbac/post.service';
 import type { ScheduledTaskRecord } from './modules/scheduled-task/scheduled-task.service';
 import type {
@@ -143,6 +145,12 @@ type RoleContract = Assert<Serialized<RoleRow> extends Role ? true : false>;
 type RoleDetailContract = Assert<
   Serialized<BackendRoleDetail> extends RoleDetail ? true : false
 >;
+// 授权聚合接口：回显字段与候选项分别来自角色详情、权限目录和菜单树，
+// 三者的行类型绑定在各自的断言里；这里保证聚合后的形状与契约一致，
+// 少返回或多改一个字段都会在编译期暴露。
+type RoleGrantsContract = Assert<
+  Serialized<RoleGrantsRecord> extends RoleGrants ? true : false
+>;
 
 // ---- 菜单 ----
 type MenuRecordContract = Assert<
@@ -206,6 +214,7 @@ export type WireContractChecks = [
   PostListContract,
   RoleContract,
   RoleDetailContract,
+  RoleGrantsContract,
   MenuRecordContract,
   MenuNodeContract,
   LoginLogContract,

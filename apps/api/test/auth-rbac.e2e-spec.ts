@@ -32,6 +32,14 @@ interface PermissionItem {
   code: string;
 }
 
+/** GET /roles/:id/grants 的响应形状（只声明用例关心的字段） */
+interface GrantRef {
+  permissionIds: number[];
+  menuIds: number[];
+  catalog: PermissionItem[];
+  menuTree: { id: number }[];
+}
+
 const PRIMARY_PASSWORD = 'E2ePrimary123!';
 const NEXT_PASSWORD = 'E2eNext123!';
 const VIEWER_PASSWORD = 'E2eViewer123!';
@@ -772,6 +780,64 @@ describe('认证与 RBAC (e2e)', () => {
       PERMISSIONS.USER_READ,
     );
   });
+
+  it('授权聚合接口一次返回回显与候选项，且非法 id 不会留下半授权状态', async () => {
+    const permissionsResponse = await request(app.getHttpServer())
+      .get('/api/permissions')
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+    const userRead = (
+      permissionsResponse.body as ResponseBody<PermissionItem[]>
+    ).data.find((item) => item.code === PERMISSIONS.USER_READ);
+
+    expect(userRead).toBeDefined();
+
+    const menuTreeResponse = await request(app.getHttpServer())
+      .get('/api/menus')
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+    const firstMenu = (menuTreeResponse.body as ResponseBody<{ id: number }[]>)
+      .data[0];
+
+    expect(firstMenu).toBeDefined();
+
+    await request(app.getHttpServer())
+      .put(`/api/roles/${roleId}/grants`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .send({ permissionIds: [userRead!.id], menuIds: [firstMenu.id] })
+      .expect(204);
+
+    const granted = await readGrants();
+
+    expect(granted.permissionIds).toEqual([userRead!.id]);
+    expect(granted.menuIds).toEqual([firstMenu.id]);
+    // 候选项随回显一起返回，授权界面不必再分别请求权限目录与菜单树
+    expect(granted.catalog.length).toBeGreaterThan(0);
+    expect(granted.menuTree.length).toBeGreaterThan(0);
+
+    // 菜单 id 非法时整体拒绝：校验发生在事务之前，不会出现
+    // 「权限码已替换、菜单没替换」的半授权状态
+    await request(app.getHttpServer())
+      .put(`/api/roles/${roleId}/grants`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .send({ permissionIds: [], menuIds: [999999999] })
+      .expect(400);
+
+    const unchanged = await readGrants();
+
+    expect(unchanged.permissionIds).toEqual([userRead!.id]);
+    expect(unchanged.menuIds).toEqual([firstMenu.id]);
+  });
+
+  /** 拉取授权聚合接口，校验回显与候选项 */
+  async function readGrants(): Promise<GrantRef> {
+    const response = await request(app.getHttpServer())
+      .get(`/api/roles/${roleId}/grants`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    return (response.body as ResponseBody<GrantRef>).data;
+  }
 
   async function register(
     username: string,
