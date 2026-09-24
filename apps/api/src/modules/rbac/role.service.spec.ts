@@ -49,11 +49,37 @@ describe('RoleService 的保护性规则', () => {
   });
 
   it('不允许修改自己的角色，避免误摘超管后失去修复能力', async () => {
-    await expect(service.setUserRoles(1, [2])).rejects.toThrow(
+    await expect(
+      service.setUserRoles(1, [2], { id: 1, deptId: 1, isSuperAdmin: true }),
+    ).rejects.toThrow(
       new ForbiddenException('不允许修改自己的角色，请由其他管理员操作'),
     );
     // 应该在任何查询之前就拦下
     expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('非超管不能把内置超管角色分配给他人', async () => {
+    mockSelectOnce([{ id: 2 }]); // 目标用户存在
+    db.select.mockReturnValueOnce({
+      from: () => ({
+        where: () => Promise.resolve([{ id: 1 }, { id: 3 }]), // 角色存在性校验
+      }),
+    });
+    db.select.mockReturnValueOnce({
+      from: () => ({
+        where: () => ({ limit: () => Promise.resolve([{ id: 1 }]) }), // 查到内置超管角色
+      }),
+    });
+
+    await expect(
+      service.setUserRoles(2, [1, 3], {
+        id: 9,
+        deptId: 1,
+        isSuperAdmin: false,
+      }),
+    ).rejects.toThrow(
+      new ForbiddenException('只有超级管理员才能分配超级管理员角色'),
+    );
   });
 
   it('内置角色不允许改角色码', async () => {
@@ -136,7 +162,11 @@ describe('RoleService 的保护性规则', () => {
         insert: () => ({ values: insertValues }),
       });
 
-    await service.setUserRoles(2, [3]);
+    await service.setUserRoles(2, [3], {
+      id: 1,
+      deptId: 1,
+      isSuperAdmin: true,
+    });
 
     expect(cache.invalidateUsers).toHaveBeenCalledWith([2]);
   });

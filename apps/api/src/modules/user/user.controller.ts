@@ -121,7 +121,12 @@ export class UserController {
   @Get(':id')
   @Permissions(PERMISSIONS.USER_READ)
   @ApiOperation({ summary: '查询用户详情' })
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<SafeUser> {
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ): Promise<SafeUser> {
+    // 与列表、强制下线同一套数据范围判定，越权按不存在处理
+    await this.userService.assertAccessible(id, user);
     return this.userService.findById(id);
   }
 
@@ -132,8 +137,9 @@ export class UserController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUserDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<SafeUser> {
-    return this.userService.update(id, dto);
+    return this.userService.update(id, dto, user);
   }
 
   @Delete(':id')
@@ -141,7 +147,10 @@ export class UserController {
   @OperationLog({ module: '用户管理', action: '删除用户' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '删除用户' })
-  remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
-    return this.userService.remove(id);
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ): Promise<void> {
+    return this.userService.remove(id, user);
   }
 }

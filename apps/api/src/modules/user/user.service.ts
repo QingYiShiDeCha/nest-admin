@@ -1,14 +1,20 @@
 import {
   departments,
   posts,
+  roles,
   userPosts,
+  userRoles,
   users,
   type SafeUser,
 } from '@nest-admin/database';
-import type { PaginatedResult } from '@nest-admin/shared';
+import {
+  SUPER_ADMIN_ROLE_CODE,
+  type PaginatedResult,
+} from '@nest-admin/shared';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -226,10 +232,16 @@ export class UserService {
     return row;
   }
 
-  async update(id: number, dto: UpdateUserDto): Promise<SafeUser> {
+  async update(
+    id: number,
+    dto: UpdateUserDto,
+    subject: DataScopeSubject,
+  ): Promise<SafeUser> {
     if (Object.keys(dto).length === 0) {
       throw new BadRequestException('没有需要更新的字段');
     }
+
+    await this.assertManagedUser(id, subject);
 
     if (dto.deptId !== undefined && dto.deptId !== null) {
       await this.departments.assertDepartmentsUsable([dto.deptId]);
@@ -251,9 +263,11 @@ export class UserService {
           .set({ ...dto, ...this.ctx.auditOnUpdate() })
           .where(alive(eq(users.id, id)));
       });
-      if (dto.deptId !== undefined) {
-        await this.rbacCache.invalidateUsers([id]);
-      }
+      // 禁用要连已有会话一起断掉，与 remove 同一套收尾：
+      // 只改状态会让对方手里的 refreshToken 继续换新，
+      // 而缓存失效挂在 deptId 上时，这次改动的授权结果根本不会被清。
+      await this.refreshTokens.revokeAllForUser(id);
+      await this.rbacCache.invalidateUsers([id]);
       return this.findById(id);
     }
 
@@ -343,6 +357,37 @@ export class UserService {
     await this.dataScopes.assertUserAccessible(id, subject);
   }
 
+  /**
+   * 管理写操作（更新/删除）的统一前置校验：
+   * 1. 目标用户必须落在调用者的数据范围内（与列表、强制下线同一套判定，越权按不存在处理）
+   * 2. 非超管不允许操作超管账号——否则持有 system:user:update 就能禁用/删除全部超管，
+   *    让「内置角色锁死」的保护形同虚设
+   */
+  private async assertManagedUser(
+    id: number,
+    subject: DataScopeSubject,
+  ): Promise<void> {
+    await this.dataScopes.assertUserAccessible(id, subject);
+    if (subject.isSuperAdmin) return;
+
+    const [superAdminBinding] = await this.db
+      .select({ roleId: userRoles.roleId })
+      .from(userRoles)
+      .innerJoin(roles, eq(roles.id, userRoles.roleId))
+      .where(
+        and(
+          eq(userRoles.userId, id),
+          eq(roles.code, SUPER_ADMIN_ROLE_CODE),
+          isNull(roles.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    if (superAdminBinding) {
+      throw new ForbiddenException('无权操作超级管理员账号');
+    }
+  }
+
   /** 管理员手动解锁因登录失败被锁定的账号 */
   async unlock(id: number): Promise<void> {
     const user = await this.findById(id);
@@ -350,8 +395,8 @@ export class UserService {
   }
 
   /** 软删除。用数据库端的 CURRENT_TIMESTAMP，与 created_at/updated_at 同源避免时钟偏差 */
-  async remove(id: number): Promise<void> {
-    await this.findById(id);
+  async remove(id: number, subject: DataScopeSubject): Promise<void> {
+    await this.assertManagedUser(id, subject);
 
     await this.db.transaction(async (tx) => {
       await tx

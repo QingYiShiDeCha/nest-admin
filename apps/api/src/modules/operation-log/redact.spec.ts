@@ -55,6 +55,17 @@ describe('serializeParams 脱敏', () => {
     expect(raw).not.toContain('super-secret-value');
   });
 
+  it('超过深度限制的子树不会把敏感值原样带出去', () => {
+    // 修复前 depth > 6 直接 return value，整棵子树跳过脱敏，
+    // 第 7 层往里的 password 会明文写进审计表
+    let payload: unknown = { password: 'deep-secret-value' };
+    for (let level = 0; level < 10; level += 1) {
+      payload = { [`layer${level}`]: payload };
+    }
+
+    expect(serializeParams(payload)).not.toContain('deep-secret-value');
+  });
+
   it('超长内容被截断，避免撑爆 TEXT 列', () => {
     const raw = serializeParams({ note: 'x'.repeat(5000) });
 

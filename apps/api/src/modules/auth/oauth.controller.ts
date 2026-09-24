@@ -4,6 +4,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpException,
+  Logger,
   Param,
   Post,
   Query,
@@ -19,6 +21,8 @@ import { OAuthService } from './oauth.service';
 @ApiTags('OAuth 登录')
 @Controller('auth/oauth')
 export class OAuthController {
+  private readonly logger = new Logger(OAuthController.name);
+
   constructor(private readonly oauth: OAuthService) {}
 
   @Public()
@@ -50,7 +54,8 @@ export class OAuthController {
   ): Promise<void> {
     const frontend = new URL(this.oauth.frontendCallbackUrl());
     try {
-      if (!code || !state) throw new Error('OAuth 回调参数不完整');
+      if (!code || !state)
+        throw new BadRequestException('OAuth 回调参数不完整');
       const ticket = await this.oauth.callback(
         this.parseProvider(provider),
         code,
@@ -58,9 +63,21 @@ export class OAuthController {
       );
       frontend.searchParams.set('ticket', ticket);
     } catch (error) {
+      // 只透传 service 里那些写给用户看的 HttpException 文案。
+      // 其余异常（上游 fetch 的 TypeError、JSON.parse 的 SyntaxError、数据库错误）
+      // 的 message 会随重定向落到浏览器历史、代理和服务端访问日志里，属于外泄面。
+      const expected = error instanceof HttpException;
+
+      if (!expected) {
+        this.logger.error(
+          `OAuth ${provider} 回调失败`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+
       frontend.searchParams.set(
         'error',
-        error instanceof Error ? error.message : 'OAuth 登录失败',
+        expected ? error.message : 'OAuth 登录失败，请重试',
       );
     }
     response.redirect(frontend.toString());

@@ -39,6 +39,7 @@ import {
 
 import { RequestContext } from '../../common/context/request-context.service';
 import { DRIZZLE, type DrizzleDB } from '../../database/database.constants';
+import type { DataScopeSubject } from './data-scope.service';
 import type { CreateRoleDto } from './dto/create-role.dto';
 import type { QueryRoleDto } from './dto/query-role.dto';
 import type { UpdateRoleDto } from './dto/update-role.dto';
@@ -336,7 +337,11 @@ export class RoleService {
   }
 
   /** 全量替换用户的角色 */
-  async setUserRoles(userId: number, roleIds: number[]): Promise<void> {
+  async setUserRoles(
+    userId: number,
+    roleIds: number[],
+    subject: DataScopeSubject,
+  ): Promise<void> {
     // 不允许改自己的角色：否则管理员可以把自己的超管角色摘掉，
     // 或误操作后失去修复权限的能力，只能去数据库手工恢复
     if (userId === this.ctx.userId) {
@@ -354,6 +359,7 @@ export class RoleService {
     }
 
     await this.assertAllExist(roles, roleIds, '角色');
+    await this.assertNoSuperAdminRoleGrant(roleIds, subject);
 
     await this.db.transaction(async (tx) => {
       await tx.delete(userRoles).where(eq(userRoles.userId, userId));
@@ -404,6 +410,31 @@ export class RoleService {
       .where(eq(userRoles.roleId, roleId));
 
     await this.cache.invalidateUsers(rows.map((row) => row.id));
+  }
+
+  /**
+   * 非超管不允许把内置超管角色分配出去：setUserRoles 原本只校验「角色存在」，
+   * 不拦的话任何拿到 system:user:assign-role 权限的账号
+   * 都能给自己控制的马甲号授超管角色完成提权。
+   * 与内置角色的 code/status 锁死是同一思路。
+   */
+  private async assertNoSuperAdminRoleGrant(
+    roleIds: number[],
+    subject: DataScopeSubject,
+  ): Promise<void> {
+    if (subject.isSuperAdmin || roleIds.length === 0) return;
+
+    const [superAdminRole] = await this.db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(
+        and(eq(roles.code, SUPER_ADMIN_ROLE_CODE), isNull(roles.deletedAt)),
+      )
+      .limit(1);
+
+    if (superAdminRole && roleIds.includes(superAdminRole.id)) {
+      throw new ForbiddenException('只有超级管理员才能分配超级管理员角色');
+    }
   }
 
   /**

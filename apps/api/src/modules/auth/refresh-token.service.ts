@@ -34,6 +34,19 @@ export type RefreshTokenCheck =
   | { ok: true; record: RefreshTokenRow }
   | { ok: false; reason: 'unknown' | 'expired' | 'revoked' | 'reused' };
 
+/**
+ * 同一 refreshToken 被并发轮换时抛出。
+ * 两个请求可能同时通过 check()，条件更新保证只有一个能作废成功，
+ * 失败者收到这个错误。此时无法区分「客户端重试」与「令牌被复制」，
+ * 由调用方统一按重用处理。
+ */
+export class RefreshTokenRotationConflictError extends Error {
+  constructor(readonly oldJti: string) {
+    super(`refreshToken ${oldJti} 已被轮换`);
+    this.name = RefreshTokenRotationConflictError.name;
+  }
+}
+
 export type OnlineUserSessionRow = Omit<
   OnlineUserSession,
   'createdAt' | 'expiresAt'
@@ -204,6 +217,10 @@ export class RefreshTokenService {
   /**
    * 轮换：作废旧 jti 并签发新的，两步在事务里完成。
    * 若只作废不签发（或反过来），用户会莫名其妙掉线或留下一个永不失效的旧 token。
+   *
+   * 作废用「revoked_at IS NULL」条件更新并检查影响行数：同一 refreshToken
+   * 并发提交两次时，两个请求都能通过 check()，没有这个守卫会各自签出新会话，
+   * 重用检测形同虚设。失败者抛错触发回滚，由调用方按令牌重用处理。
    */
   async rotate(
     oldJti: string,
@@ -222,10 +239,16 @@ export class RefreshTokenService {
         userAgent: client.userAgent?.slice(0, 255) ?? null,
       });
 
-      await tx
+      const [updateResult] = await tx
         .update(refreshTokens)
         .set({ revokedAt: sql`CURRENT_TIMESTAMP`, replacedByJti: newJti })
-        .where(eq(refreshTokens.jti, oldJti));
+        .where(
+          and(eq(refreshTokens.jti, oldJti), isNull(refreshTokens.revokedAt)),
+        );
+
+      if (updateResult.affectedRows === 0) {
+        throw new RefreshTokenRotationConflictError(oldJti);
+      }
     });
 
     return newJti;

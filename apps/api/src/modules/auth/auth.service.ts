@@ -27,7 +27,10 @@ import type {
   AuthTokens,
   JwtPayload,
 } from './interfaces/jwt-payload.interface';
-import { RefreshTokenService } from './refresh-token.service';
+import {
+  RefreshTokenRotationConflictError,
+  RefreshTokenService,
+} from './refresh-token.service';
 
 /** 通过校验的 refreshToken 一定带 jti，用它避免下游到处判空 */
 type VerifiedRefreshPayload = JwtPayload & { jti: string };
@@ -168,14 +171,7 @@ export class AuthService {
       if (check.reason === 'reused') {
         // 已作废的 token 又被用了：要么客户端有 bug，要么它被复制走了。
         // 无法区分，按最坏情况处理——把这个用户的所有会话全部踢掉。
-        const revoked = await this.refreshTokens.revokeAllForUser(payload.sub);
-        this.logger.warn(
-          `检测到 refreshToken 重复使用，用户 ${payload.sub} 的 ${revoked} 个会话已全部吊销`,
-        );
-
-        throw new UnauthorizedException(
-          '检测到令牌重复使用，出于安全考虑已退出所有登录',
-        );
+        await this.revokeAllForReuse(payload.sub);
       }
 
       if (check.reason === 'revoked') {
@@ -197,17 +193,45 @@ export class AuthService {
     }
 
     const { expiresAt, expiresIn } = this.refreshExpiry();
-    const jti = await this.refreshTokens.rotate(
-      payload.jti,
-      user.id,
-      expiresAt,
-      this.ctx.client(),
-    );
+
+    let jti: string;
+    try {
+      jti = await this.refreshTokens.rotate(
+        payload.jti,
+        user.id,
+        expiresAt,
+        this.ctx.client(),
+      );
+    } catch (error) {
+      // 并发下两个请求可能同时通过 check()。rotate 内部用条件更新保证
+      // 只有一个能作废成功，失败者在这里按令牌重用处理——与「旧 token
+      // 再次被使用」同构，无法区分是客户端重试还是令牌被复制走。
+      if (error instanceof RefreshTokenRotationConflictError) {
+        await this.revokeAllForReuse(payload.sub);
+      }
+      throw error;
+    }
 
     return {
       accessToken: await this.signAccessToken(user, jti),
       refreshToken: await this.signRefreshToken(user, jti, expiresIn),
     };
+  }
+
+  /**
+   * 检测到 refreshToken 重用时的统一处置：吊销该用户全部会话并抛 401。
+   * 无论是事后在 check() 里发现，还是 rotate() 撞见并发争用，
+   * 都无法区分是客户端重试还是令牌被复制走，统一按最坏情况处理。
+   */
+  private async revokeAllForReuse(userId: number): Promise<never> {
+    const revoked = await this.refreshTokens.revokeAllForUser(userId);
+    this.logger.warn(
+      `检测到 refreshToken 重复使用，用户 ${userId} 的 ${revoked} 个会话已全部吊销`,
+    );
+
+    throw new UnauthorizedException(
+      '检测到令牌重复使用，出于安全考虑已退出所有登录',
+    );
   }
 
   /** 主动登出：只吊销本次提交的这个 refreshToken，其他设备不受影响 */

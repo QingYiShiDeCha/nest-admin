@@ -11,8 +11,10 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { OperationLog } from '../operation-log/operation-log.decorator';
 import { Permissions } from '../../common/decorators/permissions.decorator';
+import type { AuthUser } from '../auth/interfaces/auth-user.interface';
 import { AssignIdsDto } from './dto/assign-ids.dto';
 import { RoleService } from './role.service';
 
@@ -40,12 +42,14 @@ export class UserRoleController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: '全量替换用户的角色',
-    description: '不允许修改自己的角色，避免误摘超管后失去修复能力',
+    description:
+      '不允许修改自己的角色，避免误摘超管后失去修复能力；非超管不能分配内置超管角色',
   })
   setUserRoles(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AssignIdsDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<void> {
-    return this.roleService.setUserRoles(id, dto.ids);
+    return this.roleService.setUserRoles(id, dto.ids, user);
   }
 }

@@ -3,6 +3,9 @@ const SENSITIVE_KEY = /password|token|secret|authorization|cookie|credential/i;
 
 const REDACTED = '***';
 
+/** 递归深度上限，超出后整棵子树换成占位符 */
+const MAX_DEPTH = 6;
+
 /** 单条日志的参数快照上限，避免一次大批量提交把 TEXT 列撑爆 */
 const MAX_LENGTH = 2000;
 
@@ -11,8 +14,14 @@ const MAX_LENGTH = 2000;
  * 登录失败的请求同样会被记录，而它的 body 里正好有密码。
  */
 function redact(value: unknown, depth = 0): unknown {
-  if (depth > 6 || value === null || typeof value !== 'object') {
+  if (value === null || typeof value !== 'object') {
     return value;
+  }
+
+  // 原来这一条排在最前面，超深时连标量一起原样返回，且整棵子树跳过脱敏，
+  // 第 7 层往里的 password 键会明文入库。挪到类型判断之后，深度限制只牺牲细节不再漏敏感值。
+  if (depth > MAX_DEPTH) {
+    return '[嵌套过深，已省略]';
   }
 
   if (Array.isArray(value)) {

@@ -24,6 +24,12 @@ import { serializeParams } from './redact';
 /** 只记录写操作。GET 量级太大且没有审计价值，记了反而淹没真正要看的东西 */
 const LOGGED_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+function stripQuery(url: string): string {
+  const index = url.indexOf('?');
+
+  return index === -1 ? url : url.slice(0, index);
+}
+
 @Injectable()
 export class OperationLogInterceptor implements NestInterceptor {
   constructor(
@@ -61,7 +67,10 @@ export class OperationLogInterceptor implements NestInterceptor {
     // 而我们要记的是「调用方发来的东西」
     const snapshot = {
       method: request.method,
-      path: request.originalUrl ?? request.url,
+      // 去掉 query 再入库：originalUrl 会把 ?access_token=、重置密码的 ?token= 这类
+      // 凭据原样写进审计表的 path 列，而同一批 key 走下面的 params 时是被脱敏的。
+      // query 本身并没有丢——serializeParams 已经记了 request.query，且带脱敏。
+      path: stripQuery(request.originalUrl ?? request.url),
       ip: request.ip ?? null,
       userAgent: request.get('user-agent')?.slice(0, 255) ?? null,
       params: serializeParams({

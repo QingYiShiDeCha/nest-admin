@@ -64,7 +64,11 @@ export class DepartmentController {
   @Get(':id')
   @Permissions(PERMISSIONS.DEPT_READ)
   @ApiOperation({ summary: '查询部门详情' })
-  findOne(@Param('id', ParseIntPipe) id: number): Promise<DepartmentRecord> {
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ): Promise<DepartmentRecord> {
+    await this.dataScopes.assertDepartmentAccessible(id, user);
     return this.service.findDetail(id);
   }
 
@@ -84,10 +88,12 @@ export class DepartmentController {
   @Permissions(PERMISSIONS.DEPT_UPDATE)
   @OperationLog({ module: '部门管理', action: '更新部门' })
   @ApiOperation({ summary: '更新部门' })
-  update(
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateDepartmentDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<DepartmentRecord> {
+    await this.dataScopes.assertDepartmentAccessible(id, user);
     return this.service.update(id, dto);
   }
 
@@ -96,7 +102,11 @@ export class DepartmentController {
   @OperationLog({ module: '部门管理', action: '删除部门' })
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: '删除无子部门且无直属用户的部门' })
-  remove(@Param('id', ParseIntPipe) id: number): Promise<void> {
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ): Promise<void> {
+    await this.dataScopes.assertDepartmentAccessible(id, user);
     return this.service.remove(id);
   }
 }

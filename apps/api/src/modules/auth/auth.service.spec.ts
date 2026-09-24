@@ -18,7 +18,10 @@ import { PasswordPolicyService } from '../../common/password/password-policy.ser
 import { UserService } from '../user/user.service';
 import { LoginLogService } from '../login-log/login-log.service';
 import { AuthService } from './auth.service';
-import { RefreshTokenService } from './refresh-token.service';
+import {
+  RefreshTokenRotationConflictError,
+  RefreshTokenService,
+} from './refresh-token.service';
 import type { JwtPayload } from './interfaces/jwt-payload.interface';
 
 const ACCESS_SECRET = 'unit-test-access-secret';
@@ -411,6 +414,21 @@ describe('AuthService', () => {
 
   it('已吊销的 refreshToken 再次使用会被判定为盗用，并踢掉该用户全部会话', async () => {
     refreshTokens.check.mockResolvedValue({ ok: false, reason: 'reused' });
+
+    await expect(service.refresh(await signRefresh('jti-old'))).rejects.toThrow(
+      new UnauthorizedException(
+        '检测到令牌重复使用，出于安全考虑已退出所有登录',
+      ),
+    );
+    expect(refreshTokens.revokeAllForUser).toHaveBeenCalledWith(USER.id);
+  });
+
+  it('并发轮换撞车时按令牌重用处理：踢掉全部会话', async () => {
+    // 两个请求同时通过 check()，只有一个能在 rotate 里作废成功，
+    // 失败者拿到 RefreshTokenRotationConflictError
+    refreshTokens.rotate.mockRejectedValue(
+      new RefreshTokenRotationConflictError('jti-old'),
+    );
 
     await expect(service.refresh(await signRefresh('jti-old'))).rejects.toThrow(
       new UnauthorizedException(

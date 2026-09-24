@@ -11,7 +11,8 @@ describe('OperationLogInterceptor', () => {
   it('公共接口在业务验明身份后从请求上下文记录操作人', async () => {
     const request = {
       method: 'POST',
-      originalUrl: '/api/auth/refresh',
+      // 带 query：path 列必须把它去掉，否则 ?token= 这类凭据会绕过 params 的脱敏明文入库
+      originalUrl: '/api/auth/refresh?token=plain-value-in-url',
       ip: '127.0.0.1',
       body: { refreshToken: 'redacted-by-serializer' },
       query: {},
@@ -54,6 +55,10 @@ describe('OperationLogInterceptor', () => {
         path: '/api/auth/refresh',
         status: 'success',
       }),
+    );
+    // 整条审计记录里都不该出现 URL 上那个明文 token
+    expect(JSON.stringify(record.mock.calls)).not.toContain(
+      'plain-value-in-url',
     );
   });
 });
