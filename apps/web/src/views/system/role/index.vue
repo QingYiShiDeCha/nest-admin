@@ -28,9 +28,9 @@ import {
   STATUS_OPTIONS,
 } from '@/constants/dicts';
 import RoleGrantModal from './components/role-grant-modal/index.vue';
+import { formatDateTime } from '@/utils/format';
 
 const { message } = App.useApp();
-import { formatDateTime } from '@/utils/format';
 
 const { can } = usePermission();
 
@@ -185,6 +185,9 @@ function openCreate(): void {
 
 async function openEdit(record: Role): Promise<void> {
   editing.value = record;
+  // 先重置表单再拉详情，但弹窗必须在详情加载成功后才打开：
+  // 失败时若停留在「自定义部门已清空」的半成品状态，用户点保存会
+  // 把已配置的部门静默提交成空数组
   Object.assign(form, {
     code: record.code,
     name: record.name,
@@ -194,13 +197,19 @@ async function openEdit(record: Role): Promise<void> {
     departmentIds: [],
     remark: record.remark ?? '',
   });
-  modalOpen.value = true;
 
-  const [detail] = await Promise.all([
-    apiRoleDetail(record.id),
-    ensureDepartmentTree(),
-  ]);
-  form.departmentIds = [...detail.departmentIds];
+  try {
+    const [detail] = await Promise.all([
+      apiRoleDetail(record.id),
+      ensureDepartmentTree(),
+    ]);
+    form.departmentIds = [...detail.departmentIds];
+    modalOpen.value = true;
+  } catch (error) {
+    void message.error(
+      error instanceof Error ? error.message : '加载角色详情失败',
+    );
+  }
 }
 
 async function submit(): Promise<void> {

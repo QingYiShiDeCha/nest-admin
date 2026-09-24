@@ -15,6 +15,8 @@ vi.mock('antdv-next', () => ({
   App: {
     name: 'AApp',
     template: '<div><slot /></div>',
+    // GlobalErrorToast 在 a-app 内通过 App.useApp() 拿主题化 message
+    useApp: () => ({ message: { error: vi.fn(), success: vi.fn() } }),
   },
   ConfigProvider: {
     name: 'AConfigProvider',

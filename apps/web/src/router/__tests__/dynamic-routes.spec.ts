@@ -109,6 +109,30 @@ describe('dynamic route manager', () => {
     );
   });
 
+  it('path 已被静态路由占用时不重复注册，只保留侧边栏入口', () => {
+    const target = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        {
+          path: '/',
+          name: ADMIN_ROUTE_NAME,
+          component: EmptyView,
+          children: [
+            { path: '/editor', name: 'editor-demo', component: EmptyView },
+          ],
+        },
+      ],
+    });
+    const manager = createDynamicRouteManager({
+      '../views/editor/index.vue': async () => ({ default: EmptyView }),
+    });
+
+    manager.sync(target, [menu(5, '/editor', { name: '富文本编辑器' })]);
+
+    expect(target.hasRoute('dynamic-menu-5')).toBe(false);
+    expect(target.resolve('/editor').name).toBe('editor-demo');
+  });
+
   it('重复同步不重复注册，reset 会移除全部动态路由', () => {
     const target = router();
     const manager = createDynamicRouteManager({

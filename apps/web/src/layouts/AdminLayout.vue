@@ -82,7 +82,6 @@ watch(
     <AdminSidebar :collapsed="sidebarCollapsed" />
 
     <a-layout class="min-w-0 min-h-0 flex flex-col relative">
-
       <!-- OS 视口本身是 flex 列（任意变体注入）：滚动条挂在全局视口上。
            头部/页签 sticky 常驻视口顶部（与 art-design-pro 的 #app-header 同构）。
            min-h-0 链把高度约束传导到 ProTable：表格页表体内部滚、分页器常驻；
@@ -138,7 +137,11 @@ watch(
                        页签里开着的页面在切换间保持实例 -->
                   <!-- min-h-full：非 flex 布局的页面（如富文本 demo）也撑满视口 -->
                   <KeepAlive :include="tabs.cachedNames">
-                    <component :is="Component" :key="contentKey" class="min-h-full" />
+                    <component
+                      :is="Component"
+                      :key="contentKey"
+                      class="min-h-full"
+                    />
                   </KeepAlive>
                 </Transition>
               </RouterView>

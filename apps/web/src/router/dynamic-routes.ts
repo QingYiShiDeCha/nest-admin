@@ -48,6 +48,17 @@ export function createDynamicRouteManager(
     activeRouter = router;
 
     const desiredNames = new Set<string>();
+    // 静态路由（routes.ts 里的 /messages、/editor 等）已经能解析这些 path，
+    // 再动态注册会产生同 path 的重复记录。菜单树里的这类节点只提供侧边栏入口，
+    // 路由解析交给先注册的静态记录。
+    const staticPaths = new Set(
+      router
+        .getRoutes()
+        .filter(
+          (record) => !String(record.name ?? '').startsWith('dynamic-menu-'),
+        )
+        .map((record) => record.path),
+    );
 
     walkMenus(tree, (menu) => {
       if (menu.type !== 'menu' || !menu.path) {
@@ -56,6 +67,10 @@ export function createDynamicRouteManager(
 
       if (!menu.path.startsWith('/')) {
         warn(`菜单「${menu.name}」的路由路径必须以 / 开头，已跳过动态路由注册`);
+        return;
+      }
+
+      if (staticPaths.has(menu.path.replace(/[?#].*$/, ''))) {
         return;
       }
 

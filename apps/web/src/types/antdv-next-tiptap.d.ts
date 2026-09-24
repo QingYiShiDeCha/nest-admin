@@ -5,7 +5,9 @@ declare module 'antdv-next-tiptap' {
     content?: string;
     placeholder?: string;
     height?: number | string;
-    extensions?: any[];
+    // 页面侧暂未传入自定义扩展；声明为 unknown[] 而不是 any[]，
+    // 避免放宽整个联合类型的类型检查
+    extensions?: unknown[];
   }
 
   /** 同时满足组件用法与 app.use() 插件用法 */

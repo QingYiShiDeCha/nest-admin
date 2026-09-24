@@ -292,6 +292,7 @@ describe('AdminLayout scroll ownership', () => {
     expect(layouts[1]!.classes()).toEqual(
       expect.arrayContaining(['min-w-0', 'min-h-0', 'flex', 'flex-col', 'relative']),
     );
+    expect(layouts[1]!.classes()).not.toContain('pb-5');
     expect(wrapper.get('[data-testid="header"]').classes()).toEqual(
       expect.arrayContaining([
         'admin-header',
