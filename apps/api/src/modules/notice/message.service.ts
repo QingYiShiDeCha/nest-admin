@@ -171,9 +171,7 @@ export class MessageService {
       // 解析 lastEventId 的时间戳部分（格式: uuid@timestamp）
       const lastTimestamp = this.parseEventTimestamp(lastEventId);
       if (!lastTimestamp) {
-        this.logger.debug(
-          `无法解析事件 ID ${lastEventId}，跳过历史事件重放`,
-        );
+        this.logger.debug(`无法解析事件 ID ${lastEventId}，跳过历史事件重放`);
         return [];
       }
 

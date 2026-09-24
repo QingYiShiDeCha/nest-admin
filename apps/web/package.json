@@ -26,8 +26,9 @@
     "overlayscrollbars-vue": "^0.5.10",
     "pinia": "^4.0.2",
     "pinia-plugin-persistedstate": "^4.7.1",
-    "vue": "^3.5.40",
+    "vue": "3.6.0-rc.9",
     "vue-echarts": "^8.1.0",
+    "vue-jsx": "3.3.0-rc.2",
     "vue-router": "^5.2.0"
   },
   "devDependencies": {

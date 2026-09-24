@@ -2,7 +2,7 @@ import { fileURLToPath, URL } from 'node:url';
 
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
-import vueJsx from '@vitejs/plugin-vue-jsx';
+import vueJsx from 'vue-jsx/vite';
 import vueDevTools from 'vite-plugin-vue-devtools';
 import { AntdvNextResolver } from '@antdv-next/auto-import-resolver';
 // vite.config.ts
@@ -47,7 +47,12 @@ export default defineConfig({
      * 这里复用即可，不必为前端再产一份 ESM 产物。
      * 附带好处：改 shared 的代码前端能直接热更新，不需要先 build。
      */
-    conditions: ['@nest-admin/source', 'module', 'browser', 'development|production'],
+    conditions: [
+      '@nest-admin/source',
+      'module',
+      'browser',
+      'development|production',
+    ],
   },
   optimizeDeps: {
     // 走源码解析后它就是普通 TS 文件，不该被当成预构建依赖

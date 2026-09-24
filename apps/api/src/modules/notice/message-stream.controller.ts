@@ -52,12 +52,10 @@ export class MessageStreamController {
       .pipe(map(toMessageEvent));
 
     const heartbeat = timer(0, HEARTBEAT_INTERVAL_MS).pipe(
-      map(
-        (): MessageEvent => ({
-          type: 'heartbeat',
-          data: { occurredAt: new Date().toISOString() },
-        }),
-      ),
+      map((): MessageEvent => ({
+        type: 'heartbeat',
+        data: { occurredAt: new Date().toISOString() },
+      })),
     );
 
     // SSE 重连时，浏览器会自动发送 Last-Event-ID 请求头

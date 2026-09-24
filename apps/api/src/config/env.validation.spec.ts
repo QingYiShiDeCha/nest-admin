@@ -77,5 +77,4 @@ describe('文件上传环境变量校验', () => {
       }),
     ).toThrow('LOG_ARCHIVE_S3_SECRET_ACCESS_KEY');
   });
-
 });

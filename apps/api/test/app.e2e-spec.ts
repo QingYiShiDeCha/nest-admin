@@ -74,7 +74,6 @@ describe('App (e2e)', () => {
     expect((response.body as ResponseBody).code).toBe(401);
   });
 
-
   it('POST /api/auth/login 参数不合法时返回校验错误', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/auth/login')
