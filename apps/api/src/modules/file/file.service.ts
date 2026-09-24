@@ -41,6 +41,7 @@ import {
   type DataScopeSubject,
 } from '../rbac/data-scope.service';
 import type { QueryFileResourceDto } from './dto/query-file-resource.dto';
+import { findContentTypeMismatch } from './file-signature';
 import { FILE_STORAGE, type FileStorage } from './file-storage.interface';
 
 export interface FileResourceRecord extends Omit<FileResourceRow, 'deletedAt'> {
@@ -75,6 +76,14 @@ export class FileService {
 
     if (!this.isMimeTypeAllowed(file.mimetype)) {
       throw new BadRequestException(`不支持的文件类型：${file.mimetype}`);
+    }
+
+    // 上面比的是客户端自报的 Content-Type，改个请求头就能把任意内容伪装成 image/png，
+    // 而伪装结果会一路决定存储 key 后缀、入库 mimeType 和回显 category。
+    // 这里用魔数反向校验，只对「嗅得出类型」的内容生效。
+    const mismatch = findContentTypeMismatch(file.buffer, file.mimetype);
+    if (mismatch) {
+      throw new BadRequestException(mismatch);
     }
 
     const originalName = normalizeMultipartFilename(file.originalname);
@@ -212,6 +221,13 @@ export class FileService {
 
   async remove(id: number, subject: DataScopeSubject): Promise<void> {
     const row = await this.findActiveRow(id, subject);
+
+    if (row.storage !== this.storage.driver) {
+      throw new ConflictException(
+        `文件存储于 ${row.storage}，当前启用的是 ${this.storage.driver} 驱动，无法安全删除`,
+      );
+    }
+
     const referenceCount = await this.countReferences(row.url);
 
     if (referenceCount > 0) {
@@ -220,26 +236,27 @@ export class FileService {
       );
     }
 
-    if (row.storage !== this.storage.driver) {
-      throw new ConflictException(
-        `文件存储于 ${row.storage}，当前启用的是 ${this.storage.driver} 驱动，无法安全删除`,
-      );
+    // 先软删记录、后清存储对象。原顺序是对象先没、记录后改，
+    // update 一旦失败就留下「记录还在、对象已删」的破链，该 URL 之后每次被读都是坏链接。
+    const [result] = await this.db
+      .update(fileResources)
+      .set({ deletedAt: new Date() })
+      .where(and(eq(fileResources.id, id), isNull(fileResources.deletedAt)));
+
+    if (result.affectedRows === 0) {
+      throw new NotFoundException(`文件资源 ${id} 不存在`);
     }
 
+    // 对象删除失败不再让接口失败：记录已软删，残留的是可回收的孤儿对象，
+    // 比反向的破链（记录活着、对象没了）安全得多。
     try {
       await this.storage.delete(row.key);
     } catch (error) {
       this.logger.error(
-        `删除存储对象 ${row.key} 失败`,
+        `存储对象 ${row.key} 删除失败，记录已软删，留待对账清理`,
         error instanceof Error ? error.stack : String(error),
       );
-      throw new ServiceUnavailableException('文件存储服务暂不可用');
     }
-
-    await this.db
-      .update(fileResources)
-      .set({ deletedAt: new Date() })
-      .where(and(eq(fileResources.id, id), isNull(fileResources.deletedAt)));
   }
 
   private async findActiveRow(

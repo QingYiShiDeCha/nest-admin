@@ -12,6 +12,26 @@ class FakeS3Client implements S3ClientLike {
 }
 
 describe('S3FileStorage', () => {
+  it('endpoint 配置无效时在构造期即失败，不再等对象写完才抛', () => {
+    const build = (endpoint: string) =>
+      new S3FileStorage(
+        {
+          region: 'us-east-1',
+          bucket: 'assets',
+          endpoint,
+          forcePathStyle: true,
+        },
+        new FakeS3Client(),
+      );
+
+    // 完全解析不了
+    expect(() => build('not a url')).toThrow(/S3 endpoint 配置无效/);
+    // 解析得了、但会被拼成 minio:9000/assets/key 这种废 URL
+    expect(() => build('minio:9000')).toThrow(/必须使用 http 或 https/);
+    // 合法值照常工作
+    expect(() => build('http://minio:9000')).not.toThrow();
+  });
+
   it('使用 PutObject 上传，并优先返回配置的公开域名', async () => {
     const client = new FakeS3Client();
     const storage = new S3FileStorage(
