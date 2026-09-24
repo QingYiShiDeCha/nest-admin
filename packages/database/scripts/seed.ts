@@ -334,6 +334,16 @@ const MENU_TREE: readonly MenuSeed[] = [
     sort: 20,
   },
   {
+    // 页面组件由前端静态路由注册（routes.ts 的 /editor），
+    // 这里只登记侧边栏入口；前端动态路由发现 path 已有静态记录时会跳过注册
+    name: '富文本编辑器',
+    type: 'menu',
+    path: '/editor',
+    icon: 'RiEditLine',
+    sort: 40,
+    keepAlive: true,
+  },
+  {
     // visible: false 的示例：路由可达但不出现在侧边栏，
     // 入口在右上角头像的下拉里。前端 sidebarTree 会过滤掉它
     name: '个人中心',
