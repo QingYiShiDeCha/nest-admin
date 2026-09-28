@@ -125,6 +125,18 @@ describe('认证与 RBAC (e2e)', () => {
     const transferList = (
       permissions.body as ResponseBody<PermissionItem[]>
     ).data.find((item) => item.code === PERMISSIONS.DEPT_TRANSFER_LIST);
+    // 部门详情/更新/删除也发给 viewer：它 dataScope=self，正好用来验证
+    // 这三个入口的范围判定。注意必须给到权限，否则会被 PermissionGuard
+    // 先拦成 403，根本走不到断言想测的那一步。
+    const deptRead = (
+      permissions.body as ResponseBody<PermissionItem[]>
+    ).data.find((item) => item.code === PERMISSIONS.DEPT_READ);
+    const deptUpdate = (
+      permissions.body as ResponseBody<PermissionItem[]>
+    ).data.find((item) => item.code === PERMISSIONS.DEPT_UPDATE);
+    const deptDelete = (
+      permissions.body as ResponseBody<PermissionItem[]>
+    ).data.find((item) => item.code === PERMISSIONS.DEPT_DELETE);
     const fileList = (
       permissions.body as ResponseBody<PermissionItem[]>
     ).data.find((item) => item.code === PERMISSIONS.FILE_LIST);
@@ -163,6 +175,9 @@ describe('认证与 RBAC (e2e)', () => {
     expect(sessionList).toBeDefined();
     expect(forceLogout).toBeDefined();
     expect(transferList).toBeDefined();
+    expect(deptRead).toBeDefined();
+    expect(deptUpdate).toBeDefined();
+    expect(deptDelete).toBeDefined();
     expect(fileList).toBeDefined();
     expect(fileRead).toBeDefined();
     expect(fileDelete).toBeDefined();
@@ -198,6 +213,9 @@ describe('认证与 RBAC (e2e)', () => {
           sessionList!.id,
           forceLogout!.id,
           transferList!.id,
+          deptRead!.id,
+          deptUpdate!.id,
+          deptDelete!.id,
           fileList!.id,
           fileRead!.id,
           fileDelete!.id,
@@ -764,6 +782,44 @@ describe('认证与 RBAC (e2e)', () => {
     ).toBeGreaterThan(0);
   });
 
+  it('部门详情/更新/删除都遵守数据范围', async () => {
+    // viewer 角色 dataScope=self 且部门是 scopedDepartmentId，
+    // 与 findTransfers 用的是同一套判定，三个入口都要按不存在处理越权目标。
+    await request(app.getHttpServer())
+      .get(`/api/departments/${scopedDepartmentId}`)
+      .set('Authorization', `Bearer ${viewerAuth.accessToken}`)
+      .expect(200);
+
+    await request(app.getHttpServer())
+      .get(`/api/departments/${otherDepartmentId}`)
+      .set('Authorization', `Bearer ${viewerAuth.accessToken}`)
+      .expect(404);
+    await request(app.getHttpServer())
+      .patch(`/api/departments/${otherDepartmentId}`)
+      .set('Authorization', `Bearer ${viewerAuth.accessToken}`)
+      .send({ name: `越权改名 ${suffix}` })
+      .expect(404);
+    await request(app.getHttpServer())
+      .delete(`/api/departments/${otherDepartmentId}`)
+      .set('Authorization', `Bearer ${viewerAuth.accessToken}`)
+      .expect(404);
+
+    // 超管不受数据范围限制，同一个目标要能正常读到
+    await request(app.getHttpServer())
+      .get(`/api/departments/${otherDepartmentId}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+
+    // 越权请求没有改动任何东西：名称仍是创建时的值
+    const stillIntact = await request(app.getHttpServer())
+      .get(`/api/departments/${otherDepartmentId}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .expect(200);
+    expect(
+      (stillIntact.body as ResponseBody<{ name: string }>).data.name,
+    ).toContain('E2E 其他部门');
+  });
+
   it('角色权限撤销后已缓存的授权立即失效', async () => {
     await request(app.getHttpServer())
       .put(`/api/roles/${roleId}/permissions`)
@@ -827,6 +883,48 @@ describe('认证与 RBAC (e2e)', () => {
 
     expect(unchanged.permissionIds).toEqual([userRead!.id]);
     expect(unchanged.menuIds).toEqual([firstMenu.id]);
+  });
+
+  it('禁用用户会当场吊销其全部会话，重新启用也换不出新令牌', async () => {
+    // 先正常刷新一次：既证明这条会话本来是活的（排除「刷新链路本身不通」造成的假通过），
+    // 也拿到轮换后的令牌——轮换会让上一个 refreshToken 失效，
+    // 所以后面必须用 rotated 而不是 viewerAuth 里那个。
+    const refreshed = await request(app.getHttpServer())
+      .post('/api/auth/refresh')
+      .send({ refreshToken: viewerAuth.refreshToken })
+      .expect(200);
+    const rotated = (
+      refreshed.body as ResponseBody<
+        Pick<AuthResult, 'accessToken' | 'refreshToken'>
+      >
+    ).data;
+
+    await request(app.getHttpServer())
+      .patch(`/api/users/${viewerUser.id}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .send({ status: 'disabled' })
+      .expect(200);
+
+    // 已签发的访问令牌同样立刻失效（JwtStrategy 每次请求回库查 status）
+    await request(app.getHttpServer())
+      .get('/api/auth/profile')
+      .set('Authorization', `Bearer ${rotated.accessToken}`)
+      .expect(401);
+
+    await request(app.getHttpServer())
+      .patch(`/api/users/${viewerUser.id}`)
+      .set('Authorization', `Bearer ${admin.accessToken}`)
+      .send({ status: 'active' })
+      .expect(200);
+
+    // 关键断言，而且必须「先禁用再启用」才测得出差别：
+    // 禁用期间直接刷新的话，auth.service 会在 status!==active 分支里顺手吊销全部会话，
+    // 那样即使 update() 少写了 revokeAllForUser 这条也会通过。
+    // 恢复启用后再拿旧 refreshToken，只有「禁用当场吊销」才拦得住。
+    await request(app.getHttpServer())
+      .post('/api/auth/refresh')
+      .send({ refreshToken: rotated.refreshToken })
+      .expect(401);
   });
 
   /** 拉取授权聚合接口，校验回显与候选项 */
