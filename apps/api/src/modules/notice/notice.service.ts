@@ -277,10 +277,18 @@ export class NoticeService {
           expiresAt,
           ...this.ctx.auditOnUpdate(),
         })
-        .where(aliveNotice(scopeCondition, eq(notices.id, id)));
+        .where(
+          aliveNotice(
+            scopeCondition,
+            eq(notices.id, id),
+            // 「已发布不可编辑」只靠上面那次读保证不了：读与写之间可能被并发 publish()。
+            // 与 publish() 同一套 CAS，把状态谓词压进这条 UPDATE 里才真是原子的。
+            eq(notices.status, current.status),
+          ),
+        );
 
       if (result.affectedRows !== 1) {
-        throw new NotFoundException(`公告 ${id} 不存在`);
+        throw new ConflictException('公告状态已变化，请刷新后重试');
       }
 
       if (targetChanged) {
@@ -413,10 +421,17 @@ export class NoticeService {
     const [result] = await this.db
       .update(notices)
       .set({ deletedAt: sql`CURRENT_TIMESTAMP`, ...this.ctx.auditOnUpdate() })
-      .where(aliveNotice(scopeCondition, eq(notices.id, id)));
+      .where(
+        aliveNotice(
+          scopeCondition,
+          eq(notices.id, id),
+          // 同 update()：上面那次 status 检查到这条写之间可能被并发 publish()
+          eq(notices.status, notice.status),
+        ),
+      );
 
     if (result.affectedRows !== 1) {
-      throw new NotFoundException(`公告 ${id} 不存在`);
+      throw new ConflictException('公告状态已变化，请刷新后重试');
     }
   }
 
