@@ -6,6 +6,7 @@ import {
 } from '@/composables/use-global-progress';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
+import { useRecentVisitsStore } from '@/stores/recent-visits';
 import { useSystemConfigStore } from '@/stores/system-config';
 import { useTabsStore } from '@/stores/tabs';
 import { getAccessToken } from '@/utils/auth-token';
@@ -83,6 +84,12 @@ export function setupGuards(router: Router): void {
   router.afterEach((to) => {
     finishGlobalProgress(ROUTE_PROGRESS_TASK);
     document.title = `${to.meta.title} · ${useSystemConfigStore().systemName}`;
+
+    // 只记菜单里真实存在的页面：403、登录回跳这类路由进「最近访问」没有意义，
+    // 带参数的详情页各自一条也会把面板挤满。命令面板本来就列不出这些路径。
+    if (useMenuStore().reachablePaths.has(to.path)) {
+      useRecentVisitsStore().record(to.path, to.meta.title);
+    }
   });
 
   router.onError(() => {

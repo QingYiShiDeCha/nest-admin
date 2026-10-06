@@ -17,6 +17,7 @@ import { resetDynamicRoutes } from './router/dynamic-routes';
 import { useAuthStore } from './stores/auth';
 import { useMenuStore } from './stores/menu';
 import { useNotificationsStore } from './stores/notifications';
+import { useRecentVisitsStore } from './stores/recent-visits';
 import { useSystemConfigStore } from './stores/system-config';
 import { useTabsStore } from './stores/tabs';
 import { onUnauthorized } from './utils/auth-events';
@@ -59,6 +60,8 @@ onUnauthorized(() => {
   useMenuStore(pinia).reset();
   useNotificationsStore(pinia).reset();
   useTabsStore(pinia).reset();
+  // 最近访问是持久化的，不清就会把上一个人的浏览记录带给下一个登录的人
+  useRecentVisitsStore(pinia).reset();
   resetDynamicRoutes();
 
   if (router.currentRoute.value.name !== 'login') {

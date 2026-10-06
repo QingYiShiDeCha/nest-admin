@@ -19,9 +19,13 @@ const mocks = vi.hoisted(() => ({
   menu: {
     loaded: false,
     tree: [] as unknown[],
+    // afterEach 里用它判断「这个 path 是不是菜单里的真实页面」，
+    // 各用例按需往里加路径；默认空集合表示什么都不记
+    reachablePaths: new Set<string>(),
     load: vi.fn(),
     reset: vi.fn(),
   },
+  recordVisit: vi.fn(),
   resetDynamicRoutes: vi.fn(),
   syncDynamicRoutes: vi.fn(),
   tabsReset: vi.fn(),
@@ -29,6 +33,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/stores/auth', () => ({ useAuthStore: () => mocks.auth }));
 vi.mock('@/stores/menu', () => ({ useMenuStore: () => mocks.menu }));
+vi.mock('@/stores/recent-visits', () => ({
+  useRecentVisitsStore: () => ({ record: mocks.recordVisit }),
+}));
 vi.mock('@/stores/tabs', () => ({
   useTabsStore: () => ({ reset: mocks.tabsReset }),
 }));
@@ -83,6 +90,7 @@ describe('router guards', () => {
     mocks.auth.passwordChangeRequired = false;
     mocks.menu.loaded = false;
     mocks.menu.tree = [];
+    mocks.menu.reachablePaths.clear();
     mocks.menu.load.mockImplementation(async () => {
       mocks.menu.loaded = true;
       return mocks.menu.tree;
@@ -91,6 +99,23 @@ describe('router guards', () => {
 
   afterEach(() => {
     resetGlobalProgress();
+  });
+
+  it('只把菜单里真实存在的页面记进最近访问', async () => {
+    const router = createTestRouter();
+
+    setupGuards(router);
+    mocks.menu.reachablePaths.add('/profile');
+
+    await router.push('/profile');
+
+    expect(mocks.recordVisit).toHaveBeenCalledWith('/profile', '个人中心');
+
+    // 不在菜单里的路径（403、带参详情页）不记：命令面板本来就跳不过去，
+    // 记了只会把「最近访问」挤满点不开的东西
+    await router.push('/somewhere-else');
+
+    expect(mocks.recordVisit).toHaveBeenCalledTimes(1);
   });
 
   it('路由守卫执行期间维护全局进度任务', async () => {

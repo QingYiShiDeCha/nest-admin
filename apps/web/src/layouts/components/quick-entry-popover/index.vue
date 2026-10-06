@@ -2,55 +2,23 @@
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
-import type { MenuNode } from '@nest-admin/shared';
 import AppIcon from '@/components/core/base/app-icon/index.vue';
 import { useMenuStore } from '@/stores/menu';
-import { resolveMenuIcon } from '../../menu-icons';
-
-interface QuickEntry {
-  id: number;
-  name: string;
-  path: string;
-  icon?: string;
-  external: boolean;
-}
+import {
+  flattenMenuEntries,
+  matchMenuEntries,
+  type MenuEntry,
+} from '../../menu-entries';
 
 const open = ref(false);
 const keyword = ref('');
 const router = useRouter();
 const menu = useMenuStore();
 
-function flattenEntries(nodes: MenuNode[]): QuickEntry[] {
-  return nodes.flatMap((node) => [
-    ...(node.path
-      ? [
-          {
-            id: node.id,
-            name: node.name,
-            path: node.path,
-            icon: resolveMenuIcon(node.icon),
-            external: node.type === 'external',
-          },
-        ]
-      : []),
-    ...flattenEntries(node.children),
-  ]);
-}
-
-const entries = computed(() => flattenEntries(menu.sidebarTree));
-const filteredEntries = computed(() => {
-  const search = keyword.value.trim().toLocaleLowerCase();
-
-  if (!search) {
-    return entries.value;
-  }
-
-  return entries.value.filter(
-    (entry) =>
-      entry.name.toLocaleLowerCase().includes(search) ||
-      entry.path.toLocaleLowerCase().includes(search),
-  );
-});
+const entries = computed(() => flattenMenuEntries(menu.sidebarTree));
+const filteredEntries = computed(() =>
+  matchMenuEntries(entries.value, keyword.value),
+);
 
 watch(open, (visible) => {
   if (!visible) {
@@ -58,7 +26,7 @@ watch(open, (visible) => {
   }
 });
 
-async function openEntry(entry: QuickEntry): Promise<void> {
+async function openEntry(entry: MenuEntry): Promise<void> {
   open.value = false;
 
   if (entry.external) {

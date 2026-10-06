@@ -6,11 +6,13 @@ import { useRouter } from 'vue-router';
 import AppIcon from '@/components/core/base/app-icon/index.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useMenuStore } from '@/stores/menu';
+import { useRecentVisitsStore } from '@/stores/recent-visits';
 import { useSettingsStore } from '@/stores/settings';
 import { useTabsStore } from '@/stores/tabs';
 import { resolveImageUrl } from '@/utils/image-url';
 import { resetDynamicRoutes } from '@/router/dynamic-routes';
 import AdminBreadcrumb from './AdminBreadcrumb.vue';
+import CommandPalette from './command-palette/index.vue';
 import HeaderIconButton from './header-icon-button/index.vue';
 import LayoutSettingsDrawer from './LayoutSettingsDrawer.vue';
 import NotificationPopover from './notification-popover/index.vue';
@@ -32,6 +34,7 @@ const auth = useAuthStore();
 const menu = useMenuStore();
 const settings = useSettingsStore();
 const tabs = useTabsStore();
+const recentVisits = useRecentVisitsStore();
 const avatarSrc = computed(() => resolveImageUrl(auth.profile?.avatar));
 const isDark = computed(() => settings.resolvedTheme === 'dark');
 const settingsOpen = ref(false);
@@ -63,6 +66,7 @@ async function handleUserMenuClick({
   await auth.logout();
   menu.reset();
   tabs.reset();
+  recentVisits.reset();
   resetDynamicRoutes();
   await router.push({ name: 'login' });
 }
@@ -103,6 +107,8 @@ async function handleUserMenuClick({
 
     <div class="flex items-center gap-4">
       <div class="icon-area flex items-center gap-2">
+        <CommandPalette />
+
         <QuickEntryPopover v-if="settings.showQuickEntry">
           <template #trigger>
             <HeaderIconButton title="快捷入口">

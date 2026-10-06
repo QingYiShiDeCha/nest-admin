@@ -115,6 +115,17 @@ vi.mock('@/layouts/components/quick-entry-popover/index.vue', () => ({
   },
 }));
 
+vi.mock('@/layouts/components/command-palette/index.vue', () => ({
+  default: {
+    name: 'CommandPalette',
+    template: '<div data-testid="command-palette" />',
+  },
+}));
+
+vi.mock('@/stores/recent-visits', () => ({
+  useRecentVisitsStore: () => ({ visits: [], record: vi.fn(), reset: vi.fn() }),
+}));
+
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     isSuperAdmin: false,
