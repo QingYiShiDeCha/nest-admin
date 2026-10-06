@@ -41,9 +41,9 @@ pnpm dev
 
 启动后访问：
 
-- 管理端：http://localhost:5173
-- API：http://localhost:3000/api
-- Swagger：http://localhost:3000/api/docs
+- 管理端：http://localhost:5273
+- API：http://localhost:3100/api
+- Swagger：http://localhost:3100/api/docs
 
 默认管理员账号为 `admin`，密码为 `admin123`，首次登录后请及时修改密码。
 

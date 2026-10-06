@@ -13,7 +13,7 @@ pnpm monorepo 全栈后台管理系统：NestJS 11 + Drizzle ORM/MySQL8 + Redis 
 ## 常用命令
 
 ```bash
-pnpm dev          # build:packages 后并行启动 api(3000) 与 web(5173)
+pnpm dev          # build:packages 后并行启动 api(3100) 与 web(5273)
 pnpm build        # 全量构建（web build 含 type-check，二者并行）
 pnpm lint         # eslint --fix（api+web）+ web 的样式规则检查
 pnpm typecheck    # 各包 tsc/vue-tsc --build

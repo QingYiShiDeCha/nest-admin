@@ -21,7 +21,7 @@ const baseEnvSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'test', 'production'])
     .default('development'),
-  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  PORT: z.coerce.number().int().min(1).max(65535).default(3100),
   API_PREFIX: z.string().default('api'),
   SWAGGER_ENABLED: booleanFromString.default(true),
 
@@ -41,11 +41,11 @@ const baseEnvSchema = z.object({
   OAUTH_REDIRECT_BASE_URL: z
     .string()
     .url()
-    .default('http://localhost:3000/api/auth/oauth'),
+    .default('http://localhost:3100/api/auth/oauth'),
   OAUTH_FRONTEND_CALLBACK_URL: z
     .string()
     .url()
-    .default('http://localhost:5173/oauth/callback'),
+    .default('http://localhost:5273/oauth/callback'),
   /** 用于加密数据库中的 OAuth 客户端密钥；未配置时派生自 refresh secret。 */
   OAUTH_ENCRYPTION_KEY: optionalString,
 

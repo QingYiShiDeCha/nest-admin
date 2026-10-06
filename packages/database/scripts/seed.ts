@@ -329,7 +329,7 @@ const MENU_TREE: readonly MenuSeed[] = [
   {
     name: '接口文档',
     type: 'external',
-    path: 'http://localhost:3000/api/docs',
+    path: 'http://localhost:3100/api/docs',
     icon: 'RiCodeBoxLine',
     sort: 20,
   },

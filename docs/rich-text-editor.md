@@ -57,7 +57,7 @@ app.use(AntdvNextTiptap); // 全局注册
 ## 🎯 访问方式
 
 ### 直接访问
-- URL: `http://localhost:5173/editor`
+- URL: `http://localhost:5273/editor`
 - **权限**: 所有登录用户可见（无需特殊权限）
 
 ### 侧边栏访问

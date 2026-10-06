@@ -11,7 +11,7 @@ import Unocss from 'unocss/vite';
 
 // 后端本地端口。dev 时把 /api 代理过去，前端代码里只需要写相对路径，
 // 不必关心后端跑在哪个端口、也没有跨域问题
-const API_PROXY_TARGET = 'http://localhost:3000';
+const API_PROXY_TARGET = 'http://localhost:3100';
 const SHARED_SOURCE_DIRECTORY = fileURLToPath(
   new URL('../../packages/shared/src', import.meta.url),
 );
@@ -59,6 +59,9 @@ export default defineConfig({
     exclude: ['@nest-admin/shared'],
   },
   server: {
+    // 固定端口而不是让 Vite 顺延：OAuth 回调地址、第三方登录后台里登记的
+    // 都是这个值，端口漂到 5174/5175 会让回调对不上且很难排查
+    port: 5273,
     proxy: {
       '/api': {
         target: API_PROXY_TARGET,

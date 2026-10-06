@@ -298,7 +298,7 @@ defineOptions({ name: 'OAuthProviderPage' });
         type="info"
         show-icon
         message="回调地址"
-        :description="`请在第三方平台配置：${'http://localhost:3000/api/auth/oauth'}/${form.key}/callback`"
+        :description="`请在第三方平台配置：${'http://localhost:3100/api/auth/oauth'}/${form.key}/callback`"
       />
     </a-modal>
   </section>
