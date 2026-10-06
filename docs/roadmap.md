@@ -1,1055 +1,192 @@
-# nest-admin 系统完善计划
+# nest-admin 能力现状对照表
 
-> 基于当前系统状态的功能迭代与优化规划  
-> 最后更新：2026-01-09
+> 这份文档回答一个问题：**哪些设想已经落地，哪些还没有，哪些已经不适用。**
+>
+> 最后核对：2026-10-01（对照提交 `84aa65d` 及工作区在途改动）
+>
+> 原文档是 2026-01-09 写的能力设想，正文里的代码示例多为假设写法，与项目后来确立的约定冲突
+> （例如它假设装饰器式缓存，而代码里统一是**版本票据 + 主动失效 + fail-open**）。设想细节已删除，
+> 只保留条目与结论；设计约定的唯一来源是根目录 [`计划.md`](../计划.md)，本表不重复。
 
-## 📊 当前系统状态
+## 状态图例
 
-### 已完成核心功能
-- ✅ 完整的 RBAC 权限体系
-- ✅ 双 token 认证与会话管理
-- ✅ 实时消息推送（SSE + 历史重放）
-- ✅ 数据权限控制（部门范围）
-- ✅ 审计日志（操作日志、登录日志）
-- ✅ 定时任务与系统监控
-- ✅ 文件资源管理
-- ✅ OAuth 统一管理
-- ✅ 同设备单点登录
-- ✅ 完整的前端基础设施
-
-### 技术栈优势
-- 现代化：NestJS 11 + Vue 3.5 + Drizzle ORM
-- 类型安全：TypeScript 全覆盖
-- 可维护：Monorepo + 模块化
-- 可扩展：Redis 缓存 + 多实例支持
+| 标记 | 含义 |
+| --- | --- |
+| ✅ 已实现 | 代码里有对应实现，路径在下表的「落点」列 |
+| 🟡 部分实现 | 核心有了，但与设想有实质差距（差距写在备注里） |
+| ⬜ 未实现 | 代码里没有，无等价替代 |
+| ⛔ 已不适用 | 当时的写法与现行约定冲突，若照做会引入倒退 |
+| ❓ 未验证 | 无法从代码静态判断，需要实测 |
 
 ---
 
-## 🎯 优先级分级
-
-### P0 - 生产必备（1-2 周）
-关键的安全、稳定性和运维能力，必须在上线前完成
-
-### P1 - 用户价值（1 个月）
-显著提升用户体验和系统易用性
-
-### P2 - 性能优化（按需）
-提升系统性能和响应速度
-
-### P3 - 功能扩展（长期）
-增强业务能力，支持更复杂场景
-
----
-
-## 🚀 P0 - 生产必备
+## P0 生产必备
 
 ### 1. 健康检查增强
 
-**当前状态**：`GET /api/health` 仅返回基础状态
-
-**目标**：符合 Kubernetes 和 APM 标准的健康检查
-
-**实现内容**：
-
-```typescript
-// 新增接口
-GET /api/health/liveness   // K8s 存活探针
-GET /api/health/readiness  // K8s 就绪探针
-GET /api/health/metrics    // Prometheus 指标格式
-
-// 返回示例
-{
-  status: 'ok' | 'degraded' | 'down',
-  uptime: 86400,
-  timestamp: '2026-01-09T12:00:00.000Z',
-  checks: {
-    database: { status: 'ok', latency: 5 },
-    redis: { status: 'ok', latency: 2 },
-    disk: { usage: 45, threshold: 80, status: 'ok' },
-    memory: { usage: 1024, limit: 2048, status: 'ok' }
-  }
-}
-```
-
-**验收标准**：
-- [ ] 三个健康检查端点可用
-- [ ] 数据库断开时 readiness 返回 503
-- [ ] 磁盘/内存超阈值时返回 degraded
-- [ ] Prometheus 格式可被 Grafana 采集
-
-**预计工时**：4 小时
-
----
+| | |
+| --- | --- |
+| 设想 | `GET /health/liveness`、`/readiness`、`/metrics` 三个端点，含磁盘/内存阈值，503/degraded 语义 |
+| 状态 | 🟡 部分实现 |
+| 落点 | `apps/api/src/app.service.ts` 的 `GET /api/health` → `{ status, database, uptime }`；`apps/api/src/modules/system-monitor/` 另有数据库与 Redis 探测、主机/进程信息、CPU 与内存趋势（保留最近 20 次采样） |
+| 差距 | 没有 liveness/readiness/metrics 分端点，没有磁盘与内存阈值，`health` 只探数据库不探 Redis。system-monitor 是**当前实例的只读快照**，需要登录态，不是 K8s 探针能用的形态 |
+| 备注 | system-monitor 已有独立降级逻辑：数据库或 Redis 探测失败时分别降级显示，不阻断其他信息返回 |
 
 ### 2. 数据库备份策略
 
-**当前状态**：无自动备份
-
-**目标**：自动化备份 + 灾难恢复流程
-
-**实现内容**：
-
-```bash
-# scripts/backup-database.sh
-#!/bin/bash
-# 每日全量备份 + 上传 S3
-
-DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="nest-admin-backup-$DATE.sql.gz"
-
-# 备份数据库
-mysqldump --single-transaction \
-  --routines --triggers \
-  -h $DB_HOST -u $DB_USER -p$DB_PASSWORD \
-  nest_admin | gzip > $BACKUP_FILE
-
-# 上传到 S3
-aws s3 cp $BACKUP_FILE s3://$BACKUP_BUCKET/database/
-
-# 保留最近 7 天的备份
-find . -name "nest-admin-backup-*.sql.gz" -mtime +7 -delete
-
-# 验证备份完整性
-gunzip -t $BACKUP_FILE && echo "备份验证成功" || echo "备份验证失败"
-```
-
-**配置 Cron**：
-```bash
-# 每天凌晨 2 点执行
-0 2 * * * /path/to/scripts/backup-database.sh >> /var/log/backup.log 2>&1
-```
-
-**恢复流程文档**：
-```markdown
-# docs/disaster-recovery.md
-
-## 数据库恢复步骤
-1. 从 S3 下载最新备份
-2. 解压并验证 SQL 文件
-3. 停止应用服务
-4. 恢复数据库：`mysql < backup.sql`
-5. 验证数据完整性
-6. 重启应用服务
-
-## RTO/RPO 目标
-- RTO（恢复时间目标）：2 小时
-- RPO（数据丢失目标）：24 小时
-```
-
-**验收标准**：
-- [ ] 备份脚本可执行并上传到 S3
-- [ ] Cron 定时任务配置完成
-- [ ] 恢复流程文档编写完成
-- [ ] 至少演练一次恢复流程
-
-**预计工时**：6 小时
-
----
+| | |
+| --- | --- |
+| 设想 | `scripts/backup-database.sh` + Cron + S3 上传 + 恢复流程文档 |
+| 状态 | ⬜ 未实现 |
+| 落点 | 无。`scripts/` 下只有 `test-e2e.mjs` |
+| 差距 | 无脚本、无定时配置、无 `docs/disaster-recovery.md`。仓库里有 `docker-compose.yml` 与独立迁移/seed 镜像，可作为备份脚本的挂载参考 |
 
 ### 3. 慢查询监控
 
-**当前状态**：无性能监控
-
-**目标**：自动识别和记录慢请求
-
-**实现内容**：
-
-```typescript
-// apps/api/src/common/interceptors/performance.interceptor.ts
-
-@Injectable()
-export class PerformanceInterceptor implements NestInterceptor {
-  private readonly logger = new Logger(PerformanceInterceptor.name);
-  private readonly SLOW_THRESHOLD_MS = 1000; // 1 秒
-
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
-    const { method, url } = request;
-    const start = Date.now();
-
-    return next.handle().pipe(
-      tap(() => {
-        const duration = Date.now() - start;
-        if (duration > this.SLOW_THRESHOLD_MS) {
-          this.logger.warn(`慢请求: ${method} ${url} - ${duration}ms`, {
-            method,
-            url,
-            duration,
-            userId: request.user?.id,
-          });
-        }
-      }),
-    );
-  }
-}
-
-// 在 app.module.ts 注册
-providers: [
-  {
-    provide: APP_INTERCEPTOR,
-    useClass: PerformanceInterceptor,
-  },
-]
-```
-
-**验收标准**：
-- [ ] 超过 1 秒的请求被记录
-- [ ] 日志包含 method、url、duration、userId
-- [ ] 可通过环境变量配置阈值
-
-**预计工时**：2 小时
-
----
+| | |
+| --- | --- |
+| 设想 | `PerformanceInterceptor`，超过 1 秒的请求打 warn 日志（method/url/duration/userId），阈值可配 |
+| 状态 | ⛔ 已不适用 |
+| 落点 | `apps/api/src/database/query-logger.ts` 的 `DrizzleQueryLoggerService`：debug 级别打印全部 SQL，截断到 300 字符，并从 CLS 取 `method`/`path` 标注来源 |
+| 理由 | 「只打慢请求」的方向与现状相反，而且靠请求耗时无法判断慢在 SQL 上。现有的做法是**全量 SQL 日志 + 交给外部日志系统筛**，更适合本地与生产两种场景。请求级耗时统计目前没有专门埋点 |
 
 ### 4. 告警机制
 
-**当前状态**：无主动告警
-
-**目标**：关键异常自动通知运维人员
-
-**实现内容**：
-
-```typescript
-// apps/api/src/common/alert/alert.service.ts
-
-export interface AlertChannel {
-  sendAlert(message: string, level: 'info' | 'warn' | 'error'): Promise<void>;
-}
-
-@Injectable()
-export class EmailAlertChannel implements AlertChannel {
-  async sendAlert(message: string, level: string): Promise<void> {
-    // 发送邮件告警
-  }
-}
-
-@Injectable()
-export class DingTalkAlertChannel implements AlertChannel {
-  async sendAlert(message: string, level: string): Promise<void> {
-    // 发送钉钉机器人消息
-  }
-}
-
-@Injectable()
-export class AlertService {
-  constructor(
-    @Inject('ALERT_CHANNELS') private channels: AlertChannel[],
-  ) {}
-
-  async alert(message: string, level: 'info' | 'warn' | 'error'): Promise<void> {
-    await Promise.all(
-      this.channels.map((channel) => channel.sendAlert(message, level)),
-    );
-  }
-}
-```
-
-**告警规则**：
-- 数据库连接失败连续 3 次
-- Redis 连接失败超过 5 分钟
-- 登录失败率超过 50%（可能被攻击）
-- 磁盘使用率超过 80%
-- CPU 持续高于 90% 超过 5 分钟
-
-**验收标准**：
-- [ ] 支持邮件和钉钉两种告警渠道
-- [ ] 关键异常触发告警
-- [ ] 告警频率限制（避免刷屏）
-
-**预计工时**：8 小时
+| | |
+| --- | --- |
+| 设想 | `AlertService` + 邮件/钉钉渠道，规则覆盖 DB 连接失败、Redis 失联、登录失败率、磁盘、CPU |
+| 状态 | ⬜ 未实现 |
+| 落点 | 无。系统里没有任何主动外发通道 |
+| 备注 | 代码里已有可观测性的**原料**但没有消费端：登录锁定事件（`locked` 状态独立计数）、定时任务执行日志、系统监控指标。接告警时不必从零埋点 |
 
 ---
 
-## ⭐ P1 - 用户价值
+## P1 用户价值
 
 ### 5. 数据导出功能
 
-**目标**：支持列表数据导出为 Excel/CSV
-
-**实现内容**：
-
-```typescript
-// 通用导出服务
-@Injectable()
-export class ExportService {
-  exportToExcel(data: any[], columns: ExportColumn[], filename: string): Buffer {
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Sheet1');
-    
-    worksheet.columns = columns.map(col => ({
-      header: col.label,
-      key: col.key,
-      width: col.width || 15,
-    }));
-    
-    worksheet.addRows(data);
-    return workbook.xlsx.writeBuffer();
-  }
-}
-
-// 用户列表导出
-@Get('users/export')
-@Permissions(PERMISSIONS.USER_EXPORT)
-async exportUsers(@Query() query: QueryUserDto, @Res() res: Response) {
-  const users = await this.service.findAll(query);
-  const buffer = this.exportService.exportToExcel(users, USER_COLUMNS, 'users.xlsx');
-  
-  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-  res.setHeader('Content-Disposition', 'attachment; filename=users.xlsx');
-  res.send(buffer);
-}
-```
-
-**支持导出的模块**：
-- [ ] 用户列表
-- [ ] 操作日志
-- [ ] 登录日志
-- [ ] 部门列表
-- [ ] 角色列表
-
-**验收标准**：
-- [ ] 导出功能符合数据权限控制
-- [ ] 大数据量分批导出（避免超时）
-- [ ] 导出记录写入操作日志
-
-**预计工时**：12 小时
-
----
+| | |
+| --- | --- |
+| 设想 | 通用 `ExportService`，5 个模块（用户/操作日志/登录日志/部门/角色）导出 Excel |
+| 状态 | ⬜ 未实现 |
+| 落点 | 无。没有任何导出接口，依赖里也没有 Excel 库 |
+| 备注 | 若要做，先决条件是导出必须走**与列表接口相同的数据范围过滤**——本项目已有 `DataScopeService` 与各模块的 `aliveXxx(scopeCondition)` 套路可复用 |
 
 ### 6. 批量操作
 
-**目标**：提升管理效率
-
-**实现内容**：
-
-```typescript
-// 批量启用/禁用用户
-@Post('users/bulk-update-status')
-@Permissions(PERMISSIONS.USER_UPDATE)
-async bulkUpdateStatus(@Body() dto: BulkUpdateStatusDto) {
-  // dto: { ids: [1,2,3], status: 'active' | 'inactive' }
-  return this.service.bulkUpdateStatus(dto.ids, dto.status);
-}
-
-// 批量分配角色
-@Post('users/bulk-assign-roles')
-@Permissions(PERMISSIONS.USER_ASSIGN_ROLE)
-async bulkAssignRoles(@Body() dto: BulkAssignRolesDto) {
-  // dto: { userIds: [1,2,3], roleIds: [4,5] }
-  return this.service.bulkAssignRoles(dto.userIds, dto.roleIds);
-}
-
-// 批量删除
-@Post('users/bulk-delete')
-@Permissions(PERMISSIONS.USER_DELETE)
-async bulkDelete(@Body() dto: BulkDeleteDto) {
-  // dto: { ids: [1,2,3] }
-  return this.service.bulkDelete(dto.ids);
-}
-```
-
-**支持批量操作的场景**：
-- [ ] 用户：启用/禁用、分配角色、删除
-- [ ] 角色：启用/禁用、删除
-- [ ] 通知：批量发布、批量撤回
-- [ ] 文件：批量删除
-
-**验收标准**：
-- [ ] 批量操作在事务中执行
-- [ ] 部分失败时返回明确的错误信息
-- [ ] 批量操作记录到审计日志
-
-**预计工时**：10 小时
-
----
+| | |
+| --- | --- |
+| 设想 | 用户批量启停/分配角色/删除、角色批量启停删除、通知批量发布撤回、文件批量删除 |
+| 状态 | ⬜ 未实现 |
+| 落点 | 无 |
+| 备注 | 设想里的 DTO 形态（`{ ids, status }`）与现行约定一致，可直接采用；事务与审计要求也已在 `operation-log.interceptor` 中有对应机制 |
 
 ### 7. 通知偏好设置
 
-**目标**：让用户自定义通知接收方式
-
-**实现内容**：
-
-```typescript
-// 数据库 schema
-export const userNotificationSettings = mysqlTable('sys_user_notification_settings', {
-  userId: int('user_id').primaryKey(),
-  emailEnabled: boolean('email_enabled').default(true),
-  emailTypes: json('email_types').$type<string[]>().default([]),
-  inAppEnabled: boolean('in_app_enabled').default(true),
-  inAppTypes: json('in_app_types').$type<string[]>().default([]),
-  frequency: mysqlEnum('frequency', ['realtime', 'hourly', 'daily']).default('realtime'),
-});
-
-// API
-@Get('users/me/notification-settings')
-async getMyNotificationSettings(@CurrentUser('id') userId: number) {
-  return this.service.getNotificationSettings(userId);
-}
-
-@Patch('users/me/notification-settings')
-async updateMyNotificationSettings(
-  @CurrentUser('id') userId: number,
-  @Body() dto: UpdateNotificationSettingsDto,
-) {
-  return this.service.updateNotificationSettings(userId, dto);
-}
-```
-
-**可配置项**：
-- 通知类型：系统公告、任务分配、账号安全
-- 通知渠道：站内消息、邮件
-- 推送频率：实时、每小时汇总、每日汇总
-
-**验收标准**：
-- [ ] 用户可在个人中心配置偏好
-- [ ] 发送通知时遵循用户偏好
-- [ ] 汇总通知按频率合并发送
-
-**预计工时**：16 小时
-
----
+| | |
+| --- | --- |
+| 设想 | `sys_user_notification_settings` 表，用户配置渠道开关、通知类型、推送频率（实时/小时/每日汇总） |
+| 状态 | ⬜ 未实现 |
+| 落点 | 无。站内消息链路完整（公告 → 收件人快照 → `sys_notice_recipient` → SSE 推送 → 未读计数），但没有「用户可选不收」的维度 |
+| 备注 | 现有实现是**全员可达**：公告按全员/部门/角色/指定用户四种范围展开收件人快照。加入偏好属于发布链路的过滤条件，改动点集中在发布时展开收件人那一步 |
 
 ### 8. 敏感操作二次验证
 
-**目标**：关键操作要求输入密码或验证码
-
-**实现内容**：
-
-```typescript
-// 装饰器
-export function RequirePasswordConfirmation() {
-  return applyDecorators(
-    UseGuards(PasswordConfirmationGuard),
-    ApiBody({ schema: { properties: { password: { type: 'string' } } } }),
-  );
-}
-
-// 守卫
-@Injectable()
-export class PasswordConfirmationGuard implements CanActivate {
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const { password } = request.body;
-    const user = request.user;
-    
-    if (!password) {
-      throw new BadRequestException('需要输入当前密码确认操作');
-    }
-    
-    const valid = await this.userService.verifyPassword(password, user.passwordHash);
-    if (!valid) {
-      throw new UnauthorizedException('密码错误');
-    }
-    
-    return true;
-  }
-}
-
-// 使用
-@Delete('users/:id')
-@RequirePasswordConfirmation()
-async deleteUser(
-  @Param('id') id: number,
-  @Body('password') password: string,
-) {
-  return this.service.delete(id);
-}
-```
-
-**需要二次验证的操作**：
-- [ ] 删除用户
-- [ ] 修改超级管理员角色
-- [ ] 清空操作日志
-- [ ] 修改系统关键配置
-
-**验收标准**：
-- [ ] 前端弹窗要求输入密码
-- [ ] 密码错误时清晰提示
-- [ ] 二次验证记录到审计日志
-
-**预计工时**：6 小时
+| | |
+| --- | --- |
+| 设想 | `RequirePasswordConfirmation()` 装饰器 + `PasswordConfirmationGuard`，用于删用户、改超管角色、清空日志、改关键配置 |
+| 状态 | ⬜ 未实现 |
+| 落点 | 无 |
+| 备注 | 现有防线是**权限码 + 数据范围 + 审计**，不是身份复核。相关能力已有可复用件：`users.password_hash` 校验、`permission.guard.spec.ts` 的超管短路约定 |
 
 ---
 
-## 🚀 P2 - 性能优化
+## P2 性能优化
 
 ### 9. 数据库索引优化
 
-**目标**：提升查询性能
-
-**实现内容**：
-
-```sql
--- migration: add-performance-indexes.sql
-
--- 用户按部门和状态查询
-CREATE INDEX idx_user_dept_status 
-ON sys_user(dept_id, status, deleted_at);
-
--- 用户按角色查询（通过关联表）
-CREATE INDEX idx_user_role_user 
-ON sys_user_role(user_id);
-
-CREATE INDEX idx_user_role_role 
-ON sys_user_role(role_id);
-
--- 操作日志按用户和时间查询
-CREATE INDEX idx_operation_log_user_time 
-ON sys_operation_log(user_id, created_at DESC);
-
--- 操作日志按模块查询
-CREATE INDEX idx_operation_log_module 
-ON sys_operation_log(module, created_at DESC);
-
--- 登录日志按用户名和结果查询
-CREATE INDEX idx_login_log_username_status 
-ON sys_login_log(username, status, created_at DESC);
-
--- 消息按用户和已读状态查询
-CREATE INDEX idx_notice_recipient_user_read 
-ON sys_notice_recipient(user_id, read_at, created_at DESC);
-
--- 会话按用户和有效性查询
-CREATE INDEX idx_refresh_token_user_valid 
-ON sys_refresh_token(user_id, revoked_at, expires_at);
-```
-
-**验收标准**：
-- [ ] 慢查询日志显示查询时间减少 50%+
-- [ ] EXPLAIN 分析显示使用索引
-- [ ] 索引大小控制在合理范围
-
-**预计工时**：4 小时
-
----
+| | |
+| --- | --- |
+| 设想 | 8 个复合索引（user dept+status、user_role 双向、operation_log user+time、module+time、login_log username+status、notice_recipient user+read、refresh_token user+valid） |
+| 状态 | ✅ 已实现（路线不同，结果覆盖） |
+| 落点 | 迁移里共 **47 个索引**，含 6 个复合索引：`idx_sys_notice_recipient_user_read (user_id, read_at)`、`idx_sys_notice_status_published (status, published_at)`、`idx_sys_notice_target_lookup (target_type, target_id)`、`idx_sys_dict_item_type_status_sort (type_id, status, sort)`、`idx_sys_dept_transfer_dept_created (dept_id, created_at)`、`idx_sys_scheduled_task_log_task_started (task_id, started_at)` |
+| 差距 | 与设想列的具体索引不完全同名——设想是按查询 imagined 出来的，实际是跟着功能迭代逐步加的。`EXPLAIN` 验证与「查询时间减少 50%」这类量化结论从未测过 |
 
 ### 10. 热点数据缓存
 
-**目标**：减少数据库查询压力
-
-**实现内容**：
-
-```typescript
-// 缓存装饰器
-export function Cacheable(key: string, ttl: number) {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor,
-  ) {
-    const originalMethod = descriptor.value;
-    
-    descriptor.value = async function (...args: any[]) {
-      const cacheKey = `${key}:${JSON.stringify(args)}`;
-      const cached = await this.redis?.get(cacheKey);
-      
-      if (cached) {
-        return JSON.parse(cached);
-      }
-      
-      const result = await originalMethod.apply(this, args);
-      
-      if (this.redis && result) {
-        await this.redis.set(cacheKey, JSON.stringify(result), 'EX', ttl);
-      }
-      
-      return result;
-    };
-  };
-}
-
-// 使用
-@Cacheable('user:detail', 300) // 5 分钟
-async getUserDetail(id: number) {
-  return this.db.select().from(users).where(eq(users.id, id));
-}
-
-@Cacheable('dept:tree', 1800) // 30 分钟
-async getDepartmentTree() {
-  return this.buildTree(await this.db.select().from(departments));
-}
-```
-
-**缓存策略**：
-- 用户详情：5 分钟（频繁访问）
-- 部门树：30 分钟（很少变化）
-- 字典数据：已实现（版本票据）
-- 权限数据：已实现（版本票据）
-
-**验收标准**：
-- [ ] 缓存命中率 > 80%
-- [ ] 数据更新时主动失效缓存
-- [ ] Redis 故障时降级到数据库
-
-**预计工时**：8 小时
-
----
+| | |
+| --- | --- |
+| 设想 | `@Cacheable` 装饰器（`JSON.stringify(args)` 当 key），用户详情 5 分钟、部门树 30 分钟 |
+| 状态 | ⛔ 已不适用（实现路线部分不同、结果已有） |
+| 落点 | 两个专用缓存服务，都是**版本票据 + 主动失效 + Redis 故障回源**：<br>· `apps/api/src/modules/dictionary/dictionary-cache.service.ts`：缓存键携带字典编码版本，类型或字典项写入后递增版本<br>· `apps/api/src/modules/rbac/rbac-cache.service.ts`：缓存用户角色权限与数据范围，TTL 300 秒，变更时递增用户版本，组织树变更递增全局版本 |
+| 理由 | 装饰器方案的 key 由参数拼出来，无法在数据变更时精确失效；本项目所有缓存失效都由写路径显式触发，与「权限必须立刻生效」这条安全要求一致。用户详情与部门树**没有**缓存 |
+| 备注 | Redis 未配置或故障时全部回退数据库，超管在 `PermissionGuard` 与前端 `hasPermission` 两处直接短路，不吃缓存 |
 
 ### 11. N+1 查询优化
 
-**目标**：消除循环查询问题
-
-**实现内容**：
-
-```typescript
-// 优化前：N+1 查询
-async findUsers() {
-  const users = await this.db.select().from(users);
-  
-  for (const user of users) {
-    // 每个用户触发一次查询
-    user.dept = await this.db.select().from(departments)
-      .where(eq(departments.id, user.deptId));
-  }
-  
-  return users;
-}
-
-// 优化后：JOIN 查询
-async findUsers() {
-  return this.db
-    .select({
-      ...users,
-      dept: departments,
-    })
-    .from(users)
-    .leftJoin(departments, eq(users.deptId, departments.id));
-}
-
-// 优化前：批量查询用户的角色
-async findUsersWithRoles(userIds: number[]) {
-  const users = await this.db.select().from(users)
-    .where(sql`${users.id} IN (${userIds})`);
-  
-  for (const user of users) {
-    user.roles = await this.db.select().from(roles)
-      .innerJoin(userRoles, eq(roles.id, userRoles.roleId))
-      .where(eq(userRoles.userId, user.id));
-  }
-  
-  return users;
-}
-
-// 优化后：一次性查询所有关联
-async findUsersWithRoles(userIds: number[]) {
-  const usersData = await this.db.select().from(users)
-    .where(sql`${users.id} IN (${userIds})`);
-  
-  const rolesData = await this.db
-    .select({
-      userId: userRoles.userId,
-      role: roles,
-    })
-    .from(userRoles)
-    .innerJoin(roles, eq(roles.id, userRoles.roleId))
-    .where(sql`${userRoles.userId} IN (${userIds})`);
-  
-  // 在内存中组装
-  const rolesByUser = groupBy(rolesData, 'userId');
-  return usersData.map(user => ({
-    ...user,
-    roles: rolesByUser[user.id] || [],
-  }));
-}
-```
-
-**验收标准**：
-- [ ] 列表查询不超过 3 个 SQL 语句
-- [ ] 慢查询日志无 N+1 问题
-
-**预计工时**：6 小时
+| | |
+| --- | --- |
+| 设想 | 消除循环内查询，列表查询不超过 3 条 SQL |
+| 状态 | ❓ 未验证 |
+| 落点 | 无批量预加载工具，也没有慢查询日志可用来发现（见 P0-3） |
+| 备注 | 已有几处证明在意的实现，如首页统计「一次读取后派生终端、浏览器、月趋势和热力图」、公告列表用 `withMetrics` 批量聚合收件人数而非逐条查。但整体没有 `EXPLAIN` 记录，也没有为此设过验收 |
 
 ---
 
-## 🌟 P3 - 功能扩展
+## P3 功能扩展
 
-### 12. 多租户支持（可选）
+### 12. 多租户支持
 
-**目标**：支持 SaaS 模式多组织隔离
-
-**实现内容**：
-
-```typescript
-// 租户表
-export const tenants = mysqlTable('sys_tenant', {
-  id: int('id').primaryKey().autoincrement(),
-  code: varchar('code', { length: 50 }).unique(),
-  name: varchar('name', { length: 100 }),
-  domain: varchar('domain', { length: 100 }),
-  status: mysqlEnum('status', ['active', 'suspended']),
-  plan: mysqlEnum('plan', ['free', 'basic', 'pro']),
-  maxUsers: int('max_users').default(10),
-  expiresAt: timestamp('expires_at'),
-});
-
-// 所有业务表增加 tenant_id
-export const users = mysqlTable('sys_user', {
-  id: int('id').primaryKey().autoincrement(),
-  tenantId: int('tenant_id').notNull(), // 新增
-  username: varchar('username', { length: 50 }),
-  // ...
-});
-
-// 租户上下文中间件
-@Injectable()
-export class TenantMiddleware implements NestMiddleware {
-  use(req: Request, res: Response, next: NextFunction) {
-    const subdomain = req.hostname.split('.')[0];
-    req.tenantId = this.getTenantIdBySubdomain(subdomain);
-    next();
-  }
-}
-
-// 自动过滤租户数据
-function withTenant(tenantId: number) {
-  return (query: Query) => query.where(eq(users.tenantId, tenantId));
-}
-```
-
-**数据隔离方式**：
-- 方案 1：共享数据库，所有表增加 tenant_id
-- 方案 2：每个租户独立数据库（更强隔离）
-
-**验收标准**：
-- [ ] 租户数据完全隔离
-- [ ] 支持自定义域名
-- [ ] 租户管理后台
-
-**预计工时**：40 小时
-
----
+| | |
+| --- | --- |
+| 状态 | ⬜ 未实现 |
+| 落点 | 无 `tenant_id` 列、无租户表、无租户中间件 |
+| 备注 | 若要做，「所有业务表加 `tenant_id`」的方案会与现有的 `deleted_at` 软删 + 数据范围（部门树）两层过滤叠加，需要重新设计隔离层级 |
 
 ### 13. 国际化（i18n）
 
-**目标**：支持多语言
-
-**实现内容**：
-
-```typescript
-// 后端 - 错误消息国际化
-// apps/api/src/i18n/zh-CN.json
-{
-  "auth.login.failed": "用户名或密码错误",
-  "user.not.found": "用户不存在"
-}
-
-// apps/api/src/i18n/en-US.json
-{
-  "auth.login.failed": "Invalid username or password",
-  "user.not.found": "User not found"
-}
-
-// 前端 - 界面国际化
-// apps/web/src/locales/zh-CN.ts
-export default {
-  auth: {
-    login: '登录',
-    logout: '退出',
-  },
-  user: {
-    name: '用户名',
-    email: '邮箱',
-  },
-};
-
-// apps/web/src/locales/en-US.ts
-export default {
-  auth: {
-    login: 'Login',
-    logout: 'Logout',
-  },
-  user: {
-    name: 'Username',
-    email: 'Email',
-  },
-};
-```
-
-**支持语言**：
-- 中文简体（默认）
-- 英文
-- 其他语言按需添加
-
-**验收标准**：
-- [ ] 前端界面支持切换语言
-- [ ] 后端错误消息国际化
-- [ ] 日期时间格式本地化
-
-**预计工时**：24 小时
-
----
+| | |
+| --- | --- |
+| 状态 | ⬜ 未实现 |
+| 落点 | 界面与后端错误消息均为硬编码中文。已有的 i18n 只有两处局部用途：编辑器的 `locale` prop（组件自带）、dayjs  locale（`apps/web/src/utils/dayjs-locale.ts`） |
+| 备注 | 「日期时间格式本地化」这一条实际上已经做了（时间戳按墙上时间渲染，见 `计划.md`） |
 
 ### 14. 审计日志增强
 
-**目标**：记录操作前后对比
+| | |
+| --- | --- |
+| 设想 | `sys_operation_log_snapshot` 表记录 before/after，可视化 diff，支持回滚 |
+| 状态 | 🟡 部分实现 |
+| 落点 | `apps/api/src/modules/operation-log/operation-log.interceptor.ts` 已把请求体快照写进日志（`snapshot` 字段），并有 `redact.ts` 脱敏（深度优先遍历，已修正超过 6 层会整体跳过的问题）；日志 path 已去掉 query，避免 `access_token` 明文入库 |
+| 差距 | 只有**请求侧**快照，没有读取变更前状态形成的**前后对比**，也就没有 diff 与回滚。这是有意的：before 快照要求每个写接口额外查一次并承担竞态 |
+| 备注 | 超期日志按 1000 条批次压缩为 `json.gz` 归档到独立文件存储，上传成功后才删主表行 |
 
-**实现内容**：
+### 15. 工作流引擎
 
-```typescript
-// 审计日志快照
-export const operationLogSnapshots = mysqlTable('sys_operation_log_snapshot', {
-  id: int('id').primaryKey().autoincrement(),
-  logId: int('log_id').references(() => operationLogs.id),
-  type: mysqlEnum('type', ['before', 'after']),
-  snapshot: json('snapshot'),
-});
-
-// 装饰器
-export function AuditSnapshot(entity: string) {
-  return applyDecorators(
-    UseInterceptors(SnapshotInterceptor),
-    SetMetadata('audit:entity', entity),
-  );
-}
-
-// 使用
-@Patch('roles/:id')
-@AuditSnapshot('role')
-async updateRole(@Param('id') id: number, @Body() dto: UpdateRoleDto) {
-  // 拦截器会自动记录 before/after 快照
-  return this.service.update(id, dto);
-}
-
-// 查看审计日志时对比差异
-{
-  action: '修改角色权限',
-  before: {
-    name: '普通用户',
-    permissions: ['user:read']
-  },
-  after: {
-    name: '普通用户',
-    permissions: ['user:read', 'user:delete'] // 新增了删除权限
-  },
-  diff: {
-    permissions: { added: ['user:delete'], removed: [] }
-  }
-}
-```
-
-**验收标准**：
-- [ ] 关键操作记录前后快照
-- [ ] 提供可视化对比界面
-- [ ] 支持撤销操作（回滚到 before）
-
-**预计工时**：20 小时
+| | |
+| --- | --- |
+| 状态 | ⬜ 未实现 |
+| 落点 | 无定义表、无实例表、无引擎 |
+| 备注 | 与部门迁移审批、请假报销等场景相关，当前审批只存在于公告的「发布/撤回」状态机里（单条公告 4 态，已实现） |
 
 ---
 
-### 15. 工作流引擎（进阶）
+## 已明确不做的（保留原判断）
 
-**目标**：支持审批流程
+这些结论至今成立，无需复核：
 
-**实现内容**：
-
-```typescript
-// 工作流定义
-export interface WorkflowDefinition {
-  id: number;
-  name: string; // 请假审批、报销审批
-  description: string;
-  steps: WorkflowStep[];
-}
-
-export interface WorkflowStep {
-  id: number;
-  name: string; // 发起、直属领导审批、部门经理审批
-  type: 'start' | 'approval' | 'end';
-  assigneeType: 'user' | 'role' | 'dept_manager';
-  assigneeId?: number;
-  nextSteps: number[]; // 下一步骤（支持并行和条件分支）
-}
-
-// 工作流实例
-export interface WorkflowInstance {
-  id: number;
-  definitionId: number;
-  initiatorId: number;
-  currentStepId: number;
-  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
-  data: Record<string, any>; // 业务数据
-}
-
-// API
-@Post('workflows/:definitionId/start')
-async startWorkflow(
-  @Param('definitionId') definitionId: number,
-  @CurrentUser('id') userId: number,
-  @Body() data: Record<string, any>,
-) {
-  return this.workflowService.start(definitionId, userId, data);
-}
-
-@Post('workflows/:instanceId/approve')
-async approveStep(
-  @Param('instanceId') instanceId: number,
-  @CurrentUser('id') userId: number,
-  @Body() dto: { comment: string },
-) {
-  return this.workflowService.approve(instanceId, userId, dto.comment);
-}
-```
-
-**应用场景**：
-- 请假审批
-- 报销审批
-- 采购审批
-- 合同审批
-
-**验收标准**：
-- [ ] 支持串行和并行审批
-- [ ] 支持条件分支（金额 > 1000 需要总监审批）
-- [ ] 审批超时提醒
-- [ ] 审批历史追踪
-
-**预计工时**：60 小时
+- ❌ **微服务拆分**——单体架构够用，过早拆分只增加复杂度
+- ❌ **GraphQL**——REST 已完善，切换成本大于收益
+- ❌ **WebSocket**——SSE 已满足站内消息需求，WebSocket 的部署与代理配置成本更高
 
 ---
 
-## 📅 迭代计划
+## 剩余待办
 
-### Sprint 1（第 1-2 周）- P0 生产必备
+按「离上线更近」排序，不含功能设想：
 
-**目标**：完成核心运维能力
-
-- [ ] Week 1：健康检查增强 + 慢查询监控
-- [ ] Week 2：数据库备份策略 + 告警机制
-
-**交付物**：
-- 三个健康检查端点
-- 慢查询日志拦截器
-- 自动备份脚本 + Cron 配置
-- 邮件/钉钉告警集成
-
----
-
-### Sprint 2（第 3-4 周）- P1 用户价值
-
-**目标**：提升用户体验
-
-- [ ] Week 3：数据导出功能
-- [ ] Week 4：批量操作 + 敏感操作二次验证
-
-**交付物**：
-- 5 个模块的导出功能
-- 4 类批量操作接口
-- 二次验证装饰器
-
----
-
-### Sprint 3（第 5-6 周）- P1 用户价值
-
-**目标**：完善通知系统
-
-- [ ] Week 5-6：通知偏好设置
-
-**交付物**：
-- 用户偏好配置界面
-- 汇总通知发送机制
-
----
-
-### Sprint 4（第 7-8 周）- P2 性能优化
-
-**目标**：提升系统性能
-
-- [ ] Week 7：数据库索引优化
-- [ ] Week 8：热点数据缓存 + N+1 查询优化
-
-**交付物**：
-- 8 个核心索引
-- 通用缓存装饰器
-- 主要查询优化
-
----
-
-### Sprint 5+（长期）- P3 功能扩展
-
-**按业务需求排期**：
-- 多租户支持（如有 SaaS 需求）
-- 国际化（如有国际市场需求）
-- 审计日志增强（如有合规需求）
-- 工作流引擎（如有审批需求）
-
----
-
-## 📊 投入评估
-
-### 时间成本
-
-| 优先级 | 总工时 | 开发周期 |
-|--------|--------|----------|
-| P0 | 20 小时 | 1-2 周 |
-| P1 | 44 小时 | 3-6 周 |
-| P2 | 18 小时 | 7-8 周 |
-| P3 | 144 小时 | 按需 |
-| **合计** | **226 小时** | **2 个月** |
-
-### 人力需求
-
-- 全栈开发 1 人（P0 + P1 + P2）
-- 前端开发 1 人（P1 界面优化）
-- 运维工程师 0.5 人（P0 备份和告警）
-
----
-
-## 🎯 成功指标
-
-### P0 完成后
-- [ ] 系统可监控（健康检查、慢查询、告警）
-- [ ] 数据可恢复（备份 + 恢复文档）
-- [ ] 符合生产标准
-
-### P1 完成后
-- [ ] 用户操作效率提升 30%（导出、批量操作）
-- [ ] 系统安全性提升（二次验证）
-- [ ] 用户满意度提升（通知偏好）
-
-### P2 完成后
-- [ ] 平均响应时间 < 200ms
-- [ ] 数据库查询时间减少 50%
-- [ ] 缓存命中率 > 80%
-
----
-
-## 📝 注意事项
-
-### 不建议盲目添加
-
-❌ **微服务拆分**
-- 当前单体架构够用
-- 过早拆分增加复杂度
-- 建议等到单实例性能瓶颈再考虑
-
-❌ **GraphQL**
-- REST API 已很完善
-- GraphQL 学习成本高
-- 当前场景无明显优势
-
-❌ **WebSocket**
-- SSE 已满足需求
-- WebSocket 维护成本高
-- 部署和代理配置复杂
-
-### 保持原则
-
-✅ **简洁优先**：功能够用即可，不过度设计  
-✅ **渐进增强**：按优先级逐步完善  
-✅ **稳定第一**：不引入不成熟的技术  
-✅ **文档同步**：代码和文档同步更新
-
----
-
-## 📚 参考资源
-
-- [NestJS 最佳实践](https://docs.nestjs.com/techniques/performance)
-- [Vue 3 性能优化](https://vuejs.org/guide/best-practices/performance.html)
-- [Drizzle ORM 性能指南](https://orm.drizzle.team/docs/performance)
-- [MySQL 索引优化](https://dev.mysql.com/doc/refman/8.0/en/optimization-indexes.html)
-- [Redis 缓存策略](https://redis.io/docs/manual/patterns/)
-
----
-
-**最后更新时间**：2026-01-09  
-**维护人**：开发团队  
-**版本**：v1.0
+1. 健康检查补 liveness / readiness 与磁盘、内存阈值（K8s 与 APM 前置）
+2. 数据库备份脚本与恢复流程文档（唯一没有任何自动化兜底的数据安全项）
+3. 请求级耗时埋点或慢查询筛选（当前只能靠 debug 级全量 SQL 日志）
+4. 敏感操作二次验证（补上身份复核这一层，与已有的权限码/数据范围/审计不冲突）
+5. 告警通道（原料已在：登录锁定事件、任务执行日志、监控指标）

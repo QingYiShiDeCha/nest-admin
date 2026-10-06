@@ -67,3 +67,10 @@ cp .env.docker.example .env.docker
 docker compose --env-file .env.docker up -d
 docker compose --env-file .env.docker run --rm db-seed
 ```
+
+## 文档
+
+- [计划.md](计划.md)：设计决策与实施进度，架构约定改代码前必读
+- [docs/roadmap.md](docs/roadmap.md)：能力现状对照表，哪些设想已落地
+- [AGENTS.md](AGENTS.md)：monorepo 依赖方向、样式与组件约定
+- Swagger：`http://localhost:3100/api/docs`

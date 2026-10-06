@@ -1,38 +1,47 @@
 # 富文本编辑器集成文档
 
-## 📦 已完成的工作
+> 最后核对：2026-10-01（对照提交 `84aa65d`）
 
-### 1. 安装依赖
-```bash
-pnpm add antdv-next-tiptap
-```
+组件：[`antdv-next-tiptap`](https://github.com/pengyinghao/antdv-next-tiptap) v1.0.5（基于 Tiptap 3.26），
+只用于 `views/editor` 这个示例页。**通知公告等业务表单目前仍用 `a-textarea`**，见文末「已知边界」。
 
-### 2. 全局注册组件
+## 接入现状
 
-**文件**: `apps/web/src/main.ts`
+### 依赖与全局注册
 
-```typescript
-import 'antdv-next-tiptap/dist/style.css'; // 引入样式
+`apps/web/src/main.ts`：
+
+```ts
+import 'antdv-next-tiptap/index.css'; // 组件样式（包内 dist/index.css）
+import './assets/editor-content.css'; // 渲染态样式，见下
 import AntdvNextTiptap from 'antdv-next-tiptap';
+import './assets/main.css';
 
-app.use(AntdvNextTiptap); // 全局注册
+app.use(AntdvNextTiptap); // 全局注册，注册名 AEditor
 ```
 
-### 3. 创建示例页面
+包的 `exports` 只暴露 `.` 与 `./index.css` 两个入口，没有 `dist/style.css` 这个路径。
 
-**文件**: `apps/web/src/views/editor/index.vue`
+### 渲染态样式
 
-- ✅ 富文本编辑器组件
-- ✅ 内容预览区域
-- ✅ 原始 HTML 显示
-- ✅ 示例内容加载
-- ✅ 清空/获取内容功能
+`apps/web/src/assets/editor-content.css` 提供 `.rich-content`，用于把 `v-html` 注入的富文本 HTML
+渲染成与 antd 主题一致的排版（正文色 `--ant-color-text`、行高 1.6、长串断行）。
 
-### 4. 配置路由
+编辑器自身只需要 `index.css` 里的 `.editor-content .tiptap` 规则。两者缺一不可：
+前者管编辑态，后者管展示态（公告详情、预览区等只读场景）。
 
-**文件**: `apps/web/src/router/routes.ts`
+样式全部走 `var(--ant-color-*)` 而非写死颜色，因此换 ConfigProvider 主题（浅色/深色/自定义色）
+时渲染态会跟着变。
 
-```typescript
+> `.vue` 禁止 `<style>` 块（`apps/web/scripts/no-native-css.mjs` 在 lint 里强制）。
+> 这个文件是独立 CSS 资源而非 SFC 样式块，所以不在该检查范围内。
+> 新增渲染态样式时同样优先写在这里，不要为了图方便在 SFC 里开 `<style>`。
+
+### 路由
+
+`apps/web/src/router/routes.ts` 的**静态路由**：
+
+```ts
 {
   path: '/editor',
   name: 'editor-demo',
@@ -46,286 +55,107 @@ app.use(AntdvNextTiptap); // 全局注册
 }
 ```
 
-### 5. TypeScript 类型声明
+### 菜单
 
-**文件**: `apps/web/src/types/antdv-next-tiptap.d.ts`
+菜单由 `packages/database/scripts/seed.ts` 播种，**不要手写 SQL 插菜单**：
 
-提供基础类型支持，避免 TypeScript 错误。
-
----
-
-## 🎯 访问方式
-
-### 直接访问
-- URL: `http://localhost:5273/editor`
-- **权限**: 所有登录用户可见（无需特殊权限）
-
-### 侧边栏访问
-由于这是静态路由（不是从后端菜单接口加载），你需要选择以下方式之一：
-
-#### 方式1：添加到后端菜单（推荐）
-
-在数据库中添加菜单记录：
-
-```sql
-INSERT INTO sys_menu (
-  name, path, component, type, icon, sort, 
-  visible, status, created_at, updated_at
-) VALUES (
-  '富文本编辑器',
-  '/editor',
-  'editor/index',
-  'menu',
-  'RiEditLine',
-  100,
-  1,
-  'active',
-  NOW(),
-  NOW()
-);
+```ts
+{
+  // 页面组件由前端静态路由注册（routes.ts 的 /editor），
+  // 菜单这里只登记 path 不登记组件，避免与前端动态路由冲突
+  name: '富文本编辑器',
+  type: 'menu',
+  path: '/editor',
+  icon: 'RiEditLine',
+  sort: 40,
+  keepAlive: true,
+}
 ```
 
-然后为角色分配这个菜单权限。
+`icon` 存的是**字符串**不是 class。字符串到 class 的映射在
+`apps/web/src/layouts/menu-icons.ts`：`RiEditLine` → `i-ri:edit-line`。
+该文件同时生成 `uno.config.ts` 的 safelist——运行时拼出来的图标 class 不进 safelist 就不生成 CSS。
 
-#### 方式2：添加到 Header 快捷入口
+菜单是「当前版本应当长什么样」，属于 seed 而不是迁移。
 
-在 `apps/web/src/layouts/components/Header.vue` 中添加快捷访问按钮：
+## 访问方式
 
-```vue
-<a-button @click="$router.push('/editor')">
-  <template #icon><RiEditLine /></template>
-  富文本编辑器
-</a-button>
-```
+- 直接访问：http://localhost:5273/editor
+- 侧边栏：菜单播种后由 `db:seed` 生成，需要角色被授予该菜单
+- **权限**：无独立权限码，所有登录用户可见
 
----
-
-## 🎨 编辑器功能
-
-### 支持的格式
-- ✅ **文本格式**: 粗体、斜体、下划线、删除线、代码
-- ✅ **标题**: H1 - H6
-- ✅ **列表**: 有序列表、无序列表
-- ✅ **引用**: 块引用
-- ✅ **代码块**: 支持语法高亮
-- ✅ **表格**: 可调整大小
-- ✅ **图片**: 插入图片
-- ✅ **链接**: 超链接
-- ✅ **文本对齐**: 左对齐、居中、右对齐
-- ✅ **颜色**: 文本颜色、背景色
-- ✅ **字体大小**: 可调整
-
-### 工具栏功能
-- 撤销/重做
-- 清空格式
-- 插入分隔线
-- 全屏编辑
-
----
-
-## 🔧 高级用法
-
-### 自定义配置
-
-如果需要自定义编辑器配置，可以在组件中这样使用：
+## 用法
 
 ```vue
 <template>
-  <AntdvNextTiptap
-    v-model:content="content"
-    :height="600"
-    :placeholder="请输入内容..."
-    :disabled="false"
-    @update:content="handleUpdate"
-  />
+  <AEditor v-model="content" placeholder="请输入内容..." :height="600" @change="onChange" />
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue';
 
 const content = ref('');
-
-const handleUpdate = (newContent: string) => {
-  console.log('内容更新:', newContent);
-};
+const onChange = (html: string) => console.log(html.length);
 </script>
 ```
 
-### 与后端集成
+绑的是 `v-model`（默认 `modelValue`），不是 `v-model:content`。
 
-保存内容到服务器：
+### Props（来自包的 `EditorProps`）
 
-```typescript
-import { apiCreateNotice } from '@/api/notices';
+| Prop | 说明 |
+| --- | --- |
+| `height` | 内容区高度 |
+| `editable` | 是否可编辑 |
+| `disabledPlugins` | 禁用的插件名列表，如 `['image', 'video', 'table']` |
+| `uploadImage` | `(file, onProgress) => Promise<string>`，返回图片 URL；**不传则 base64 内嵌** |
+| `uploadVideo` | 同上；不传时只支持填视频地址，没有本地上传入口 |
+| `wordCount` | `true` 显示计数，数字则同时限制上限 |
+| `outputFormat` | `'html'`（默认，`modelValue` 为 HTML 字符串）或 `'json'`（Tiptap doc JSON 字符串） |
+| `locale` | `'zh-CN'`（默认）/ `'en-US'` / 自定义消息对象 |
 
-const handleSave = async () => {
-  try {
-    await apiCreateNotice({
-      title: '标题',
-      content: content.value, // HTML 内容
-      type: 'announcement',
-    });
-    message.success('保存成功');
-  } catch (error) {
-    message.error('保存失败');
-  }
-};
-```
+内置插件：撤销重做、标题、粗体、斜体、下划线、删除线、行内代码、代码块、引用、有序/无序/任务列表、
+左中右对齐、分隔线、清除格式、文字色、高亮、链接、图片、图片上传、视频、视频上传、表格、
+字体、字号、打印、全屏。
 
 ### 图片上传
 
-如果需要支持图片上传到服务器，可以配置：
+示例页没传 `uploadImage`，所以插进去的图片是 base64 内联。要改成上传到资源中心：
 
-```typescript
+```ts
 import { apiUploadFile } from '@/api/files';
 
 const uploadImage = async (file: File) => {
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  const result = await apiUploadFile(formData);
-  return result.url; // 返回图片 URL
-};
-```
-
----
-
-## 📝 使用示例
-
-### 示例1：创建通知公告
-
-```vue
-<template>
-  <a-card title="发布公告">
-    <a-form :model="form">
-      <a-form-item label="标题">
-        <a-input v-model:value="form.title" />
-      </a-form-item>
-      
-      <a-form-item label="内容">
-        <AntdvNextTiptap v-model:content="form.content" :height="400" />
-      </a-form-item>
-      
-      <a-form-item>
-        <a-button type="primary" @click="handleSubmit">发布</a-button>
-      </a-form-item>
-    </a-form>
-  </a-card>
-</template>
-
-<script setup lang="ts">
-import { reactive } from 'vue';
-
-const form = reactive({
-  title: '',
-  content: '',
-});
-
-const handleSubmit = () => {
-  console.log('提交数据:', form);
-  // 调用 API 保存
-};
-</script>
-```
-
-### 示例2：编辑已有内容
-
-```vue
-<script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { apiGetNotice } from '@/api/notices';
-
-const content = ref('');
-
-onMounted(async () => {
-  const notice = await apiGetNotice(1);
-  content.value = notice.content; // 加载已有的 HTML 内容
-});
-</script>
-```
-
----
-
-## 🐛 常见问题
-
-### 1. 样式不生效
-
-确保在 `main.ts` 中引入了样式：
-
-```typescript
-import 'antdv-next-tiptap/dist/style.css';
-```
-
-### 2. TypeScript 类型错误
-
-确保存在类型声明文件：`apps/web/src/types/antdv-next-tiptap.d.ts`
-
-### 3. 组件未注册
-
-确保在 `main.ts` 中全局注册：
-
-```typescript
-import AntdvNextTiptap from 'antdv-next-tiptap';
-app.use(AntdvNextTiptap);
-```
-
-### 4. 侧边栏看不到入口
-
-- 检查是否在数据库中添加了菜单
-- 检查角色是否有菜单权限
-- 或者直接访问 `/editor` 路径
-
----
-
-## 🚀 下一步优化
-
-### 1. 图片上传到服务器
-当前图片是 base64 内联，可以改为上传到文件服务器：
-
-```typescript
-// 配置图片上传
-const imageUploadHandler = async (file: File) => {
-  const formData = new FormData();
-  formData.append('file', file);
-  const result = await apiUploadFile(formData);
+  const result = await apiUploadFile(file);
   return result.url;
 };
 ```
 
-### 2. 内容审核
-如果需要内容审核，在保存前可以调用审核接口：
-
-```typescript
-const handleSave = async () => {
-  // 1. 审核内容
-  const auditResult = await apiAuditContent(content.value);
-  
-  if (!auditResult.passed) {
-    message.error('内容包含敏感词，请修改');
-    return;
-  }
-  
-  // 2. 保存内容
-  await apiSave(content.value);
-};
+```vue
+<AEditor v-model="content" :upload-image="uploadImage" />
 ```
 
-### 3. 协同编辑
-如果需要多人协同编辑，可以集成 Yjs：
+后端上传接口会做魔数嗅探校验内容类型，并登记 `sys_file_resource` 元数据；
+被用户头像引用的资源不允许删除。
 
-```bash
-pnpm add @tiptap/extension-collaboration
-```
+## 已知边界
 
----
+1. **业务表单还没接编辑器**。`views/system/notice` 的正文仍是 `a-textarea`，写入的是纯文本/HTML 字符串，
+   前端用 `v-html` 直接渲染。要改成富文本编辑需要先决定存量内容的兼容策略。
+2. **类型声明是本地手写的**。`apps/web/src/types/antdv-next-tiptap.d.ts` 用
+   `declare module 'antdv-next-tiptap'` 声明了一个 `TiptapProps`，会遮蔽包自带的
+   `dist/types/index.d.ts`，且 props 名单过时（写的是 `content`，实际是 `modelValue`/`editable`/
+   `uploadImage`/`wordCount`/`outputFormat`/`locale`）。目前没出问题是因为组件靠插件全局注册、
+   没有直接 import，模板里的类型检查管不到它。清理清单见 [`计划.md`](../计划.md) 的「下一步候选」。
+3. **示例页有 `alert()`**。`handleGetContent` 用 `alert()` 弹输出，示例性质，别照抄到业务代码。
 
-## 📚 参考资源
+## 排错
 
-- [antdv-next-tiptap GitHub](https://github.com/pengyinghao/antdv-next-tiptap)
-- [Tiptap 官方文档](https://tiptap.dev/)
-- [Ant Design Vue](https://antdv.com/)
-
----
-
-**完成时间**: 2026-01-09  
-**版本**: v1.0
+| 现象 | 检查 |
+| --- | --- |
+| 编辑区完全没样式 | `main.ts` 是否引了 `antdv-next-tiptap/index.css` |
+| 展示区（`v-html`）排版是浏览器默认样式 | `editor-content.css` 是否引入、容器是否加了 `.rich-content` |
+| 深色模式下正文看不清 | 渲染态颜色是否写死了值，应走 `var(--ant-color-*)` |
+| 侧边栏没入口 | 跑过 `pnpm db:seed`；菜单 icon 字符串在 `menu-icons.ts` 里有映射 |
+| 图标 class 生效但样式丢失 | 运行时拼出的 class 是否进了 `uno.config.ts` 的 safelist |
+| 组件模板不认识 `AEditor` | `main.ts` 是否 `app.use(AntdvNextTiptap)` |
