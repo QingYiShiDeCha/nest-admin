@@ -1,6 +1,7 @@
 import {
   oauthIdentities,
   oauthProviders,
+  users,
   type OAuthProviderRow,
 } from '@nest-admin/database';
 import {
@@ -15,6 +16,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   ServiceUnavailableException,
   UnauthorizedException,
@@ -93,6 +95,8 @@ const DEFAULTS: Record<
 
 @Injectable()
 export class OAuthService {
+  private readonly logger = new Logger(OAuthService.name);
+
   constructor(
     @Inject(DRIZZLE) private readonly db: DrizzleDB,
     @Inject(REDIS_CLIENT) private readonly redis: RedisClient,
@@ -200,10 +204,15 @@ export class OAuthService {
 
   async remove(id: number): Promise<void> {
     await this.findRow(id);
-    await this.db
-      .update(oauthProviders)
-      .set({ deletedAt: new Date(), ...this.context.auditOnUpdate() })
-      .where(eq(oauthProviders.id, id));
+    // 硬删而不是打墓碑：provider_key 上是无条件唯一索引
+    // （uk_sys_oauth_provider_key，覆盖软删行），而这一列只有枚举里那几个固定取值。
+    // 软删等于「删掉 GitHub 之后永远加不回来」。
+    //
+    // oauth_identities 刻意保留：它是 (providerKey, subject) → userId 的绑定，
+    // 一起删会让重新添加后老用户被当成新人重复建号。
+    // 副作用要知情：重新添加同名 key 时，既有绑定会直接命中旧账号，
+    // 相当于沿用上一任该 provider 下注册的用户。
+    await this.db.delete(oauthProviders).where(eq(oauthProviders.id, id));
   }
 
   listEnabled(): Promise<OAuthProviderPublic[]> {
@@ -330,14 +339,35 @@ export class OAuthService {
       email: this.truncate(profile.email, 128) ?? undefined,
       avatar: this.truncate(profile.avatar, 255) ?? undefined,
     });
-    await this.db.insert(oauthIdentities).values({
-      userId: user.id,
-      providerKey: provider.key,
-      subject: profile.subject,
-      username: profile.username,
-      email: profile.email,
-      avatar: profile.avatar,
-    });
+    try {
+      await this.db.insert(oauthIdentities).values({
+        userId: user.id,
+        providerKey: provider.key,
+        subject: profile.subject,
+        username: profile.username,
+        email: profile.email,
+        avatar: profile.avatar,
+      });
+    } catch (error) {
+      // 身份没落成，这个刚建的账号就没人认领了，反过来把它删掉。
+      // 必须硬删：username 是 subject 的确定性派生值，而 uk_sys_user_username
+      // 是无条件索引，留一个墓碑就等于该 OAuth 主体永久无法再登录。
+      // 刚建的号此时还没有部门、角色、会话与 RBAC 缓存，直接删表没有绕过必要的收尾。
+      await this.db
+        .delete(users)
+        .where(eq(users.id, user.id))
+        .catch((cleanupError: unknown) => {
+          // 回滚也失败时只报出来，不掩盖原始错误：并发撞上唯一索引才是常见原因
+          this.logger.error(
+            `回滚 OAuth 自动注册账号 ${user.id} 失败，需人工清理`,
+            cleanupError instanceof Error
+              ? cleanupError.stack
+              : String(cleanupError),
+          );
+        });
+
+      throw error;
+    }
     return user;
   }
 
