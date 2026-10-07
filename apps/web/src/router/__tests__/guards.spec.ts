@@ -163,23 +163,14 @@ describe('router guards', () => {
     expect(router.currentRoute.value.name).toBe('dynamic-menu-1');
   });
 
-  it('密码需要强制修改时把其他页面拦截到个人中心', async () => {
+  it('密码需要修改时不再拦截，其他页面照常可达', async () => {
     mocks.auth.passwordChangeRequired = true;
     const router = createTestRouter();
     setupGuards(router);
 
     await router.push('/dashboard');
 
-    expect(router.currentRoute.value.path).toBe('/profile');
-  });
-
-  it('密码需要强制修改时仍允许停留在个人中心改密', async () => {
-    mocks.auth.passwordChangeRequired = true;
-    const router = createTestRouter();
-    setupGuards(router);
-
-    await router.push('/profile');
-
-    expect(router.currentRoute.value.path).toBe('/profile');
+    // 只提示不拦截：能被拽到 /profile 的话，用户就被锁死在改密页了
+    expect(router.currentRoute.value.path).toBe('/dashboard');
   });
 });

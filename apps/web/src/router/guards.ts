@@ -66,11 +66,11 @@ export function setupGuards(router: Router): void {
       return { path: to.path, query: to.query, hash: to.hash, replace: true };
     }
 
-    // 密码为初始密码或已过有效期：除个人中心（改密入口）外一律拦截。
-    // 放在动态路由注册之后——/profile 是动态菜单路由，注册前跳过去会 404
-    if (auth.passwordChangeRequired && to.path !== '/profile') {
-      return { path: '/profile', query: { force: '1' } };
-    }
+    // 密码为初始密码或已过有效期：只提示不拦截。
+    // 早期版本会在此把非 /profile 的访问一律重定向过去，但刚性拦截的代价太大——
+    // 管理员忘掉初始密码、或策略被配错时，整个系统除改密页外全部不可用，
+    // 连去别处排查问题的路都堵死了。现在改为在个人中心展示提示条，由用户自行决定何时改。
+    // 注意：仍保留 passwordChangeRequired 状态本身，供需要它的界面消费。
 
     // 权限不足跳 403 而不是登录页：跳登录会让用户以为登录态失效，
     // 反复登录仍然进不去，是很糟的体验

@@ -132,7 +132,7 @@ export class AuthController {
   @ApiOperation({
     summary: '获取当前登录用户信息，含角色码与权限码',
     description:
-      '前端登录后调用一次，用 permissions 做按钮级控制。isSuperAdmin 为 true 时后端跳过权限比对，前端也应视为拥有全部权限。passwordChangeRequired 为 true 时前端应拦截进改密页。',
+      '前端登录后调用一次，用 permissions 做按钮级控制。isSuperAdmin 为 true 时后端跳过权限比对，前端也应视为拥有全部权限。passwordChangeRequired 为 true 时前端只做提醒（个人中心提示条），不拦截访问。',
   })
   async profile(
     @CurrentUser() user: AuthUser,

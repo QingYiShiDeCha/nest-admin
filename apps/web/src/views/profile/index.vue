@@ -214,8 +214,9 @@ defineOptions({ name: 'ProfilePage' });
       class="lg:col-span-2"
       type="warning"
       show-icon
-      message="当前账号使用初始密码或密码已过有效期，请尽快修改密码"
-      description="修改密码后需要重新登录；在完成修改前无法访问其他页面。"
+      closable
+      message="当前账号使用初始密码或密码已过有效期，建议尽快修改密码"
+      description="修改密码后需要重新登录。这不影响你继续使用系统，但初始密码存在安全风险。"
     />
     <a-card>
       <div class="flex flex-col items-center text-center">
