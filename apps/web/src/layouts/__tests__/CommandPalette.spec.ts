@@ -200,4 +200,17 @@ describe('CommandPalette', () => {
 
     vi.unstubAllGlobals();
   });
+
+  it('触发点是不接受输入的假搜索框，并展示 Ctrl K 提示', async () => {
+    const wrapper = createWrapper();
+    const trigger = wrapper.get('button[title="搜索页面"]');
+
+    expect(trigger.text()).toContain('搜索');
+    // 快捷键提示常驻，不必点开面板就能看见
+    expect(trigger.text()).toContain('Ctrl');
+    expect(trigger.text()).toContain('K');
+    // 它是个按钮而不是可输入元素——点击只是唤起面板
+    expect(trigger.element.tagName).toBe('BUTTON');
+    expect(trigger.find('input').exists()).toBe(false);
+  });
 });

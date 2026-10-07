@@ -10,7 +10,6 @@ import {
   matchMenuEntries,
   type MenuEntry,
 } from '../../menu-entries';
-import HeaderIconButton from '../header-icon-button/index.vue';
 
 interface PaletteItem extends MenuEntry {
   section: 'recent' | 'menu';
@@ -129,19 +128,25 @@ onUnmounted(() => window.removeEventListener('keydown', onGlobalKeydown));
 </script>
 
 <template>
-  <!-- 单根节点约束：modal 会被 teleport 到 body，这个包裹层实际只承载触发按钮 -->
+  <!-- 单根节点约束：modal 会被 teleport 到 body，这个包裹层实际只承载触发按钮。
+       触发点是一个「假输入框」——它不接受输入，点击后由 modal 里的真输入框接管，
+       这样一眼能看出这里有搜索，且快捷键提示不用点开也能看到。 -->
   <div class="flex items-center">
-    <HeaderIconButton
-      class="command-palette-trigger"
+    <button
+      type="button"
+      class="command-palette-trigger h-9 w-40 md:w-60 flex items-center gap-2 shrink-0 border border-solid rounded-md px-3 bg-transparent a-border-border-secondary a-color-text-tertiary cursor-pointer transition-colors duration-200 hover:a-border-border hover:a-bg-fill-quaternary focus-visible:outline-2 focus-visible:outline-primary"
       title="搜索页面"
       aria-label="打开命令面板"
       @click="open = true"
     >
       <AppIcon
         icon="i-ri:search-line"
-        class="command-palette-icon a-color-text text-xl"
+        class="command-palette-icon shrink-0 text-base"
       />
-    </HeaderIconButton>
+      <span class="min-w-0 flex-1 text-left text-sm truncate">搜索</span>
+      <kbd :class="`${KBD_CLASS} shrink-0`">Ctrl</kbd>
+      <kbd :class="`${KBD_CLASS} shrink-0 -ml-1`">K</kbd>
+    </button>
 
     <a-modal
       v-model:open="open"
