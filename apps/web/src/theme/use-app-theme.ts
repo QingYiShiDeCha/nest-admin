@@ -216,7 +216,7 @@ function createThemeConfig(
       colorWarning: SEMANTIC_COLORS.warning,
       colorError: SEMANTIC_COLORS.danger,
       colorInfo: SEMANTIC_COLORS.info,
-      fontSize: 15,
+      fontSize: 14,
       controlHeight: 34,
       borderRadius,
       borderRadiusLG: borderRadius + 2,

@@ -52,7 +52,7 @@ describe('App theme provider', () => {
       algorithm: themeAlgorithms.light,
       cssVar: { key: 'css-var-nest-admin' },
       token: {
-        fontSize: 15,
+        fontSize: 14,
         controlHeight: 34,
         borderRadius: 6,
         borderRadiusLG: 8,
