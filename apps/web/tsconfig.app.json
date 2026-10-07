@@ -8,9 +8,20 @@
     "jsx": "preserve",
     "jsxImportSource": "vue-jsx",
 
+    // 本文件 extends 的是 @vue/tsconfig，不经过仓库根的 tsconfig.base.json，
+    // 所以拿不到那里的 @nest-admin/source 条件与 paths，得多写一份。
+    // 不加的话 @nest-admin/* 只能按 exports 的 types 落到 dist，
+    // 而 CI 全新 clone 没有 dist —— 直接一片 TS2307 Cannot find module。
+    // 这与 vite.config.ts 的 resolve.conditions 是同一套语义：前后端一致走源码。
+    "customConditions": ["@nest-admin/source"],
+
     // Path mapping for cleaner imports.
+    // 这份 paths 会整体覆盖继承来的同名配置，所以 @/* 与 @nest-admin/* 必须写在一起。
+    // 相对本文件所在目录解析（apps/web），故指到仓库根要往上退两级。
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@nest-admin/shared": ["../../packages/shared/src/index.ts"],
+      "@nest-admin/shared/node": ["../../packages/shared/src/node/index.ts"]
     },
 
     // `vue-tsc --build` produces a .tsbuildinfo file for incremental type-checking.
