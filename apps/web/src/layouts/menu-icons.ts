@@ -90,6 +90,12 @@ export const MENU_ICON_OPTIONS = [
     keywords: 'permission role security',
   },
   {
+    value: 'RiShieldCheckLine',
+    icon: 'i-ri:shield-check-line',
+    label: '安全审计',
+    keywords: 'shield security audit safe',
+  },
+  {
     value: 'RiMenu2Line',
     icon: 'i-ri:menu-2-line',
     label: '菜单',
