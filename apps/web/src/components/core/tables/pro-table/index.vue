@@ -497,6 +497,12 @@ const emptyStretchChain = computed(() =>
         class="flex-col flex-1 min-h-0"
         :class="settings.mobileTableCardMode ? 'hidden md:flex' : 'flex'"
       >
+        <!--
+          bodyCell 只在页面确实提供了该插槽时才转发。
+          antdv 的单元格渲染顺序是「先 bodyCell，后 column.render」，而且
+          一旦 bodyCell 有返回值就会整个覆盖掉 render 的结果——无条件挂一个
+          空转发插槽，等于把所有列上自定义的 render 全部吃掉。
+        -->
         <a-table
           :row-key="rowKey"
           :columns="visibleColumns"
@@ -510,7 +516,7 @@ const emptyStretchChain = computed(() =>
           :locale="tableLocale"
           @update:expanded-row-keys="handleExpandedRowKeys"
         >
-          <template #bodyCell="slotProps">
+          <template v-if="$slots.bodyCell" #bodyCell="slotProps">
             <slot name="bodyCell" v-bind="slotProps" />
           </template>
         </a-table>

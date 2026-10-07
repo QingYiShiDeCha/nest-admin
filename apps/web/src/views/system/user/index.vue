@@ -1,5 +1,5 @@
 <script setup lang="tsx">
-import { App, Button, Popconfirm, Space } from 'antdv-next';
+import { App, Button, Popconfirm, Space, Tooltip } from 'antdv-next';
 import type { FormInstance } from 'antdv-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 
@@ -81,8 +81,26 @@ onMounted(async () => {
 
 const table = useTable<UserListItem, UserQuery>({
   columns: [
-    { title: '用户名', dataIndex: 'username' },
-    { title: '昵称', dataIndex: 'nickname' },
+    {
+      title: '用户名',
+      dataIndex: 'username',
+      ellipsis: true,
+      render: (_value, record) => (
+        <Tooltip title={record.username} placement="topLeft">
+          <span class="a-text-ellipsis">{record.username}</span>
+        </Tooltip>
+      ),
+    },
+    {
+      title: '昵称',
+      dataIndex: 'nickname',
+      ellipsis: true,
+      render: (_value, record) => (
+        <Tooltip title={record.username} placement="topLeft">
+          <span class="a-text-ellipsis">{record.username}</span>
+        </Tooltip>
+      ),
+    },
     {
       title: '所属部门',
       key: 'deptId',
@@ -108,8 +126,8 @@ const table = useTable<UserListItem, UserQuery>({
           </Space>
         ),
     },
-    { title: '邮箱', dataIndex: 'email' },
-    { title: '手机号', dataIndex: 'phone' },
+    { title: '邮箱', dataIndex: 'email', ellipsis: { showTitle: false } },
+    { title: '手机号', dataIndex: 'phone', ellipsis: { showTitle: false } },
     {
       title: '状态',
       dataIndex: 'status',

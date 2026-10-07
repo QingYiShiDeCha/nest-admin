@@ -72,8 +72,12 @@ const componentStubs = vi.hoisted(() => ({
       expandable: Object,
     },
     emits: ['update:expandedRowKeys'],
+    // `hasBodyCell` 暴露「父组件有没有传 bodyCell 插槽」，用来断言 ProTable
+    // 不会平白挂一个空转发插槽（那会把列 render 全部覆盖掉）。
     template:
-      '<div data-testid="table"><slot name="bodyCell" :column="{ key: \'name\' }" :record="{ id: 1, name: \'admin\' }" /><button data-testid="expand" @click="$emit(\'update:expandedRowKeys\', [1])" /></div>',
+      '<div data-testid="table" :data-has-body-cell="String($slots.bodyCell !== undefined)">' +
+      '<slot name="bodyCell" :column="{ key: \'name\' }" :record="{ id: 1, name: \'admin\' }" />' +
+      '<button data-testid="expand" @click="$emit(\'update:expandedRowKeys\', [1])" /></div>',
   },
 }));
 
@@ -279,13 +283,27 @@ describe('ProTable', () => {
     expect(wrapper.find('button[title="密度：紧凑"]').exists()).toBe(true);
   });
 
-  it('继续向 a-table 转发 bodyCell 插槽', async () => {
+  it('页面提供 bodyCell 时才转发该插槽', async () => {
     const { wrapper } = mountTable(true);
     await nextTick();
 
     expect(wrapper.get('[data-testid="table"]').text()).toContain(
       '自定义：admin',
     );
+  });
+
+  /**
+   * 回归：antdv 的单元格渲染是「bodyCell 优先，命中即覆盖 column.render」。
+   * ProTable 早期无条件挂了一个空转发插槽，导致页面所有列的 render 全被吃掉
+   * ——用户名列的 Tooltip、状态列的标签都渲染不出来，只剩原始文本。
+   */
+  it('页面未提供 bodyCell 时不挂空插槽，列 render 仍生效', async () => {
+    const { wrapper } = mountTable(false);
+    await nextTick();
+
+    const table = wrapper.get('[data-testid="table"]');
+
+    expect(table.attributes('data-has-body-cell')).toBe('false');
   });
 
   it('移动端卡片复用 columns 渲染并保留独立分页', async () => {
